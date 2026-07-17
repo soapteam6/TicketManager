@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "dataverse-org5c824bd0": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx -y @microsoft/dataverse@latest mcp https://org5c824bd0.crm.dynamics.com"
+      ],
+      "env": {
+        "DATAVERSE_OPERATION_CONTEXT": "app=dataverse-skills/1.6.0;skill=mcp-direct;agent=claude-code"
+      }
+    }
+  }
+}

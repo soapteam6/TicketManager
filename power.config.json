@@ -1,0 +1,106 @@
+{
+  "version": "1.0",
+  "appId": "1323f8ca-47e5-402e-9657-45f8651af4dc",
+  "appDisplayName": "AIS Ticket Concierge",
+  "region": "prod",
+  "appType": "CodeApp",
+  "environmentId": "946e5045-3200-eb26-9160-3fe967a6b21c",
+  "description": " ",
+  "buildPath": "./dist",
+  "buildEntryPoint": "index.html",
+  "localAppUrl": "http://localhost:3000",
+  "logoPath": "Default",
+  "connectionReferences": {},
+  "databaseReferences": {
+    "default.cds": {
+      "dataSources": {
+        "accounts": {
+          "entitySetName": "accounts",
+          "logicalName": "account",
+          "isHidden": false
+        },
+        "teams": {
+          "entitySetName": "cr9cd_teams",
+          "logicalName": "cr9cd_team",
+          "isHidden": false
+        },
+        "seasons": {
+          "entitySetName": "cr9cd_seasons",
+          "logicalName": "cr9cd_season",
+          "isHidden": false
+        },
+        "games": {
+          "entitySetName": "cr9cd_games",
+          "logicalName": "cr9cd_game",
+          "isHidden": false
+        },
+        "seats": {
+          "entitySetName": "cr9cd_seats",
+          "logicalName": "cr9cd_seat",
+          "isHidden": false
+        },
+        "beneficiarycontacts": {
+          "entitySetName": "cr9cd_contact_beneficiaries",
+          "logicalName": "cr9cd_contact_beneficiary",
+          "isHidden": false
+        },
+        "scoringconfigs": {
+          "entitySetName": "cr9cd_scoringconfigs",
+          "logicalName": "cr9cd_scoringconfig",
+          "isHidden": false
+        },
+        "ticketrequests": {
+          "entitySetName": "cr9cd_ticketrequests",
+          "logicalName": "cr9cd_ticketrequest",
+          "isHidden": false
+        },
+        "requestcontacts": {
+          "entitySetName": "cr9cd_requestcontacts",
+          "logicalName": "cr9cd_requestcontact",
+          "isHidden": false
+        },
+        "assignments": {
+          "entitySetName": "cr9cd_assignments",
+          "logicalName": "cr9cd_assignment",
+          "isHidden": false
+        },
+        "waitlistentrys": {
+          "entitySetName": "cr9cd_waitlistentries",
+          "logicalName": "cr9cd_waitlistentry",
+          "isHidden": false
+        },
+        "attendancerecords": {
+          "entitySetName": "cr9cd_attendancerecords",
+          "logicalName": "cr9cd_attendancerecord",
+          "isHidden": false
+        },
+        "contacts": {
+          "entitySetName": "contacts",
+          "logicalName": "contact",
+          "isHidden": false
+        },
+        "integrationlogs": {
+          "entitySetName": "cr9cd_integrationlogs",
+          "logicalName": "cr9cd_integrationlog",
+          "isHidden": false
+        },
+        "users": {
+          "entitySetName": "systemusers",
+          "logicalName": "systemuser",
+          "isHidden": false
+        },
+        "systemuserroles": {
+          "entitySetName": "systemuserrolescollection",
+          "logicalName": "systemuserroles",
+          "isHidden": false
+        },
+        "securityroles": {
+          "entitySetName": "roles",
+          "logicalName": "role",
+          "isHidden": false
+        }
+      },
+      "environmentVariableName": ""
+    }
+  }
+}
