@@ -53,3 +53,29 @@ export function toDateInput(value: string | null | undefined): string {
   if (!d) return '';
   return d.toISOString().slice(0, 10);
 }
+
+// Pair for date-only fields (no time-of-day, e.g. season start/end date) that round-trip through
+// a <input type="date">. `new Date("2026-07-18")` parses as UTC midnight, so a plain
+// `.toISOString()`/`.toLocaleDateString()` round-trip shifts a day in any timezone behind UTC.
+// Storing as LOCAL midnight instead, and reading back via local (not UTC) getters, keeps the
+// calendar date the user picked stable regardless of timezone offset direction.
+export function dateOnlyToIso(value: string): string {
+  return new Date(`${value}T00:00:00`).toISOString();
+}
+
+export function isoToDateOnlyInput(value: string | null | undefined): string {
+  const d = toDate(value);
+  if (!d) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// Display a date-only ISO value using local calendar components (pairs with dateOnlyToIso) so it
+// doesn't fall back a day in timezones behind UTC the way `new Date(iso).toLocaleDateString()` can.
+export function formatDateOnly(value: string | null | undefined): string {
+  const d = toDate(value);
+  if (!d) return '—';
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).toLocaleDateString();
+}

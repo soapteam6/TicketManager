@@ -4,6 +4,8 @@ import clsx from 'clsx';
 import logoUrl from '../assets/ais-logo.webp';
 import { useAuth } from '../auth/AuthContext';
 import { Spinner } from './Spinner';
+import { Button } from './Button';
+import { exportSeasonTracker } from '../services/exportService';
 
 interface NavItem {
   to: string;
@@ -25,6 +27,41 @@ function Icon({ path }: { path: string }) {
   );
 }
 
+// Global export, mirrors the original topbar ExportButton -- no seasonId means every team/season
+// combined into one workbook, distinct from the per-season export on Teams & Seasons.
+function TopbarExportButton() {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  return (
+    <div className="flex items-center gap-2">
+      {error && <span className="text-xs text-rose-600">{error}</span>}
+      <Button
+        variant="secondary"
+        size="sm"
+        disabled={busy}
+        loading={busy}
+        onClick={async () => {
+          setBusy(true);
+          setError('');
+          try {
+            await exportSeasonTracker();
+          } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
+        </svg>
+        Export to Excel
+      </Button>
+    </div>
+  );
+}
+
 const NAV: NavSection[] = [
   {
     heading: 'Overview',
@@ -38,11 +75,26 @@ const NAV: NavSection[] = [
         label: 'Teams & Seasons',
         icon: <Icon path="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm7 0a3 3 0 10-3-3" />,
       },
+      {
+        to: '/games',
+        label: 'Games',
+        icon: <Icon path="M8 7V3m8 4V3M3 11h18M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />,
+      },
+      {
+        to: '/events',
+        label: 'Events',
+        icon: <Icon path="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />,
+      },
     ],
   },
   {
     heading: 'Distribution',
     items: [
+      {
+        to: '/requests',
+        label: 'Requests',
+        icon: <Icon path="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />,
+      },
       {
         to: '/contacts',
         label: 'Contacts',
@@ -134,7 +186,8 @@ export function Layout() {
             </svg>
           </button>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-3">
+            <TopbarExportButton />
             {loading ? (
               <Spinner size="sm" />
             ) : user ? (

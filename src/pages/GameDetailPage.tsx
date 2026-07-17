@@ -5,7 +5,9 @@ import { Cr9cd_gamesService } from '../generated/services/Cr9cd_gamesService';
 import { Cr9cd_seatsService } from '../generated/services/Cr9cd_seatsService';
 import { Cr9cd_ticketrequestsService } from '../generated/services/Cr9cd_ticketrequestsService';
 import { Cr9cd_assignmentsService } from '../generated/services/Cr9cd_assignmentsService';
+import { Cr9cd_seasonsService } from '../generated/services/Cr9cd_seasonsService';
 import type { Cr9cd_games } from '../generated/models/Cr9cd_gamesModel';
+import type { Cr9cd_seasons } from '../generated/models/Cr9cd_seasonsModel';
 import type { Cr9cd_seats } from '../generated/models/Cr9cd_seatsModel';
 import type { Cr9cd_ticketrequests } from '../generated/models/Cr9cd_ticketrequestsModel';
 import type { Cr9cd_assignments } from '../generated/models/Cr9cd_assignmentsModel';
@@ -40,7 +42,7 @@ import type { ContactType, GameStatus, GameKind } from '../domain/enums';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
-import { TextInput, Select } from '../components/Field';
+import { TextInput, Select, Field } from '../components/Field';
 import { Spinner } from '../components/Spinner';
 
 const thClass = 'whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500';
@@ -139,7 +141,11 @@ export default function GameDetailPage() {
                     : `vs ${game.cr9cd_opponent}`}
                 </>
               }
-              subtitle={game.cr9cd_promotions || undefined}
+              subtitle={
+                game.cr9cd_seasonname
+                  ? [game.cr9cd_seasonname, game.cr9cd_promotions].filter(Boolean).join(' · ')
+                  : game.cr9cd_promotions || undefined
+              }
               actions={
                 <>
                   <Badge status={game.cr9cd_status != null ? gameStatusChoice.toValue(game.cr9cd_status) : 'scheduled'} />
@@ -450,7 +456,13 @@ function EditGameForm({ game, onDone }: { game: Cr9cd_games; onDone: () => void 
   const [promotions, setPromotions] = useState(game.cr9cd_promotions ?? '');
   const [notes, setNotes] = useState(game.cr9cd_notes ?? '');
   const [status, setStatus] = useState<GameStatus>(game.cr9cd_status != null ? gameStatusChoice.toValue(game.cr9cd_status) : 'scheduled');
+  const [seasonId, setSeasonId] = useState(game._cr9cd_season_value ?? '');
+  const [seasons, setSeasons] = useState<Cr9cd_seasons[]>([]);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    Cr9cd_seasonsService.getAll({ orderBy: ['cr9cd_name asc'] }).then((result) => setSeasons(result.data ?? []));
+  }, []);
 
   async function save() {
     setBusy(true);
@@ -463,6 +475,7 @@ function EditGameForm({ game, onDone }: { game: Cr9cd_games; onDone: () => void 
         cr9cd_promotions: promotions,
         cr9cd_notes: notes,
         cr9cd_status: gameStatusChoice.toCode(status),
+        ...(seasonId && seasonId !== game._cr9cd_season_value ? { 'cr9cd_Season@odata.bind': bindRef('cr9cd_seasons', seasonId) } : {}),
       });
       onDone();
     } finally {
@@ -488,6 +501,15 @@ function EditGameForm({ game, onDone }: { game: Cr9cd_games; onDone: () => void 
       </div>
       <TextInput placeholder="Promotions" value={promotions} onChange={(e) => setPromotions(e.target.value)} />
       <TextInput placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
+      <Field label="Season" hint="Move this game/event into a different season">
+        <Select value={seasonId} onChange={(e) => setSeasonId(e.target.value)}>
+          {seasons.map((s) => (
+            <option key={s.cr9cd_seasonid} value={s.cr9cd_seasonid}>
+              {s.cr9cd_teamname ?? 'Team'} — {s.cr9cd_name}
+            </option>
+          ))}
+        </Select>
+      </Field>
       <div className="flex gap-2">
         <Button disabled={busy} loading={busy} onClick={save}>
           Save
@@ -605,6 +627,7 @@ function NewRequestForm({ gameId, onCreated }: { gameId: string; onCreated: () =
   const [quantity, setQuantity] = useState(1);
   const [type, setType] = useState<ContactType>('customer');
   const [salesOpp, setSalesOpp] = useState(0);
+  const [opportunity, setOpportunity] = useState<{ id: string; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [showCrmPicker, setShowCrmPicker] = useState(false);
 
@@ -612,6 +635,13 @@ function NewRequestForm({ gameId, onCreated }: { gameId: string; onCreated: () =
     setContact(selection);
     setType(selection.type);
     setShowCrmPicker(false);
+  }
+
+  function resetForm() {
+    setContact(null);
+    setOpportunity(null);
+    setQuantity(1);
+    setSalesOpp(0);
   }
 
   async function createRequest() {
@@ -626,10 +656,9 @@ function NewRequestForm({ gameId, onCreated }: { gameId: string; onCreated: () =
         cr9cd_quantity: quantity,
         cr9cd_sales_opportunity_usd: salesOpp,
         cr9cd_status: requestStatusChoice.toCode('submitted'),
+        ...(opportunity ? { cr9cd_crm_opportunity_id: opportunity.id, cr9cd_crm_opportunity_name: opportunity.name } : {}),
       } as Parameters<typeof Cr9cd_ticketrequestsService.create>[0]);
-      setContact(null);
-      setQuantity(1);
-      setSalesOpp(0);
+      resetForm();
       onCreated();
     } finally {
       setBusy(false);
@@ -650,7 +679,7 @@ function NewRequestForm({ gameId, onCreated }: { gameId: string; onCreated: () =
         {showCrmPicker && (
           <>
             <CrmPicker
-              onSelect={async ({ account, contact: crmContact }) => {
+              onSelect={async ({ account, contact: crmContact, opportunity: crmOpportunity }) => {
                 setBusy(true);
                 try {
                   const id = await upsertBeneficiaryFromCrmContact({
@@ -662,6 +691,10 @@ function NewRequestForm({ gameId, onCreated }: { gameId: string; onCreated: () =
                     title: crmContact.title,
                     company: account.name,
                   });
+                  if (crmOpportunity) {
+                    setOpportunity({ id: crmOpportunity.id, name: crmOpportunity.name });
+                    setSalesOpp(crmOpportunity.manualRepCredit ?? crmOpportunity.estimatedValue ?? 0);
+                  }
                   selectContact({ id, name: crmContact.fullName, type: 'customer' });
                 } finally {
                   setBusy(false);
@@ -681,10 +714,18 @@ function NewRequestForm({ gameId, onCreated }: { gameId: string; onCreated: () =
     <div className="mb-4">
       <p className="mb-2 text-sm text-slate-500">
         Requestor: <span className="font-medium text-slate-700">{contact.name}</span>{' '}
-        <button className="text-xs font-medium text-slate-500 hover:text-slate-700" onClick={() => setContact(null)}>
+        <button className="text-xs font-medium text-slate-500 hover:text-slate-700" onClick={resetForm}>
           Change
         </button>
       </p>
+      {opportunity && (
+        <p className="mb-2 text-sm text-slate-500">
+          Opportunity: <span className="font-medium text-slate-700">{opportunity.name}</span>{' '}
+          <button className="text-xs font-medium text-slate-500 hover:text-slate-700" onClick={() => setOpportunity(null)}>
+            Unlink
+          </button>
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <Select value={type} onChange={(e) => setType(e.target.value as ContactType)} className="w-auto">
           <option value="customer">Customer</option>
@@ -698,6 +739,7 @@ function NewRequestForm({ gameId, onCreated }: { gameId: string; onCreated: () =
           value={salesOpp}
           onChange={(e) => setSalesOpp(Number(e.target.value))}
           className="input w-28"
+          title={opportunity ? 'Prefilled from the linked opportunity\'s Manual Rep Credit — editable' : 'Sales opportunity $'}
         />
         <Button disabled={busy} loading={busy} onClick={createRequest}>
           New request
