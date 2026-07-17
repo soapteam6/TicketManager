@@ -1,0 +1,35 @@
+{
+  "name": "ais-ticket-concierge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AIS Corporate Season Ticket Management & Distribution",
+  "workspaces": [
+    "packages/shared",
+    "packages/server",
+    "packages/client"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "dev": "concurrently -n server,client -c blue,magenta \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm run dev --workspace @ais/server",
+    "dev:client": "npm run dev --workspace @ais/client",
+    "build": "npm run build --workspace @ais/shared && npm run build --workspace @ais/server && npm run build --workspace @ais/client",
+    "start": "cross-env NODE_ENV=production node packages/server/dist/index.js",
+    "db:generate": "npm run db:generate --workspace @ais/server",
+    "db:migrate": "npm run db:migrate --workspace @ais/server",
+    "db:reset": "npm run db:reset --workspace @ais/server",
+    "seed": "npm run seed --workspace @ais/server",
+    "seed:demo": "npm run seed:demo --workspace @ais/server",
+    "test": "npm run test --workspace @ais/server",
+    "typecheck": "npm run typecheck --workspace @ais/shared && npm run typecheck --workspace @ais/server && npm run typecheck --workspace @ais/client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.6.3"
+  }
+}
