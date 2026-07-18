@@ -105,6 +105,7 @@ export function CrmPicker({ onChange }: { onChange: (sel: CrmSelection | null) =
           <div>
             <div className="text-[11px] font-medium uppercase text-slate-400">Company</div>
             <div className="text-sm font-semibold text-slate-900">{account.name}</div>
+            {account.ownerName && <div className="text-xs text-slate-500">Owner: {account.ownerName}</div>}
           </div>
           <button type="button" onClick={reset} className="text-xs font-medium text-brand-700 hover:underline">Change</button>
         </div>

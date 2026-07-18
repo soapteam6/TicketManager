@@ -7,6 +7,8 @@ import { scoreGame } from './scoring-service.js';
 import { addToWaitlist } from './waitlist-service.js';
 
 export function seatLabel(seat: typeof seats.$inferSelect): string {
+  // Generic pool seats (section 'GA') read as "GA-12"; specific seats as "114 C-5".
+  if (seat.section === 'GA') return `GA-${seat.seatNumber}`;
   return `${seat.section} ${seat.row}-${seat.seatNumber}`;
 }
 

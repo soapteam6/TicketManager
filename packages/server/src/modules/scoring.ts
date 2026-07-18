@@ -6,7 +6,7 @@ import { scoringConfigs } from '../db/schema.js';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/requireRole.js';
-import { notFound } from '../lib/errors.js';
+import { notFound, conflict } from '../lib/errors.js';
 import { getActiveConfig } from './scoring-service.js';
 
 export const scoringRouter = Router();
@@ -56,6 +56,15 @@ scoringRouter.post('/configs', requireRole('admin'), validate(createScoringConfi
       .get();
   });
   res.status(201).json({ config: deserialize(created) });
+});
+
+scoringRouter.delete('/configs/:id', requireRole('admin'), validate(idParam, 'params'), (req: Request, res: Response) => {
+  const { id } = req.params as unknown as { id: number };
+  const existing = db.select().from(scoringConfigs).where(eq(scoringConfigs.id, id)).get();
+  if (!existing) throw notFound('Config not found');
+  if (existing.isActive) throw conflict('Cannot delete the active configuration. Activate another first.');
+  db.delete(scoringConfigs).where(eq(scoringConfigs.id, id)).run();
+  res.json({ ok: true });
 });
 
 scoringRouter.post('/configs/:id/activate', requireRole('admin'), validate(idParam, 'params'), (req: Request, res: Response) => {

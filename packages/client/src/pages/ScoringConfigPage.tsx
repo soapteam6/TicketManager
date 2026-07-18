@@ -17,6 +17,7 @@ import { QueryState, ErrorNote } from '@/components/QueryState';
 import { Badge } from '@/components/Badge';
 import { Button } from '@/components/Button';
 import { Field, TextInput } from '@/components/Field';
+import { RoleGate } from '@/auth/AuthContext';
 
 type Weights = Record<FactorKey, number>;
 
@@ -43,6 +44,7 @@ export function ScoringConfigPage() {
   const [name, setName] = useState('');
   const [weights, setWeights] = useState<Weights>(DEFAULT_SCORING_WEIGHTS);
   const [params, setParams] = useState<ScoringParams>(DEFAULT_SCORING_PARAMS);
+  const [loadedId, setLoadedId] = useState<number | null>(null);
 
   // Seed the editor from the active config once it loads.
   useEffect(() => {
@@ -50,8 +52,19 @@ export function ScoringConfigPage() {
       setWeights(active.data.weightsObj);
       setParams(active.data.paramsObj);
       setName(`${active.data.name} (copy)`);
+      setLoadedId(active.data.id);
     }
   }, [active.data]);
+
+  // Load a saved/archived config's weights and parameters into the editor.
+  function loadConfig(c: ScoringConfig) {
+    const n = normalizeConfig(c);
+    if (!n) return;
+    setWeights(n.weightsObj);
+    setParams(n.paramsObj);
+    setName(`${c.name} (copy)`);
+    setLoadedId(c.id);
+  }
 
   const weightTotal = useMemo(
     () => FACTOR_KEYS.reduce((s, k) => s + (weights[k] ?? 0), 0),
@@ -63,6 +76,15 @@ export function ScoringConfigPage() {
       (await api.post('/scoring/configs', { name, weights, params, activate: true })).data,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['scoring'] });
+    },
+  });
+
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const del = useMutation({
+    mutationFn: async (id: number) => (await api.delete(`/scoring/configs/${id}`)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['scoring'] });
+      setConfirmDeleteId(null);
     },
   });
 
@@ -154,39 +176,40 @@ export function ScoringConfigPage() {
           </div>
         </div>
 
-        {/* Active + history */}
+        {/* Saved configurations */}
         <div className="space-y-6">
           <div className="card p-5">
-            <h3 className="mb-3 text-sm font-semibold text-slate-800">Active configuration</h3>
-            <QueryState isLoading={active.isLoading} error={active.error}>
-              {active.data ? (
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-slate-900">{active.data.name}</span>
-                    <Badge status="active" />
-                  </div>
-                  <div className="mt-1 text-xs text-slate-400">
-                    v{active.data.version} · {formatDate(active.data.createdAt)}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-slate-400">No active config.</p>
-              )}
-            </QueryState>
-          </div>
-
-          <div className="card p-5">
-            <h3 className="mb-3 text-sm font-semibold text-slate-800">History</h3>
+            <h3 className="text-sm font-semibold text-slate-800">Saved configurations</h3>
+            <p className="mb-3 mt-1 text-xs text-slate-400">Click a configuration to load its weights &amp; parameters into the editor.</p>
             <QueryState isLoading={list.isLoading} error={list.error}>
               {list.data && list.data.length > 0 ? (
                 <div className="space-y-2">
                   {list.data.map((c) => (
-                    <div key={c.id} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm">
-                      <div>
-                        <div className="font-medium text-slate-800">{c.name}</div>
+                    <div
+                      key={c.id}
+                      className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm ${
+                        loadedId === c.id ? 'border-brand-400 bg-brand-50/50' : 'border-slate-200'
+                      }`}
+                    >
+                      <button type="button" onClick={() => loadConfig(c)} className="min-w-0 flex-1 text-left transition hover:opacity-70">
+                        <div className="truncate font-medium text-slate-800">{c.name}</div>
                         <div className="text-xs text-slate-400">v{c.version} · {formatDate(c.createdAt)}</div>
-                      </div>
-                      {c.isActive ? <Badge status="active" /> : <Badge tone="zinc">Inactive</Badge>}
+                      </button>
+                      {confirmDeleteId === c.id ? (
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Button size="sm" variant="danger" loading={del.isPending} onClick={() => del.mutate(c.id)}>Delete</Button>
+                          <Button size="sm" variant="secondary" onClick={() => setConfirmDeleteId(null)}>Cancel</Button>
+                        </div>
+                      ) : (
+                        <div className="flex shrink-0 items-center gap-2">
+                          {c.isActive ? <Badge status="active" /> : <Badge tone="zinc">Inactive</Badge>}
+                          {!c.isActive && (
+                            <RoleGate roles={['admin']}>
+                              <Button size="sm" variant="ghost" onClick={() => setConfirmDeleteId(c.id)}>Delete</Button>
+                            </RoleGate>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -194,6 +217,7 @@ export function ScoringConfigPage() {
                 <p className="text-sm text-slate-400">No configurations yet.</p>
               )}
             </QueryState>
+            <ErrorNote error={del.error} />
           </div>
         </div>
       </div>

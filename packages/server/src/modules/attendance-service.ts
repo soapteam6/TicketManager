@@ -49,6 +49,13 @@ export function recordAttendance(assignmentId: number, input: RecordAttendanceIn
     throw conflict('Attendance can only be recorded for approved/transferred assignments');
   }
 
+  // Designation is optional in the simplified reconcile flow — default to the beneficiary's
+  // contact type so the NOT NULL / CHECK column is always satisfied.
+  const beneficiary = a.beneficiaryContactId
+    ? db.select().from(contacts).where(eq(contacts.id, a.beneficiaryContactId)).get()
+    : undefined;
+  const designation = input.designation ?? (beneficiary?.type === 'employee' ? 'employee' : 'customer');
+
   const now = Date.now();
   const existing = db.select().from(attendanceRecords).where(eq(attendanceRecords.assignmentId, assignmentId)).get();
 
@@ -57,7 +64,7 @@ export function recordAttendance(assignmentId: number, input: RecordAttendanceIn
         .update(attendanceRecords)
         .set({
           ticketStatus: input.ticketStatus,
-          designation: input.designation,
+          designation,
           salesRepUserId: input.salesRepUserId ?? null,
           businessGenerated: input.businessGenerated ?? 0,
           followUpNotes: input.followUpNotes ?? null,
@@ -74,7 +81,7 @@ export function recordAttendance(assignmentId: number, input: RecordAttendanceIn
           gameId: a.gameId,
           contactId: a.beneficiaryContactId ?? null,
           ticketStatus: input.ticketStatus,
-          designation: input.designation,
+          designation,
           salesRepUserId: input.salesRepUserId ?? null,
           businessGenerated: input.businessGenerated ?? 0,
           followUpNotes: input.followUpNotes ?? null,

@@ -1,11 +1,11 @@
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { REQUEST_STATUS, CONTACT_TYPE, type DirectoryUser } from '@ais/shared';
+import { REQUEST_STATUS, CONTACT_TYPE } from '@ais/shared';
 import { api } from '@/lib/api';
 import type { Game, TicketRequest } from '@/lib/types';
 import { pickArray } from '@/lib/unwrap';
-import { formatUsd, formatDateTime } from '@/lib/format';
+import { formatUsd, formatDate, formatDateTime } from '@/lib/format';
 import { PageHeader } from '@/components/PageHeader';
 import { QueryState, ErrorNote } from '@/components/QueryState';
 import { DataTable, type Column } from '@/components/DataTable';
@@ -14,18 +14,39 @@ import { Button } from '@/components/Button';
 import { Modal } from '@/components/Modal';
 import { Field, TextInput, TextArea, Select, EnumOptions } from '@/components/Field';
 import { CrmPicker, type CrmSelection } from '@/components/CrmPicker';
-import { DirectoryPicker } from '@/components/DirectoryPicker';
+import { RoleGate } from '@/auth/AuthContext';
 
 export function RequestsPage() {
+  const qc = useQueryClient();
   const [status, setStatus] = useState('');
   const [showNew, setShowNew] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   const requests = useQuery({
     queryKey: ['requests', { status }],
     queryFn: async () => {
       const res = await api.get('/requests', { params: status ? { status } : undefined });
       return pickArray<TicketRequest>(res.data, 'requests');
+    },
+  });
+
+  const del = useMutation({
+    mutationFn: async (id: number) => (await api.delete(`/requests/${id}`)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['requests'] });
+      qc.invalidateQueries({ queryKey: ['game'] });
+      qc.invalidateQueries({ queryKey: ['dashboards'] });
+      setConfirmDeleteId(null);
+    },
+  });
+
+  const waitlist = useMutation({
+    mutationFn: async (r: TicketRequest) => (await api.post('/waitlist', { gameId: r.gameId, requestId: r.id })).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['requests'] });
+      qc.invalidateQueries({ queryKey: ['game'] });
+      qc.invalidateQueries({ queryKey: ['waitlist'] });
     },
   });
 
@@ -45,16 +66,51 @@ export function RequestsPage() {
       header: 'Game',
       render: (r) => (
         <Link to={`/games/${r.gameId}`} className="text-brand-700 hover:underline">
-          Game #{r.gameId}
+          {r.gameDate ? formatDate(r.gameDate) : `Game #${r.gameId}`}
         </Link>
       ),
     },
+    { key: 'opponent', header: 'Opponent', render: (r) => (r.gameKind === 'event' ? <span className="text-slate-400">—</span> : r.opponent ?? <span className="text-slate-400">—</span>) },
+    { key: 'event', header: 'Event', render: (r) => (r.gameKind === 'event' ? (r.gameTitle ?? r.opponent ?? '—') : <span className="text-slate-400">—</span>) },
+    { key: 'owner', header: 'Account owner', render: (r) => r.accountOwner ?? <span className="text-slate-400">—</span> },
     { key: 'type', header: 'For', render: (r) => <Badge tone="slate">{r.beneficiaryType}</Badge> },
     { key: 'qty', header: 'Qty', align: 'right', render: (r) => r.quantity },
     { key: 'sales', header: 'Sales opp', align: 'right', render: (r) => formatUsd(r.salesOpportunityUsd) },
     { key: 'score', header: 'Score', align: 'right', render: (r) => (r.priorityScore != null ? r.priorityScore.toFixed(3) : '—') },
-    { key: 'source', header: 'Source', render: (r) => <Badge tone={r.source === 'email_intake' ? 'violet' : 'slate'}>{r.source === 'email_intake' ? 'Email' : 'Manual'}</Badge> },
     { key: 'status', header: 'Status', render: (r) => <Badge status={r.status} /> },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      render: (r) => {
+        const canWaitlist = !['waitlisted', 'cancelled', 'declined'].includes(r.status);
+        return (
+          <RoleGate roles={['admin']}>
+            {confirmDeleteId === r.id ? (
+              <div className="flex items-center justify-end gap-2">
+                <span className="text-xs text-rose-700">Delete?</span>
+                <Button size="sm" variant="danger" loading={del.isPending} onClick={() => del.mutate(r.id)}>Confirm</Button>
+                <Button size="sm" variant="secondary" onClick={() => setConfirmDeleteId(null)}>Cancel</Button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-end gap-2">
+                {canWaitlist && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    loading={waitlist.isPending && waitlist.variables?.id === r.id}
+                    onClick={() => waitlist.mutate(r)}
+                  >
+                    Waitlist
+                  </Button>
+                )}
+                <Button size="sm" variant="secondary" onClick={() => setConfirmDeleteId(r.id)}>Delete</Button>
+              </div>
+            )}
+          </RoleGate>
+        );
+      },
+    },
   ];
 
   return (
@@ -74,6 +130,8 @@ export function RequestsPage() {
           </>
         }
       />
+
+      <ErrorNote error={del.error || waitlist.error} />
 
       <QueryState isLoading={requests.isLoading} error={requests.error}>
         <DataTable columns={columns} rows={requests.data} keyFn={(r) => r.id} emptyTitle="No requests" />
@@ -106,7 +164,7 @@ function NewRequestModal({ onClose }: { onClose: () => void }) {
   const [salesOpportunityUsd, setSalesOpportunityUsd] = useState('');
   const [notes, setNotes] = useState('');
   const [sel, setSel] = useState<CrmSelection | null>(null);
-  const [empUsers, setEmpUsers] = useState<DirectoryUser[]>([]);
+  const [empName, setEmpName] = useState('');
 
   const isEmployee = beneficiaryType === 'employee';
 
@@ -114,7 +172,7 @@ function NewRequestModal({ onClose }: { onClose: () => void }) {
     setBeneficiaryType(next);
     // Switching source clears the other selection and derived fields.
     setSel(null);
-    setEmpUsers([]);
+    setEmpName('');
     setSalesOpportunityUsd('');
     if (!quantityTouched) setQuantity('');
   }
@@ -123,11 +181,6 @@ function NewRequestModal({ onClose }: { onClose: () => void }) {
     setSel(next);
     if (next && !quantityTouched) setQuantity(String(next.contacts.length || ''));
     if (next?.opportunity) setSalesOpportunityUsd(next.opportunity.revenue != null ? String(next.opportunity.revenue) : '');
-  }
-
-  function handleDirectoryChange(users: DirectoryUser[]) {
-    setEmpUsers(users);
-    if (!quantityTouched) setQuantity(String(users.length || ''));
   }
 
   // Selection: Team game (Team -> Opponent) or Event (by title). Both resolve to a gameId.
@@ -146,19 +199,13 @@ function NewRequestModal({ onClose }: { onClose: () => void }) {
     setGameId('');
   }
 
-  const beneficiariesCount = isEmployee ? empUsers.length : sel?.contacts.length ?? 0;
+  const beneficiariesCount = isEmployee ? (empName.trim() ? 1 : 0) : sel?.contacts.length ?? 0;
   const canCreate = !!gameId && beneficiariesCount > 0 && Number(quantity) >= 1;
 
   const create = useMutation({
     mutationFn: async () => {
       const beneficiaryContacts = isEmployee
-        ? empUsers.map((u) => ({
-            directoryUserId: u.id,
-            fullName: u.displayName,
-            email: u.email ?? undefined,
-            title: u.jobTitle ?? undefined,
-            company: u.department ?? undefined,
-          }))
+        ? [{ fullName: empName.trim() }]
         : sel?.contacts.map((c) => ({
             crmContactId: c.crmContactId ?? undefined,
             crmAccountId: c.crmAccountId ?? undefined,
@@ -181,6 +228,7 @@ function NewRequestModal({ onClose }: { onClose: () => void }) {
           beneficiaryContacts,
           crmOpportunityId: isEmployee ? undefined : sel?.opportunity?.crmOpportunityId,
           crmOpportunityName: isEmployee ? undefined : sel?.opportunity?.name,
+          accountOwner: isEmployee ? undefined : sel?.account.ownerName ?? undefined,
           notes: notes || undefined,
         })
       ).data;
@@ -258,7 +306,7 @@ function NewRequestModal({ onClose }: { onClose: () => void }) {
               </Select>
             </Field>
           )}
-          <Field label="Beneficiary type" required hint="Customer → CRM · Employee → Entra directory">
+          <Field label="Beneficiary type" required hint="Customer → CRM · Employee → name">
             <Select value={beneficiaryType} onChange={(e) => handleTypeChange(e.target.value)}>
               <EnumOptions values={CONTACT_TYPE} />
             </Select>
@@ -271,7 +319,7 @@ function NewRequestModal({ onClose }: { onClose: () => void }) {
                 <option value="">{teamId ? 'Select opponent…' : 'Select a team first'}</option>
                 {teamGames.map((g) => (
                   <option key={g.id} value={String(g.id)}>
-                    vs {g.opponent}
+                    vs {g.opponent} — {formatDate(g.gameDate)}
                   </option>
                 ))}
               </Select>
@@ -284,19 +332,32 @@ function NewRequestModal({ onClose }: { onClose: () => void }) {
           </Field>
         </div>
 
-        {isEmployee ? <DirectoryPicker onChange={handleDirectoryChange} /> : <CrmPicker onChange={handleCrmChange} />}
+        {isEmployee ? (
+          <Field label="Employee name" required>
+            <TextInput
+              value={empName}
+              onChange={(e) => {
+                setEmpName(e.target.value);
+                if (!quantityTouched) setQuantity(e.target.value.trim() ? '1' : '');
+              }}
+              placeholder="Jane Smith"
+            />
+          </Field>
+        ) : (
+          <CrmPicker onChange={handleCrmChange} />
+        )}
 
         {beneficiariesCount > 0 && (
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
             <div className="flex flex-wrap gap-1.5">
-              {(isEmployee ? empUsers.map((u) => u.displayName) : (sel?.contacts ?? []).map((c) => c.fullName)).map((name, i) => (
+              {(isEmployee ? [empName] : (sel?.contacts ?? []).map((c) => c.fullName)).map((name, i) => (
                 <span key={`${name}-${i}`} className="inline-flex items-center rounded-full bg-white px-2.5 py-0.5 text-xs font-medium text-slate-700 ring-1 ring-slate-200">
                   {name}
                 </span>
               ))}
             </div>
             <div className="mt-2 text-xs text-slate-500">
-              {isEmployee ? 'AIS employees' : sel?.account.name}
+              {isEmployee ? 'AIS employee' : sel?.account.name}
               {!isEmployee && sel?.opportunity && (
                 <> · Opportunity: <span className="font-medium text-slate-700">{sel.opportunity.name}</span></>
               )}

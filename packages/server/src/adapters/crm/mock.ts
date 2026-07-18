@@ -6,6 +6,8 @@ interface MockAccount {
   name: string;
   email: string | null;
   phone: string | null;
+  isParent: boolean; // mirrors the Dynamics IsParent (ais_isparent) column
+  ownerName: string; // the rep who owns this account (Dynamics ownerid)
   contacts: Array<{ crmContactId: string; fullName: string; email: string; phone: string; title: string }>;
 }
 
@@ -16,7 +18,9 @@ const ACCOUNTS: MockAccount[] = [
     crmAccountId: 'a-2001',
     name: 'Summit Realty Group',
     email: 'info@summitrealty.com',
+    ownerName: 'Jordan Blake',
     phone: '702-555-0100',
+    isParent: true,
     contacts: [
       { crmContactId: 'c-1001', fullName: 'Alice Nguyen', email: 'alice.nguyen@summitrealty.com', phone: '702-555-0110', title: 'VP Operations' },
       { crmContactId: 'c-1013', fullName: 'Brian Ford', email: 'brian.ford@summitrealty.com', phone: '702-555-0111', title: 'Broker' },
@@ -27,7 +31,9 @@ const ACCOUNTS: MockAccount[] = [
     crmAccountId: 'a-2002',
     name: 'Bell Logistics',
     email: 'contact@belllogistics.com',
+    ownerName: 'Jordan Blake',
     phone: '702-555-0120',
+    isParent: false,
     contacts: [
       { crmContactId: 'c-1002', fullName: 'Marcus Bell', email: 'marcus.bell@belllogistics.com', phone: '702-555-0121', title: 'Owner' },
       { crmContactId: 'c-1015', fullName: 'Sofia Bell', email: 'sofia.bell@belllogistics.com', phone: '702-555-0122', title: 'Operations Lead' },
@@ -37,7 +43,9 @@ const ACCOUNTS: MockAccount[] = [
     crmAccountId: 'a-2003',
     name: 'Desert Financial Partners',
     email: 'hello@desertfin.com',
+    ownerName: 'Priya Anand',
     phone: '702-555-0130',
+    isParent: true,
     contacts: [
       { crmContactId: 'c-1003', fullName: 'Priya Shah', email: 'priya.shah@desertfin.com', phone: '702-555-0131', title: 'Managing Director' },
       { crmContactId: 'c-1016', fullName: 'Evan Wright', email: 'evan.wright@desertfin.com', phone: '702-555-0132', title: 'Advisor' },
@@ -47,7 +55,9 @@ const ACCOUNTS: MockAccount[] = [
     crmAccountId: 'a-2004',
     name: 'Alvarez Construction',
     email: 'office@alvarezbuild.com',
+    ownerName: 'Priya Anand',
     phone: '702-555-0140',
+    isParent: false,
     contacts: [
       { crmContactId: 'c-1004', fullName: 'Tom Alvarez', email: 'tom@alvarezbuild.com', phone: '702-555-0141', title: 'President' },
     ],
@@ -56,7 +66,9 @@ const ACCOUNTS: MockAccount[] = [
     crmAccountId: 'a-2008',
     name: 'Haddad Auto Group',
     email: 'sales@haddadauto.com',
+    ownerName: 'Marcus Lee',
     phone: '702-555-0180',
+    isParent: true,
     contacts: [
       { crmContactId: 'c-1008', fullName: 'Omar Haddad', email: 'omar@haddadauto.com', phone: '702-555-0181', title: 'Dealer Principal' },
       { crmContactId: 'c-1017', fullName: 'Lena Haddad', email: 'lena.haddad@haddadauto.com', phone: '702-555-0182', title: 'Finance Director' },
@@ -66,7 +78,9 @@ const ACCOUNTS: MockAccount[] = [
     crmAccountId: 'a-2009',
     name: 'Skyline Hotels',
     email: 'gm@skylinehotels.com',
+    ownerName: 'Marcus Lee',
     phone: '702-555-0190',
+    isParent: true,
     contacts: [
       { crmContactId: 'c-1009', fullName: 'Jenny Park', email: 'jenny.park@skylinehotels.com', phone: '702-555-0191', title: 'Regional GM' },
       { crmContactId: 'c-1018', fullName: 'Raj Patel', email: 'raj.patel@skylinehotels.com', phone: '702-555-0192', title: 'Events Manager' },
@@ -100,9 +114,10 @@ export class MockCrmAdapter implements CrmAdapter {
   async searchAccounts(query: string): Promise<CrmAccount[]> {
     const q = query.trim().toLowerCase();
     if (!q) return [];
-    return ACCOUNTS.filter((a) => a.name.toLowerCase().includes(q))
+    // Only parent accounts (IsParent = Yes) are selectable, mirroring the live Dynamics filter.
+    return ACCOUNTS.filter((a) => a.isParent && a.name.toLowerCase().includes(q))
       .slice(0, 15)
-      .map((a) => ({ crmAccountId: a.crmAccountId, name: a.name, email: a.email, phone: a.phone, contactCount: a.contacts.length }));
+      .map((a) => ({ crmAccountId: a.crmAccountId, name: a.name, email: a.email, phone: a.phone, contactCount: a.contacts.length, ownerName: a.ownerName }));
   }
 
   async listContacts(accountId: string): Promise<CrmResult[]> {

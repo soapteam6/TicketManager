@@ -15,12 +15,14 @@ import { inventoryRouter } from './modules/inventory.js';
 import { requestsRouter, gameRequestsRouter } from './modules/requests.js';
 import { assignmentsRouter, gameAssignmentsRouter, gameTransferRouter } from './modules/assignments.js';
 import { waitlistRouter } from './modules/waitlist.js';
+import { gameReservationsRouter, reservationsRouter } from './modules/reservations.js';
 import { scoringRouter } from './modules/scoring.js';
 import { contactsRouter } from './modules/contacts.js';
 import { crmRouter } from './modules/crm.js';
 import { directoryRouter } from './modules/directory.js';
 import { dashboardsRouter } from './modules/dashboards.js';
 import { integrationsRouter } from './modules/integrations.js';
+import { notificationsRouter } from './modules/notifications.js';
 import { exportRouter } from './modules/export.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
 
@@ -41,8 +43,10 @@ export function createApp() {
   app.use('/api/games/:gameId/requests', gameRequestsRouter);
   app.use('/api/games/:gameId/assignments', gameAssignmentsRouter);
   app.use('/api/games/:gameId/transfer', gameTransferRouter);
+  app.use('/api/games/:gameId/reservations', gameReservationsRouter);
   app.use('/api/requests', requestsRouter);
   app.use('/api/assignments', assignmentsRouter);
+  app.use('/api/reservations', reservationsRouter);
   app.use('/api/waitlist', waitlistRouter);
   app.use('/api/scoring', scoringRouter);
   app.use('/api/contacts', contactsRouter);
@@ -50,6 +54,7 @@ export function createApp() {
   app.use('/api/directory', directoryRouter);
   app.use('/api/dashboards', dashboardsRouter);
   app.use('/api/integrations', integrationsRouter);
+  app.use('/api/notifications', notificationsRouter);
   app.use('/api', exportRouter);
 
   app.use('/api', notFoundHandler);

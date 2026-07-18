@@ -3,8 +3,10 @@
 export const ROLES = ['admin', 'sales_rep', 'employee'] as const;
 export type Role = (typeof ROLES)[number];
 
-export const SEASON_STATUS = ['draft', 'active', 'archived'] as const;
+export const SEASON_STATUS = ['draft', 'active', 'completed', 'archived'] as const;
 export type SeasonStatus = (typeof SEASON_STATUS)[number];
+// The season states an admin sets/filters on in the UI.
+export const SEASON_FILTER_STATUS = ['active', 'completed'] as const;
 
 export const GAME_STATUS = ['scheduled', 'transfer_pending', 'completed', 'cancelled'] as const;
 export type GameStatus = (typeof GAME_STATUS)[number];
@@ -58,14 +60,26 @@ export const ACTIVE_ASSIGNMENT_STATUSES: AssignmentStatus[] = ['proposed', 'appr
 export const WAITLIST_STATUS = ['active', 'promoted', 'expired', 'cancelled'] as const;
 export type WaitlistStatus = (typeof WAITLIST_STATUS)[number];
 
-export const TICKET_STATUS = ['accepted', 'declined', 'no_show', 'attended'] as const;
+export const RESERVATION_STATUS = ['offered', 'reserved', 'expired', 'released'] as const;
+export type ReservationStatus = (typeof RESERVATION_STATUS)[number];
+// Statuses where a reservation actively holds its seat.
+export const ACTIVE_RESERVATION_STATUSES: ReservationStatus[] = ['offered', 'reserved'];
+
+export const TICKET_STATUS = ['accepted', 'declined', 'no_show', 'attended', 'cancelled'] as const;
 export type TicketStatus = (typeof TICKET_STATUS)[number];
+// The outcomes an admin reconciles after a game, in the simplified attendance flow.
+export const ATTENDANCE_OUTCOMES = ['attended', 'no_show', 'cancelled'] as const;
+export type AttendanceOutcome = (typeof ATTENDANCE_OUTCOMES)[number];
 
 export const TRANSFER_PLATFORM = ['ticketmaster', 'axs', 'seatgeek', 'mock'] as const;
 export type TransferPlatform = (typeof TRANSFER_PLATFORM)[number];
 
-export const INTEGRATION_ADAPTER = ['ticketing', 'email_intake', 'narrative', 'schedule_import', 'crm', 'directory'] as const;
+export const INTEGRATION_ADAPTER = ['ticketing', 'email_intake', 'narrative', 'schedule_import', 'crm', 'directory', 'notification'] as const;
 export type IntegrationAdapter = (typeof INTEGRATION_ADAPTER)[number];
+
+// Audiences an availability broadcast can target.
+export const NOTIFY_AUDIENCE = ['everyone', 'sales_team'] as const;
+export type NotifyAudience = (typeof NOTIFY_AUDIENCE)[number];
 
 export const INTEGRATION_STATUS = ['success', 'error', 'skipped'] as const;
 export type IntegrationStatus = (typeof INTEGRATION_STATUS)[number];

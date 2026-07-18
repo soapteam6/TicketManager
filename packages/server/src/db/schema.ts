@@ -85,6 +85,7 @@ export const seats = sqliteTable(
     section: text('section').notNull(),
     row: text('row').notNull(),
     seatNumber: text('seat_number').notNull(),
+    ticketType: text('ticket_type').notNull().default('Standard'),
     isAda: integer('is_ada').notNull().default(0),
     status: text('status').notNull().default('available'),
     createdAt: integer('created_at').notNull(),
@@ -146,6 +147,7 @@ export const ticketRequests = sqliteTable(
     source: text('source').notNull().default('manual'),
     crmOpportunityId: text('crm_opportunity_id'),
     crmOpportunityName: text('crm_opportunity_name'),
+    accountOwner: text('account_owner'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
@@ -183,6 +185,27 @@ export const assignments = sqliteTable(
     updatedAt: integer('updated_at').notNull(),
   },
   (t) => ({ byGameStatus: index('ix_assignment_game_status').on(t.gameId, t.status) })
+);
+
+// A seat offered to a named person with a deadline to confirm (reserve). If not reserved by
+// expiresAt it is released and the seat returns to the available pool.
+export const reservations = sqliteTable(
+  'reservations',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    gameId: integer('game_id').notNull().references(() => games.id, { onDelete: 'cascade' }),
+    seatId: integer('seat_id').notNull().references(() => seats.id, { onDelete: 'cascade' }),
+    personName: text('person_name').notNull(),
+    personEmail: text('person_email'),
+    ticketType: text('ticket_type'),
+    status: text('status').notNull().default('offered'),
+    expiresAt: integer('expires_at').notNull(),
+    reservedAt: integer('reserved_at'),
+    createdByUserId: integer('created_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => ({ byGameStatus: index('ix_reservation_game_status').on(t.gameId, t.status) })
 );
 
 export const waitlistEntries = sqliteTable(
@@ -261,6 +284,7 @@ export const schema = {
   ticketRequests,
   requestContacts,
   assignments,
+  reservations,
   waitlistEntries,
   attendanceRecords,
   scoringConfigs,

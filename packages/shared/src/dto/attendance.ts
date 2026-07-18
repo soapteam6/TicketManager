@@ -3,7 +3,9 @@ import { TICKET_STATUS, CONTACT_TYPE, FUTURE_PRIORITY } from '../enums.js';
 
 export const recordAttendanceSchema = z.object({
   ticketStatus: z.enum(TICKET_STATUS),
-  designation: z.enum(CONTACT_TYPE),
+  // Designation and the scoring fields are optional in the simplified reconcile flow;
+  // the service defaults designation to the beneficiary's type (falling back to 'customer').
+  designation: z.enum(CONTACT_TYPE).optional(),
   salesRepUserId: z.coerce.number().int().positive().optional().nullable(),
   businessGenerated: z.coerce.number().min(0).optional(),
   followUpNotes: z.string().optional(),

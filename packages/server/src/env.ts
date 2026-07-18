@@ -26,6 +26,9 @@ const schema = z.object({
   DYNAMICS_CLIENT_SECRET: z.string().optional(),
   // Logical name of the opportunity "revenue" money field (default = AIS Manual Rep Credit).
   DYNAMICS_OPP_REVENUE_FIELD: z.string().default('ais_manualrepcredit'),
+  // OData filter fragment that restricts account search to parent accounts only. Default assumes
+  // a Yes/No column `ais_isparent`; change to e.g. `ais_isparent eq 1` for a choice column.
+  DYNAMICS_ACCOUNT_PARENT_FILTER: z.string().default('ais_isparent eq true'),
   // Entra directory source: 'auto' = live Graph when creds present, else sample. Set 'mock' to
   // force sample employees (e.g. while Graph admin consent is pending).
   DIRECTORY_PROVIDER: z.enum(['auto', 'graph', 'mock']).default('auto'),

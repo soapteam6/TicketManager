@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { and, asc, eq, getTableColumns } from 'drizzle-orm';
+import { and, asc, eq, getTableColumns, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { createGameSchema, updateGameSchema, idParam } from '@ais/shared';
 import { db } from '../db/client.js';
@@ -18,21 +18,32 @@ function toMs(value: string, field: string): number {
 
 const gamesListQuery = z.object({
   seasonId: z.coerce.number().int().positive().optional(),
+  teamId: z.coerce.number().int().positive().optional(),
   status: z.string().min(1).optional(),
+  seasonStatus: z.string().min(1).optional(),
 });
 
 export const gamesRouter = Router();
 gamesRouter.use(requireAuth);
 
 gamesRouter.get('/', validate(gamesListQuery, 'query'), (req: Request, res: Response) => {
-  const { seasonId, status } = req.query as unknown as { seasonId?: number; status?: string };
+  const { seasonId, teamId, status, seasonStatus } = req.query as unknown as { seasonId?: number; teamId?: number; status?: string; seasonStatus?: string };
   const conditions = [];
   if (seasonId) conditions.push(eq(games.seasonId, seasonId));
+  if (teamId) conditions.push(eq(seasons.teamId, teamId));
   if (status) conditions.push(eq(games.status, status));
+  if (seasonStatus) conditions.push(eq(seasons.status, seasonStatus));
   const where = conditions.length === 1 ? conditions[0] : conditions.length > 1 ? and(...conditions) : undefined;
   // Enrich with team info so the request form can cascade Team -> Opponent -> start time.
   const base = db
-    .select({ ...getTableColumns(games), teamId: teams.id, teamName: teams.name, seasonLabel: seasons.label })
+    .select({
+      ...getTableColumns(games),
+      teamId: teams.id,
+      teamName: teams.name,
+      seasonLabel: seasons.label,
+      seasonStatus: seasons.status,
+      availableSeats: sql<number>`(SELECT count(*) FROM seats WHERE seats.game_id = ${games.id} AND seats.status = 'available')`,
+    })
     .from(games)
     .innerJoin(seasons, eq(games.seasonId, seasons.id))
     .innerJoin(teams, eq(seasons.teamId, teams.id));

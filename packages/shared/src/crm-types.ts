@@ -5,6 +5,8 @@ export interface CrmAccount {
   email: string | null;
   phone: string | null;
   contactCount: number | null;
+  // The Dynamics account owner (systemuser) — the rep who owns this customer.
+  ownerName: string | null;
 }
 
 // A contact within a selected account — step 2 of the intake picker.

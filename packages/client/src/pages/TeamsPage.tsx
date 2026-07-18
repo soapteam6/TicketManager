@@ -15,12 +15,14 @@ import { Field, TextInput, TextArea } from '@/components/Field';
 import { RoleGate } from '@/auth/AuthContext';
 import { EmptyState } from '@/components/EmptyState';
 import { Spinner } from '@/components/Spinner';
+import { NotifyAvailabilityModal } from '@/components/NotifyAvailabilityModal';
 import { formatDateTime } from '@/lib/format';
 import type { ExtractedGame } from '@ais/shared';
 
 export function TeamsPage() {
   const [selected, setSelected] = useState<Team | null>(null);
   const [showNewTeam, setShowNewTeam] = useState(false);
+  const [showNotify, setShowNotify] = useState(false);
 
   const teams = useQuery({
     queryKey: ['teams'],
@@ -40,8 +42,6 @@ export function TeamsPage() {
     },
     { key: 'abbr', header: 'Abbr', render: (t) => <Badge tone="slate">{t.abbreviation}</Badge> },
     { key: 'venue', header: 'Venue', render: (t) => t.venue ?? '—' },
-    { key: 'platform', header: 'Platform', render: (t) => <span className="capitalize">{t.defaultPlatform}</span> },
-    { key: 'games', header: 'Home games', align: 'right', render: (t) => t.homeGamesPerSeason },
     {
       key: 'active',
       header: 'Status',
@@ -56,10 +56,13 @@ export function TeamsPage() {
         subtitle="Season-ticket holdings across all AIS teams."
         actions={
           <RoleGate roles={['admin']}>
+            <Button variant="secondary" onClick={() => setShowNotify(true)}>Send availability</Button>
             <Button onClick={() => setShowNewTeam(true)}>New team</Button>
           </RoleGate>
         }
       />
+
+      {showNotify && <NotifyAvailabilityModal onClose={() => setShowNotify(false)} />}
 
       <QueryState isLoading={teams.isLoading} error={teams.error}>
         <DataTable
@@ -177,6 +180,15 @@ function TeamDrawer({ team, onClose }: { team: Team; onClose: () => void }) {
     },
   });
 
+  const complete = useMutation({
+    mutationFn: async (seasonId: number) => (await api.patch(`/seasons/${seasonId}`, { status: 'completed' })).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['teams', team.id] });
+      qc.invalidateQueries({ queryKey: ['games'] });
+      qc.invalidateQueries({ queryKey: ['dashboards', 'overview'] });
+    },
+  });
+
   return (
     <Modal open onClose={onClose} title={team.name} description={`${team.sport ?? ''} · ${team.venue ?? ''}`} size="lg"
       footer={<Button variant="secondary" onClick={onClose}>Close</Button>}
@@ -212,13 +224,18 @@ function TeamDrawer({ team, onClose }: { team: Team; onClose: () => void }) {
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge status={s.status} />
-                  {s.status !== 'active' && (
-                    <RoleGate roles={['admin']}>
+                  <RoleGate roles={['admin']}>
+                    {s.status !== 'active' && (
                       <Button size="sm" variant="secondary" loading={activate.isPending && activate.variables === s.id} onClick={() => activate.mutate(s.id)}>
                         Activate
                       </Button>
-                    </RoleGate>
-                  )}
+                    )}
+                    {s.status !== 'completed' && (
+                      <Button size="sm" variant="secondary" loading={complete.isPending && complete.variables === s.id} onClick={() => complete.mutate(s.id)}>
+                        Complete
+                      </Button>
+                    )}
+                  </RoleGate>
                 </div>
               </div>
             ))}
@@ -228,7 +245,7 @@ function TeamDrawer({ team, onClose }: { team: Team; onClose: () => void }) {
         )}
       </QueryState>
 
-      <ErrorNote error={activate.error} />
+      <ErrorNote error={activate.error || complete.error} />
 
       {showCreate && (
         <CreateSeasonModal

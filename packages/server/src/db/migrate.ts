@@ -22,11 +22,25 @@ export function runMigrations(sqlite: BetterSqlite3.Database): string[] {
   for (const file of files) {
     if (applied.has(file)) continue;
     const sql = readFileSync(`${MIGRATIONS_DIR}/${file}`, 'utf8');
-    const tx = sqlite.transaction(() => {
-      sqlite.exec(sql);
+    // Migrations that rebuild a table referenced by ON DELETE CASCADE foreign keys must run
+    // with foreign_keys OFF, which SQLite only honors OUTSIDE a transaction. Such files opt in
+    // via a leading `-- migrate:no-transaction` directive and manage their own BEGIN/COMMIT.
+    if (/^\s*--\s*migrate:no-transaction/m.test(sql)) {
+      const fkOn = sqlite.pragma('foreign_keys', { simple: true }) === 1;
+      sqlite.pragma('foreign_keys = OFF');
+      try {
+        sqlite.exec(sql);
+      } finally {
+        if (fkOn) sqlite.pragma('foreign_keys = ON');
+      }
       sqlite.prepare('INSERT INTO _migrations (id, applied_at) VALUES (?, ?)').run(file, Date.now());
-    });
-    tx();
+    } else {
+      const tx = sqlite.transaction(() => {
+        sqlite.exec(sql);
+        sqlite.prepare('INSERT INTO _migrations (id, applied_at) VALUES (?, ?)').run(file, Date.now());
+      });
+      tx();
+    }
     ran.push(file);
   }
   return ran;

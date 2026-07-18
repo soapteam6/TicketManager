@@ -80,11 +80,9 @@ export const scheduleImportSchema = z.object({
 export type ScheduleImportInput = z.infer<typeof scheduleImportSchema>;
 
 // --- Seats / inventory ---
+// Seats are tracked as a simple pool: add N available seats of a given ticket type to a game.
 export const bulkSeatsSchema = z.object({
-  section: z.string().min(1),
-  row: z.string().min(1),
-  fromSeat: z.coerce.number().int().positive(),
-  toSeat: z.coerce.number().int().positive(),
-  isAda: z.boolean().optional(),
+  count: z.coerce.number().int().min(1).max(1000),
+  ticketType: z.string().min(1).max(60).optional(),
 });
 export type BulkSeatsInput = z.infer<typeof bulkSeatsSchema>;

@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { and, eq } from 'drizzle-orm';
 import { createAssignmentSchema, reassignSchema, recommendSchema, recordAttendanceSchema, transferSchema, idParam } from '@ais/shared';
 import { db } from '../db/client.js';
-import { assignments, seats, ticketRequests, contacts } from '../db/schema.js';
+import { assignments, seats, ticketRequests, contacts, attendanceRecords } from '../db/schema.js';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/requireRole.js';
@@ -28,19 +28,22 @@ assignmentsRouter.get('/', (req: Request, res: Response) => {
   if (gameId) conds.push(eq(assignments.gameId, gameId));
   if (status) conds.push(eq(assignments.status, status));
   const rows = db
-    .select({ a: assignments, seat: seats, req: ticketRequests, contact: contacts })
+    .select({ a: assignments, seat: seats, req: ticketRequests, contact: contacts, att: attendanceRecords })
     .from(assignments)
     .leftJoin(seats, eq(assignments.seatId, seats.id))
     .leftJoin(ticketRequests, eq(assignments.requestId, ticketRequests.id))
     .leftJoin(contacts, eq(assignments.beneficiaryContactId, contacts.id))
+    .leftJoin(attendanceRecords, eq(attendanceRecords.assignmentId, assignments.id))
     .where(conds.length ? and(...conds) : undefined)
     .all();
   res.json({
-    assignments: rows.map(({ a, seat, req, contact }) => ({
+    assignments: rows.map(({ a, seat, req, contact, att }) => ({
       ...a,
       seatLabel: seat ? seatLabel(seat) : null,
+      ticketType: seat?.ticketType ?? null,
       requesterName: contact?.fullName ?? req?.requesterName ?? null,
       quantity: req?.quantity ?? null,
+      attendanceStatus: att?.ticketStatus ?? null,
     })),
   });
 });
@@ -92,19 +95,22 @@ gameAssignmentsRouter.get('/', (req: Request, res: Response) => {
   const gameId = Number((req.params as Record<string, string>).gameId);
   if (!Number.isInteger(gameId) || gameId <= 0) throw badRequest('Invalid game id');
   const rows = db
-    .select({ a: assignments, seat: seats, req: ticketRequests, contact: contacts })
+    .select({ a: assignments, seat: seats, req: ticketRequests, contact: contacts, att: attendanceRecords })
     .from(assignments)
     .leftJoin(seats, eq(assignments.seatId, seats.id))
     .leftJoin(ticketRequests, eq(assignments.requestId, ticketRequests.id))
     .leftJoin(contacts, eq(assignments.beneficiaryContactId, contacts.id))
+    .leftJoin(attendanceRecords, eq(attendanceRecords.assignmentId, assignments.id))
     .where(eq(assignments.gameId, gameId))
     .all();
   res.json({
-    assignments: rows.map(({ a, seat, req, contact }) => ({
+    assignments: rows.map(({ a, seat, req, contact, att }) => ({
       ...a,
       seatLabel: seat ? seatLabel(seat) : null,
+      ticketType: seat?.ticketType ?? null,
       requesterName: contact?.fullName ?? req?.requesterName ?? null,
       quantity: req?.quantity ?? null,
+      attendanceStatus: att?.ticketStatus ?? null,
     })),
   });
 });

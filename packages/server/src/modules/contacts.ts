@@ -85,6 +85,16 @@ contactsRouter.post('/', requireRole('admin', 'sales_rep'), validate(createConta
   res.status(201).json({ contact });
 });
 
+// Hard-delete a contact. Foreign keys handle references: ticket requests, assignments and
+// attendance records are set null; request_contacts link rows cascade away.
+contactsRouter.delete('/:id', requireRole('admin'), validate(idParam, 'params'), (req: Request, res: Response) => {
+  const { id } = req.params as unknown as { id: number };
+  const existing = db.select().from(contacts).where(eq(contacts.id, id)).get();
+  if (!existing) throw notFound('Contact not found');
+  db.delete(contacts).where(eq(contacts.id, id)).run();
+  res.json({ ok: true });
+});
+
 contactsRouter.patch(
   '/:id',
   requireRole('admin', 'sales_rep'),

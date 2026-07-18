@@ -1,16 +1,18 @@
 import { Router, type Request, type Response } from 'express';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import {
   createRequestSchema,
   updateRequestSchema,
   requestQuery,
   importRequestsSchema,
   idParam,
+  ACTIVE_ASSIGNMENT_STATUSES,
 } from '@ais/shared';
 import { db } from '../db/client.js';
-import { ticketRequests, contacts, games, requestContacts } from '../db/schema.js';
+import { ticketRequests, contacts, games, requestContacts, assignments, seats } from '../db/schema.js';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
+import { requireRole } from '../middleware/requireRole.js';
 import { newPublicId } from '../lib/ids.js';
 import { badRequest, notFound } from '../lib/errors.js';
 import { getEmailIntakeAdapter } from '../adapters/email/index.js';
@@ -20,12 +22,22 @@ import { scoreGameWithNarrative } from './scoring-service.js';
 export const requestsRouter = Router();
 requestsRouter.use(requireAuth);
 
-function withBeneficiary(rows: Array<{ req: typeof ticketRequests.$inferSelect; contact: typeof contacts.$inferSelect | null }>) {
-  return rows.map(({ req, contact }) => ({
+function withBeneficiary(
+  rows: Array<{
+    req: typeof ticketRequests.$inferSelect;
+    contact: typeof contacts.$inferSelect | null;
+    game?: typeof games.$inferSelect | null;
+  }>
+) {
+  return rows.map(({ req, contact, game }) => ({
     ...req,
     scoringBreakdown: req.scoringBreakdown ? JSON.parse(req.scoringBreakdown) : null,
     beneficiaryName: contact?.fullName ?? req.requesterName ?? null,
     beneficiaryCompany: contact?.company ?? req.requesterCompany ?? null,
+    opponent: game?.opponent ?? null,
+    gameTitle: game?.title ?? null,
+    gameKind: game?.kind ?? null,
+    gameDate: game?.gameDate ?? null,
   }));
 }
 
@@ -36,9 +48,10 @@ requestsRouter.get('/', validate(requestQuery, 'query'), (req: Request, res: Res
   if (q.status) conds.push(eq(ticketRequests.status, q.status));
   if (q.mine) conds.push(eq(ticketRequests.requesterUserId, req.user!.id));
   const rows = db
-    .select({ req: ticketRequests, contact: contacts })
+    .select({ req: ticketRequests, contact: contacts, game: games })
     .from(ticketRequests)
     .leftJoin(contacts, eq(ticketRequests.beneficiaryContactId, contacts.id))
+    .leftJoin(games, eq(ticketRequests.gameId, games.id))
     .where(conds.length ? and(...conds) : undefined)
     .orderBy(desc(ticketRequests.createdAt))
     .all();
@@ -175,6 +188,7 @@ function createRequestRow(input: ReturnType<typeof createRequestSchema.parse>, u
       source,
       crmOpportunityId: input.crmOpportunityId || null,
       crmOpportunityName: input.crmOpportunityName || null,
+      accountOwner: input.accountOwner || null,
       createdAt: now,
       updatedAt: now,
     })
@@ -210,6 +224,27 @@ requestsRouter.patch('/:id', validate(idParam, 'params'), validate(updateRequest
     .returning()
     .get();
   res.json({ request: updated });
+});
+
+// Hard-delete a request. Its assignments, waitlist entries, request-contact links and any
+// attendance records cascade away; we first release the seats those assignments were holding so
+// they return to the available pool (the cascade alone would leave them stuck as "assigned").
+requestsRouter.delete('/:id', requireRole('admin'), validate(idParam, 'params'), (req: Request, res: Response) => {
+  const { id } = req.params as unknown as { id: number };
+  const existing = db.select().from(ticketRequests).where(eq(ticketRequests.id, id)).get();
+  if (!existing) throw notFound('Request not found');
+  db.transaction(() => {
+    const held = db
+      .select({ seatId: assignments.seatId })
+      .from(assignments)
+      .where(and(eq(assignments.requestId, id), inArray(assignments.status, ACTIVE_ASSIGNMENT_STATUSES)))
+      .all();
+    for (const { seatId } of held) {
+      db.update(seats).set({ status: 'available' }).where(eq(seats.id, seatId)).run();
+    }
+    db.delete(ticketRequests).where(eq(ticketRequests.id, id)).run();
+  });
+  res.json({ ok: true });
 });
 
 requestsRouter.post('/:id/cancel', validate(idParam, 'params'), (req: Request, res: Response) => {

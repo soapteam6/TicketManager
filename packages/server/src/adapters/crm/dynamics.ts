@@ -47,8 +47,9 @@ export class DynamicsCrmAdapter implements CrmAdapter {
 
   async searchAccounts(query: string): Promise<CrmAccount[]> {
     const q = query.replace(/'/g, "''");
-    const filter = `contains(name,'${q}')`;
-    const path = `accounts?$select=accountid,name,emailaddress1,telephone1&$filter=${encodeURIComponent(filter)}&$orderby=name&$top=15`;
+    // Restrict to parent accounts (IsParent = Yes) via a configurable OData filter fragment.
+    const filter = `contains(name,'${q}') and (${env.DYNAMICS_ACCOUNT_PARENT_FILTER})`;
+    const path = `accounts?$select=accountid,name,emailaddress1,telephone1,_ownerid_value&$filter=${encodeURIComponent(filter)}&$orderby=name&$top=15`;
     const data = await this.webApi<{ value: DynamicsAccount[] }>(path);
     logger.debug({ query, count: data.value.length }, 'Dynamics account search');
     return data.value.map((a) => ({
@@ -57,6 +58,8 @@ export class DynamicsCrmAdapter implements CrmAdapter {
       email: a.emailaddress1 ?? null,
       phone: a.telephone1 ?? null,
       contactCount: null,
+      // Owner name comes from the formatted-value annotation on the ownerid lookup.
+      ownerName: a['_ownerid_value@OData.Community.Display.V1.FormattedValue'] ?? null,
     }));
   }
 
@@ -104,6 +107,8 @@ interface DynamicsAccount {
   name: string;
   emailaddress1?: string;
   telephone1?: string;
+  _ownerid_value?: string;
+  '_ownerid_value@OData.Community.Display.V1.FormattedValue'?: string;
 }
 
 interface DynamicsContact {

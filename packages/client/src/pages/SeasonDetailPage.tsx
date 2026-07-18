@@ -45,6 +45,16 @@ export function SeasonDetailPage() {
   });
 
   const season = detail.data?.season;
+  const qc = useQueryClient();
+
+  const setStatus = useMutation({
+    mutationFn: async (status: 'active' | 'completed') => (await api.patch(`/seasons/${seasonId}`, { status })).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['seasons', seasonId] });
+      qc.invalidateQueries({ queryKey: ['games'] });
+      qc.invalidateQueries({ queryKey: ['dashboards'] });
+    },
+  });
 
   const columns: Column<Game>[] = [
     { key: 'date', header: 'Date', render: (g) => formatDate(g.gameDate) },
@@ -77,6 +87,16 @@ export function SeasonDetailPage() {
           <>
             {season && <Badge status={season.status} />}
             <RoleGate roles={['admin']}>
+              {season && season.status !== 'active' && (
+                <Button variant="secondary" loading={setStatus.isPending && setStatus.variables === 'active'} onClick={() => setStatus.mutate('active')}>
+                  Mark active
+                </Button>
+              )}
+              {season && season.status !== 'completed' && (
+                <Button variant="secondary" loading={setStatus.isPending && setStatus.variables === 'completed'} onClick={() => setStatus.mutate('completed')}>
+                  Mark complete
+                </Button>
+              )}
               <Button variant="secondary" onClick={() => setShowImport(true)}>
                 Import schedule
               </Button>
@@ -85,6 +105,8 @@ export function SeasonDetailPage() {
           </>
         }
       />
+
+      <ErrorNote error={setStatus.error} />
 
       <QueryState isLoading={detail.isLoading} error={detail.error}>
         <DataTable

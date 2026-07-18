@@ -10,6 +10,7 @@ import { RequestsPage } from '@/pages/RequestsPage';
 import { ContactsPage } from '@/pages/ContactsPage';
 import { ScoringConfigPage } from '@/pages/ScoringConfigPage';
 import { WaitlistPage } from '@/pages/WaitlistPage';
+import { NotificationsPage } from '@/pages/NotificationsPage';
 import { IntegrationLogsPage } from '@/pages/IntegrationLogsPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="requests" element={<RequestsPage />} />
         <Route path="contacts" element={<ContactsPage />} />
         <Route path="waitlist" element={<WaitlistPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
         <Route path="scoring" element={<ScoringConfigPage />} />
         <Route path="admin/logs" element={<IntegrationLogsPage />} />
         <Route path="404" element={<NotFoundPage />} />

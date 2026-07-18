@@ -19,7 +19,7 @@ const createTeamSchema = z.object({
   abbreviation: z.string().min(1).optional(),
   sport: z.string().optional(),
   venue: z.string().optional(),
-  officialUrl: z.string().url().optional().or(z.literal('')),
+  officialUrl: z.string().optional(),
   homeGamesPerSeason: z.coerce.number().int().min(0).optional(),
   defaultPlatform: z.string().min(1).optional().default('mock'),
   defaultTicketsPerGame: z.coerce.number().int().min(0).optional(),
@@ -32,7 +32,7 @@ const updateTeamSchema = z.object({
   venue: z.string().optional(),
   homeGamesPerSeason: z.coerce.number().int().min(0).optional(),
   defaultPlatform: z.string().min(1).optional(),
-  officialUrl: z.string().url().optional().or(z.literal('')),
+  officialUrl: z.string().optional(),
   defaultTicketsPerGame: z.coerce.number().int().min(0).optional(),
   isActive: z.boolean().optional(),
 });

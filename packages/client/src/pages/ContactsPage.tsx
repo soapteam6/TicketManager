@@ -44,7 +44,6 @@ export function ContactsPage() {
     },
     { key: 'type', header: 'Type', render: (c) => <Badge tone="slate">{c.type}</Badge> },
     { key: 'tier', header: 'Tier', render: (c) => <Badge status={c.valueTier} /> },
-    { key: 'ltv', header: 'Lifetime biz', align: 'right', render: (c) => formatUsd(c.lifetimeBusinessGenerated) },
     { key: 'att', header: 'Attended', align: 'right', render: (c) => `${c.attendedCount}/${c.awardedCount}` },
     { key: 'priority', header: 'Priority', render: (c) => <Badge status={c.futurePriorityFlag} /> },
     {
@@ -109,6 +108,15 @@ function ContactModal({ contact, onClose }: { contact: Contact | null; onClose: 
   const [valueTier, setValueTier] = useState(contact?.valueTier ?? 'prospect');
   const [futurePriorityFlag, setFuturePriorityFlag] = useState(contact?.futurePriorityFlag ?? 'normal');
   const [notes, setNotes] = useState(contact?.notes ?? '');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const del = useMutation({
+    mutationFn: async () => (await api.delete(`/contacts/${contact!.id}`)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contacts'] });
+      onClose();
+    },
+  });
 
   const save = useMutation({
     mutationFn: async () => {
@@ -146,10 +154,27 @@ function ContactModal({ contact, onClose }: { contact: Contact | null; onClose: 
       title={isEdit ? 'Edit contact' : 'New contact'}
       size="lg"
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" form="contact-form" loading={save.isPending}>Save</Button>
-        </>
+        <div className="flex w-full items-center justify-between">
+          <div>
+            {isEdit && (
+              <RoleGate roles={['admin']}>
+                {confirmDelete ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-rose-700">Delete this contact?</span>
+                    <Button variant="danger" size="sm" loading={del.isPending} onClick={() => del.mutate()}>Confirm</Button>
+                    <Button variant="secondary" size="sm" onClick={() => setConfirmDelete(false)}>Cancel</Button>
+                  </div>
+                ) : (
+                  <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>Delete</Button>
+                )}
+              </RoleGate>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={onClose}>Cancel</Button>
+            <Button type="submit" form="contact-form" loading={save.isPending}>Save</Button>
+          </div>
+        </div>
       }
     >
       <form id="contact-form" onSubmit={onSubmit} className="space-y-4">
@@ -190,7 +215,7 @@ function ContactModal({ contact, onClose }: { contact: Contact | null; onClose: 
         <Field label="Notes">
           <TextArea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>
-        <ErrorNote error={save.error} />
+        <ErrorNote error={save.error || del.error} />
       </form>
     </Modal>
   );

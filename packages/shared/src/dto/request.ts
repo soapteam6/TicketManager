@@ -34,6 +34,8 @@ export const createRequestSchema = z.object({
   // The CRM opportunity whose Manual Rep Credit populated salesOpportunityUsd.
   crmOpportunityId: z.string().optional(),
   crmOpportunityName: z.string().optional(),
+  // The Dynamics account owner (rep who owns the customer) captured at intake.
+  accountOwner: z.string().optional(),
 });
 export type CreateRequestInput = z.infer<typeof createRequestSchema>;
 

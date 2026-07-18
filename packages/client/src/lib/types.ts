@@ -58,8 +58,10 @@ export interface Game {
   createdAt: number;
   // Enriched on GET /games (list) and GET /games/:id
   seasonLabel?: string | null;
+  seasonStatus?: SeasonStatus | null;
   teamName?: string | null;
   teamId?: number | null;
+  availableSeats?: number;
 }
 
 export interface Seat {
@@ -68,6 +70,7 @@ export interface Seat {
   section: string;
   row: string;
   seatNumber: string;
+  ticketType: string;
   isAda: number;
   status: SeatStatus;
   createdAt: number;
@@ -117,8 +120,14 @@ export interface TicketRequest {
   scoringConfigId: number | null;
   narrative: string | null;
   source: string;
+  accountOwner: string | null;
   createdAt: number;
   updatedAt: number;
+  // Enriched on GET /requests with the associated game's details.
+  opponent?: string | null;
+  gameTitle?: string | null;
+  gameKind?: 'game' | 'event' | null;
+  gameDate?: number | null;
 }
 
 export interface Assignment {
@@ -138,8 +147,11 @@ export interface Assignment {
   updatedAt: number;
   // Enriched on GET /assignments and GET /games/:id/assignments
   seatLabel?: string | null;
+  ticketType?: string | null;
   requesterName?: string | null;
   quantity?: number | null;
+  // The recorded attendance outcome, if reconciled (attended / no_show / cancelled).
+  attendanceStatus?: string | null;
 }
 
 export interface WaitlistEntry {
@@ -151,6 +163,28 @@ export interface WaitlistEntry {
   reason: string | null;
   createdAt: number;
   updatedAt: number;
+  // Enriched on GET /waitlist
+  requesterName?: string | null;
+  quantity?: number | null;
+  requestStatus?: string | null;
+  opponent?: string | null;
+  gameTitle?: string | null;
+  gameKind?: 'game' | 'event' | null;
+}
+
+export interface Reservation {
+  id: number;
+  gameId: number;
+  seatId: number;
+  personName: string;
+  personEmail: string | null;
+  ticketType: string | null;
+  status: 'offered' | 'reserved' | 'expired' | 'released';
+  expiresAt: number;
+  reservedAt: number | null;
+  createdAt: number;
+  updatedAt: number;
+  seatLabel?: string | null;
 }
 
 export interface AttendanceRecord {
