@@ -72,6 +72,19 @@ export const ACTIVE_RESERVATION_STATUSES: ReservationStatus[] = ['offered', 'res
 export const NOTIFY_AUDIENCE = ['everyone', 'sales_team'] as const;
 export type NotifyAudience = (typeof NOTIFY_AUDIENCE)[number];
 
+// Notification Manager (cr9cd_notification / cr9cd_notificationtemplate) choice sets.
+export const NOTIFICATION_TYPE = ['reminder', 'announcement', 'availability', 'game_link'] as const;
+export type NotificationType = (typeof NOTIFICATION_TYPE)[number];
+
+export const NOTIFICATION_CHANNEL = ['email', 'sms', 'in_app'] as const;
+export type NotificationChannel = (typeof NOTIFICATION_CHANNEL)[number];
+
+export const NOTIFICATION_AUDIENCE = ['everyone', 'sales_team', 'employees', 'holders'] as const;
+export type NotificationAudience = (typeof NOTIFICATION_AUDIENCE)[number];
+
+export const NOTIFICATION_STATUS = ['draft', 'scheduled', 'sent'] as const;
+export type NotificationStatus = (typeof NOTIFICATION_STATUS)[number];
+
 export const TRANSFER_PLATFORM = ['ticketmaster', 'axs', 'seatgeek', 'mock'] as const;
 export type TransferPlatform = (typeof TRANSFER_PLATFORM)[number];
 

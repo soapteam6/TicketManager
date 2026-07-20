@@ -40,6 +40,7 @@ export interface CreateReservationsInput {
   quantity: number;
   ticketType?: string;
   expiresAt: string; // ISO datetime
+  reservedByContactId?: string; // employee (contact_beneficiary) who placed the hold
 }
 
 // Offers up to `quantity` available seats (optionally of a given ticket type) to a named person.
@@ -66,6 +67,9 @@ export async function createReservations(input: CreateReservationsInput): Promis
       cr9cd_ticket_type: seat.cr9cd_ticket_type,
       cr9cd_status: reservationStatusChoice.toCode('offered'),
       cr9cd_expires_at: input.expiresAt,
+      ...(input.reservedByContactId
+        ? { 'cr9cd_Reserved_By@odata.bind': bindRef('cr9cd_contact_beneficiaries', input.reservedByContactId) }
+        : {}),
     } as Parameters<typeof Cr9cd_reservationsService.create>[0]);
     await Cr9cd_seatsService.update(seat.cr9cd_seatid, { cr9cd_status: seatStatusChoice.toCode('held') });
     created += 1;

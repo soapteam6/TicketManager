@@ -28,6 +28,7 @@ export interface Cr9cd_reservationsBase {
   cr9cd_person_name?: string;
   cr9cd_reservationid: string;
   cr9cd_reserved_at?: string;
+  "cr9cd_Reserved_By@odata.bind"?: string;
   "cr9cd_Seat@odata.bind": string;
   cr9cd_status?: Cr9cd_reservationscr9cd_status;
   cr9cd_ticket_type?: string;
@@ -43,6 +44,7 @@ export interface Cr9cd_reservationsBase {
 
 export interface Cr9cd_reservations extends Cr9cd_reservationsBase {
   cr9cd_gamename?: string;
+  cr9cd_reserved_byname?: string;
   cr9cd_seatname?: string;
   cr9cd_statusname?: string;
   createdbyname?: string;
@@ -63,6 +65,8 @@ export interface Cr9cd_reservations extends Cr9cd_reservationsBase {
   versionnumber?: number;
   cr9cd_game?: object;
   _cr9cd_game_value?: string;
+  cr9cd_reserved_by?: object;
+  _cr9cd_reserved_by_value?: string;
   cr9cd_seat?: object;
   _cr9cd_seat_value?: string;
   createdby?: object;

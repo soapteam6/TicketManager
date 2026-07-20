@@ -19,18 +19,6 @@
       ],
       "authenticationType": "Oauth",
       "dataSets": {}
-    },
-    "dc70ed9e-bb9d-4dd9-9c26-307894318922": {
-      "id": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
-      "displayName": "Logic flows",
-      "dataSources": [
-        "powerappv2__runaprompt_parsejson_respondtoapowerapporflow"
-      ],
-      "workflowDetails": {
-        "workflowEntityId": "f3412ab2-2e21-f011-998a-6045bd03b043",
-        "workflowDisplayName": "PowerAppV2 -> Run a prompt,Parse JSON,Respond to a Power App or flow",
-        "workflowName": "e6f23153-94ba-3883-0a1b-03c3d5e5fcb7"
-      }
     }
   },
   "databaseReferences": {
@@ -109,6 +97,16 @@
         "integrationlogs": {
           "entitySetName": "cr9cd_integrationlogs",
           "logicalName": "cr9cd_integrationlog",
+          "isHidden": false
+        },
+        "notifications": {
+          "entitySetName": "cr9cd_notifications",
+          "logicalName": "cr9cd_notification",
+          "isHidden": false
+        },
+        "notificationtemplates": {
+          "entitySetName": "cr9cd_notificationtemplates",
+          "logicalName": "cr9cd_notificationtemplate",
           "isHidden": false
         },
         "users": {

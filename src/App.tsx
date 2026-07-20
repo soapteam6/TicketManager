@@ -12,6 +12,7 @@ import ContactsPage from './pages/ContactsPage';
 import WaitlistPage from './pages/WaitlistPage';
 import NotificationsPage from './pages/NotificationsPage';
 import ScoringConfigPage from './pages/ScoringConfigPage';
+import IntegrationLogsPage from './pages/IntegrationLogsPage';
 
 export default function App() {
   return (
@@ -33,6 +34,14 @@ export default function App() {
               element={
                 <RequireAdmin>
                   <ScoringConfigPage />
+                </RequireAdmin>
+              }
+            />
+            <Route
+              path="/integration-logs"
+              element={
+                <RequireAdmin>
+                  <IntegrationLogsPage />
                 </RequireAdmin>
               }
             />

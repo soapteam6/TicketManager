@@ -1,8 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Cr9cd_gamesService } from '../generated/services/Cr9cd_gamesService';
 import type { Cr9cd_games } from '../generated/models/Cr9cd_gamesModel';
-import { gameKindChoice } from '../dataverse/choiceMaps';
+import { Cr9cd_notificationsService } from '../generated/services/Cr9cd_notificationsService';
+import type { Cr9cd_notifications } from '../generated/models/Cr9cd_notificationsModel';
+import { Cr9cd_notificationtemplatesService } from '../generated/services/Cr9cd_notificationtemplatesService';
+import { Cr9cd_contact_beneficiariesService } from '../generated/services/Cr9cd_contact_beneficiariesService';
+import {
+  gameKindChoice,
+  notificationTypeChoice,
+  notificationChannelChoice,
+  notificationAudienceChoice,
+  notificationStatusChoice,
+} from '../dataverse/choiceMaps';
+import { bindRef } from '../dataverse/bind';
+import { formatDateTime } from '../lib/format';
 import { PageHeader } from '../components/PageHeader';
+import { PlaceholderFlag } from '../components/PlaceholderFlag';
 import { DataTable, type Column } from '../components/DataTable';
 import { Badge, type BadgeTone } from '../components/Badge';
 import { Button } from '../components/Button';
@@ -46,11 +59,13 @@ const TYPES: { key: NotifType; label: string; tone: BadgeTone; subject: string; 
   },
 ];
 
-const AUDIENCES: { key: Audience; label: string; reach: number }[] = [
-  { key: 'everyone', label: 'Everyone', reach: 248 },
-  { key: 'sales_team', label: 'Sales team', reach: 12 },
-  { key: 'employees', label: 'Employees', reach: 240 },
-  { key: 'holders', label: 'Season-ticket holders', reach: 36 },
+// `reach` here is a fallback/placeholder count. `done` audiences get a live headcount from
+// Dataverse (see reachByKey); the rest keep the placeholder and are flagged with <PlaceholderFlag>.
+const AUDIENCES: { key: Audience; label: string; reach: number; done: boolean; todo?: string }[] = [
+  { key: 'everyone', label: 'Everyone', reach: 248, done: true },
+  { key: 'sales_team', label: 'Sales team', reach: 12, done: false, todo: '“sales team” membership isn’t modeled on contacts yet' },
+  { key: 'employees', label: 'Employees', reach: 240, done: false, todo: 'no real staff/employee list — the contact table only holds ticket beneficiaries' },
+  { key: 'holders', label: 'Season-ticket holders', reach: 36, done: false, todo: 'there’s no season-ticket-holder flag on contacts yet' },
 ];
 
 const CHANNELS: { key: Channel; label: string }[] = [
@@ -76,23 +91,6 @@ function gameLabel(g: Cr9cd_games): string {
   return kind === 'event' ? g.cr9cd_title ?? g.cr9cd_opponent ?? 'Event' : `vs ${g.cr9cd_opponent ?? ''}`;
 }
 
-interface NotifRow {
-  id: number;
-  type: NotifType;
-  subject: string;
-  audience: Audience;
-  channel: Channel;
-  status: Status;
-  when: string;
-}
-
-const SEED: NotifRow[] = [
-  { id: 4, type: 'reminder', subject: 'Tonight: Knights vs Avalanche', audience: 'holders', channel: 'email', status: 'sent', when: '2h ago' },
-  { id: 3, type: 'availability', subject: 'New tickets available this week', audience: 'everyone', channel: 'email', status: 'sent', when: 'Yesterday' },
-  { id: 2, type: 'announcement', subject: 'Playoff ticket lottery opens Friday', audience: 'employees', channel: 'in_app', status: 'scheduled', when: 'in 2 days' },
-  { id: 1, type: 'game_link', subject: 'Your seats: vs San Jose Sharks', audience: 'sales_team', channel: 'email', status: 'sent', when: '3d ago' },
-];
-
 // ------------------------------------------------------------------------------------------------
 
 export default function NotificationsPage() {
@@ -104,15 +102,53 @@ export default function NotificationsPage() {
   const [gameId, setGameId] = useState('');
   const [scheduled, setScheduled] = useState(false);
   const [scheduleAt, setScheduleAt] = useState('');
-  const [rows, setRows] = useState<NotifRow[]>(SEED);
+  const [rows, setRows] = useState<Cr9cd_notifications[]>([]);
   const [flash, setFlash] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [games, setGames] = useState<Cr9cd_games[]>([]);
+  const [templates, setTemplates] = useState<{ name: string; type: NotifType; subject: string; body: string }[]>(TEMPLATES);
 
   useEffect(() => {
     Cr9cd_gamesService.getAll({ orderBy: ['cr9cd_game_date desc'] }).then((result) => setGames(result.data ?? []));
   }, []);
 
-  const reach = audienceMeta(audience).reach;
+  function loadRecent() {
+    return Cr9cd_notificationsService.getAll({ orderBy: ['createdon desc'], top: 50 }).then((result) => setRows(result.data ?? []));
+  }
+
+  useEffect(() => {
+    loadRecent();
+  }, []);
+
+  // Live headcount for the only real audience today (Everyone = all contacts). The rest keep
+  // their static placeholder value and are flagged with <PlaceholderFlag>.
+  const [reachByKey, setReachByKey] = useState<Record<Audience, number>>(() =>
+    Object.fromEntries(AUDIENCES.map((a) => [a.key, a.reach])) as Record<Audience, number>
+  );
+
+  useEffect(() => {
+    Cr9cd_contact_beneficiariesService.getAll({ select: ['cr9cd_contact_beneficiaryid'] }).then((all) => {
+      setReachByKey((prev) => ({ ...prev, everyone: all.data?.length ?? 0 }));
+    });
+  }, []);
+
+  useEffect(() => {
+    Cr9cd_notificationtemplatesService.getAll({ orderBy: ['cr9cd_name asc'] }).then((result) => {
+      const data = result.data ?? [];
+      if (data.length > 0) {
+        setTemplates(
+          data.map((t) => ({
+            name: t.cr9cd_name,
+            type: t.cr9cd_type != null ? notificationTypeChoice.toValue(t.cr9cd_type) : 'reminder',
+            subject: t.cr9cd_subject ?? '',
+            body: t.cr9cd_body ?? '',
+          }))
+        );
+      }
+    });
+  }, []);
+
+  const reach = reachByKey[audience];
 
   function applyTemplate(t: { type: NotifType; subject: string; body: string }) {
     setType(t.type);
@@ -127,32 +163,69 @@ export default function NotificationsPage() {
     setBody((b) => `${b}\n\n🎟 ${gameLabel(g)} — ${window.location.origin}/#/games/${g.cr9cd_gameid}`);
   }
 
-  function send() {
-    const next: NotifRow = {
-      id: Math.max(0, ...rows.map((r) => r.id)) + 1,
-      type,
-      subject: subject.trim() || typeMeta(type).subject,
-      audience,
-      channel,
-      status: scheduled ? 'scheduled' : 'sent',
-      when: scheduled ? (scheduleAt ? scheduleAt.replace('T', ' ') : 'scheduled') : 'Just now',
-    };
-    setRows((r) => [next, ...r]);
-    setFlash(
-      scheduled
-        ? `Scheduled for ${audienceMeta(audience).label} (~${reach} recipients) via ${channelLabel(channel)}.`
-        : `Sent to ${audienceMeta(audience).label} (~${reach} recipients) via ${channelLabel(channel)}.`
-    );
+  async function send() {
+    setBusy(true);
+    try {
+      await Cr9cd_notificationsService.create({
+        cr9cd_name: subject.trim() || typeMeta(type).subject,
+        cr9cd_message: body,
+        cr9cd_type: notificationTypeChoice.toCode(type),
+        cr9cd_channel: notificationChannelChoice.toCode(channel),
+        cr9cd_audience: notificationAudienceChoice.toCode(audience),
+        cr9cd_status: notificationStatusChoice.toCode(scheduled ? 'scheduled' : 'sent'),
+        cr9cd_recipient_count: reach,
+        ...(scheduled && scheduleAt ? { cr9cd_scheduled_at: new Date(scheduleAt).toISOString() } : {}),
+        ...(!scheduled ? { cr9cd_sent_at: new Date().toISOString() } : {}),
+        ...(gameId ? { 'cr9cd_Game@odata.bind': bindRef('cr9cd_games', gameId) } : {}),
+      } as Parameters<typeof Cr9cd_notificationsService.create>[0]);
+      setFlash(
+        scheduled
+          ? `Scheduled for ${audienceMeta(audience).label} (~${reach} recipients) via ${channelLabel(channel)}.`
+          : `Sent to ${audienceMeta(audience).label} (~${reach} recipients) via ${channelLabel(channel)}.`
+      );
+      await loadRecent();
+    } finally {
+      setBusy(false);
+    }
   }
 
-  const columns: Column<NotifRow>[] = useMemo(
+  const columns: Column<Cr9cd_notifications>[] = useMemo(
     () => [
-      { key: 'type', header: 'Type', render: (r) => <Badge tone={typeMeta(r.type).tone}>{typeMeta(r.type).label}</Badge> },
-      { key: 'subject', header: 'Subject', render: (r) => <span className="font-medium text-slate-800">{r.subject}</span> },
-      { key: 'aud', header: 'Audience', render: (r) => audienceMeta(r.audience).label },
-      { key: 'ch', header: 'Channel', render: (r) => channelLabel(r.channel) },
-      { key: 'status', header: 'Status', render: (r) => <Badge tone={STATUS_TONE[r.status]}>{r.status[0].toUpperCase() + r.status.slice(1)}</Badge> },
-      { key: 'when', header: 'When', align: 'right', render: (r) => <span className="text-slate-500">{r.when}</span> },
+      {
+        key: 'type',
+        header: 'Type',
+        render: (r) => {
+          if (r.cr9cd_type == null) return <span className="text-slate-400">—</span>;
+          const meta = typeMeta(notificationTypeChoice.toValue(r.cr9cd_type));
+          return <Badge tone={meta.tone}>{meta.label}</Badge>;
+        },
+      },
+      { key: 'subject', header: 'Subject', render: (r) => <span className="font-medium text-slate-800">{r.cr9cd_name}</span> },
+      {
+        key: 'aud',
+        header: 'Audience',
+        render: (r) => (r.cr9cd_audience != null ? audienceMeta(notificationAudienceChoice.toValue(r.cr9cd_audience)).label : '—'),
+      },
+      {
+        key: 'ch',
+        header: 'Channel',
+        render: (r) => (r.cr9cd_channel != null ? channelLabel(notificationChannelChoice.toValue(r.cr9cd_channel)) : '—'),
+      },
+      {
+        key: 'status',
+        header: 'Status',
+        render: (r) => {
+          if (r.cr9cd_status == null) return <span className="text-slate-400">—</span>;
+          const s = notificationStatusChoice.toValue(r.cr9cd_status);
+          return <Badge tone={STATUS_TONE[s]}>{s[0].toUpperCase() + s.slice(1)}</Badge>;
+        },
+      },
+      {
+        key: 'when',
+        header: 'When',
+        align: 'right',
+        render: (r) => <span className="text-slate-500">{formatDateTime(r.cr9cd_sent_at ?? r.cr9cd_scheduled_at ?? r.createdon)}</span>,
+      },
     ],
     []
   );
@@ -165,10 +238,6 @@ export default function NotificationsPage() {
   return (
     <div>
       <PageHeader title="Notification Manager" subtitle="Send reminders, announcements, and game links to your audiences." />
-
-      <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-        Mock-up preview — composing and scheduling work here, but messages aren't delivered yet.
-      </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         {/* Composer */}
@@ -246,11 +315,14 @@ export default function NotificationsPage() {
             <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm text-slate-500">
                 Will {scheduled ? 'schedule' : 'send'} to <span className="font-semibold text-slate-800">{audienceMeta(audience).label}</span>{' '}
-                (~{reach} recipients) via {channelLabel(channel)}.
+                (~{reach} recipients){!audienceMeta(audience).done && <PlaceholderFlag note={audienceMeta(audience).todo} className="mx-1 align-middle" />} via {channelLabel(channel)}.
               </div>
-              <Button disabled={!subject.trim() || !body.trim()} onClick={send}>
-                {scheduled ? 'Schedule' : 'Send now'}
-              </Button>
+              <div className="flex items-center gap-2">
+                <PlaceholderFlag note="messages are recorded here but not actually delivered yet" />
+                <Button disabled={!subject.trim() || !body.trim() || busy} onClick={send}>
+                  {scheduled ? 'Schedule' : 'Send now'}
+                </Button>
+              </div>
             </div>
             {flash && <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{flash}</div>}
           </div>
@@ -261,17 +333,20 @@ export default function NotificationsPage() {
           <div className="card p-5">
             <h3 className="mb-3 text-sm font-semibold text-slate-800">Audience reach</h3>
             <div className="space-y-2">
-              {AUDIENCES.map((a) => (
+              {AUDIENCES.filter((a) => a.key !== 'everyone').map((a) => (
                 <button
                   key={a.key}
                   type="button"
                   onClick={() => setAudience(a.key)}
-                  className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm transition hover:border-brand-400 ${
+                  className={`flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm transition hover:border-brand-400 ${
                     audience === a.key ? 'border-brand-400 bg-brand-50/50' : 'border-slate-200'
                   }`}
                 >
                   <span className="font-medium text-slate-700">{a.label}</span>
-                  <span className="tabular-nums text-slate-500">{a.reach}</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="tabular-nums text-slate-500">{reachByKey[a.key]}</span>
+                    {!a.done && <PlaceholderFlag note={a.todo} />}
+                  </span>
                 </button>
               ))}
             </div>
@@ -281,7 +356,7 @@ export default function NotificationsPage() {
             <h3 className="mb-1 text-sm font-semibold text-slate-800">Templates</h3>
             <p className="mb-3 text-xs text-slate-400">Click to load into the composer.</p>
             <div className="space-y-2">
-              {TEMPLATES.map((t) => (
+              {templates.map((t) => (
                 <button
                   key={t.name}
                   type="button"
@@ -303,7 +378,7 @@ export default function NotificationsPage() {
       {/* History */}
       <div className="mt-6">
         <h3 className="mb-3 text-sm font-semibold text-slate-800">Recent notifications</h3>
-        <DataTable columns={columns} rows={rows} keyFn={(r) => r.id} emptyTitle="No notifications yet" />
+        <DataTable columns={columns} rows={rows} keyFn={(r) => r.cr9cd_notificationid} emptyTitle="No notifications yet" />
       </div>
     </div>
   );

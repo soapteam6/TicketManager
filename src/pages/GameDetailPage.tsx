@@ -6,6 +6,8 @@ import { Cr9cd_seatsService } from '../generated/services/Cr9cd_seatsService';
 import { Cr9cd_ticketrequestsService } from '../generated/services/Cr9cd_ticketrequestsService';
 import { Cr9cd_assignmentsService } from '../generated/services/Cr9cd_assignmentsService';
 import { Cr9cd_seasonsService } from '../generated/services/Cr9cd_seasonsService';
+import { Cr9cd_contact_beneficiariesService } from '../generated/services/Cr9cd_contact_beneficiariesService';
+import type { Cr9cd_contact_beneficiaries } from '../generated/models/Cr9cd_contact_beneficiariesModel';
 import type { Cr9cd_games } from '../generated/models/Cr9cd_gamesModel';
 import type { Cr9cd_seasons } from '../generated/models/Cr9cd_seasonsModel';
 import type { Cr9cd_seats } from '../generated/models/Cr9cd_seatsModel';
@@ -48,6 +50,9 @@ import { Badge, type BadgeTone } from '../components/Badge';
 import { TextInput, Select, Field } from '../components/Field';
 import { Modal } from '../components/Modal';
 import { Spinner } from '../components/Spinner';
+import { StatCard } from '../components/StatCard';
+
+const LONG_DATE: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' };
 
 const thClass = 'whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500';
 const tdClass = 'px-4 py-3 align-top text-sm text-slate-700';
@@ -73,6 +78,7 @@ export default function GameDetailPage() {
   const [editingGame, setEditingGame] = useState(false);
   const [editingRequestId, setEditingRequestId] = useState<string | null>(null);
   const [showReserve, setShowReserve] = useState(false);
+  const [assignToRequestId, setAssignToRequestId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!gameId) return;
@@ -113,6 +119,10 @@ export default function GameDetailPage() {
       return acc;
     }, {})
   ).sort((a, b) => a[0].localeCompare(b[0]));
+  const openRequestStatuses = new Set(['submitted', 'scored', 'recommended', 'approved', 'partially_fulfilled', 'waitlisted']);
+  const openRequestCount = requests.filter((r) =>
+    openRequestStatuses.has(r.cr9cd_status != null ? requestStatusChoice.toValue(r.cr9cd_status) : 'submitted')
+  ).length;
   const assignmentsByRequest = new Map<string, Cr9cd_assignments[]>();
   for (const a of assignments) {
     const reqId = a._cr9cd_ticket_request_value;
@@ -122,6 +132,7 @@ export default function GameDetailPage() {
     assignmentsByRequest.set(reqId, list);
   }
   const activeAssignmentStatuses = new Set(['proposed', 'approved', 'transferred']);
+  const seatTypeById = new Map(seats.map((s) => [s.cr9cd_seatid, s.cr9cd_ticket_type || 'Standard']));
 
   async function run(fn: () => Promise<void>) {
     setBusy(true);
@@ -159,17 +170,13 @@ export default function GameDetailPage() {
             <PageHeader
               title={
                 <>
-                  {game.cr9cd_game_date ? new Date(game.cr9cd_game_date).toLocaleDateString() : ''}{' '}
+                  {game.cr9cd_game_date ? new Date(game.cr9cd_game_date).toLocaleDateString('en-US', LONG_DATE) : ''}{' '}
                   {(game.cr9cd_kind != null ? gameKindChoice.toValue(game.cr9cd_kind) : 'game') === 'event'
                     ? game.cr9cd_title
                     : `vs ${game.cr9cd_opponent}`}
                 </>
               }
-              subtitle={
-                game.cr9cd_seasonname
-                  ? [game.cr9cd_seasonname, game.cr9cd_promotions].filter(Boolean).join(' · ')
-                  : game.cr9cd_promotions || undefined
-              }
+              subtitle={game.cr9cd_seasonname || undefined}
               actions={
                 <>
                   <Badge status={game.cr9cd_status != null ? gameStatusChoice.toValue(game.cr9cd_status) : 'scheduled'} />
@@ -199,19 +206,33 @@ export default function GameDetailPage() {
         )}
       </div>
 
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard label="Total seats" value={seats.length} tone="brand" />
+        <StatCard label="Available seats" value={availableSeats.length} tone="emerald" />
+        <StatCard label="Open requests" value={openRequestCount} tone="amber" />
+      </div>
+
+      {availableByType.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Available by type:</span>
+          {availableByType.map(([type, n]) => (
+            <span key={type} className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
+              {type}: {n}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {game.cr9cd_promotions && (
+        <div className="mb-4 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+          <span className="font-semibold text-slate-900">Promotions:</span> {game.cr9cd_promotions}
+        </div>
+      )}
+
       <div className="card mb-4 p-5">
         <h2 className="mb-3 text-sm font-semibold text-slate-900">
           Seats <span className="font-normal text-slate-400">({availableSeats.length} available of {seats.length})</span>
         </h2>
-        {availableByType.length > 0 && (
-          <div className="mb-3 flex flex-wrap gap-2">
-            {availableByType.map(([type, n]) => (
-              <span key={type} className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                {type}: {n}
-              </span>
-            ))}
-          </div>
-        )}
         <AddSeatsForm gameId={gameId} seats={seats} onCreated={load} />
         <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -272,7 +293,10 @@ export default function GameDetailPage() {
           </Button>
         </div>
         {reservations.length === 0 ? (
-          <p className="text-sm text-slate-400">No reservations yet — offer available seats to a named person with a deadline.</p>
+          <div className="py-6 text-center">
+            <div className="text-sm font-medium text-slate-500">No reservations</div>
+            <div className="mt-1 text-sm text-slate-400">Use “Reserve seats” to hold seats for a person until a deadline.</div>
+          </div>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-slate-200">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -343,6 +367,25 @@ export default function GameDetailPage() {
         />
       )}
 
+      {assignToRequestId && (
+        <AssignToContactModal
+          onClose={() => setAssignToRequestId(null)}
+          onPick={(contactId) =>
+            run(async () => {
+              const { assigned } = await assignOutstandingTickets({
+                requestId: assignToRequestId,
+                gameId,
+                quantity: 1,
+                beneficiaryContactId: contactId,
+                availableSeatIds: availableSeats.map((s) => s.cr9cd_seatid),
+              });
+              if (assigned === 0) setMessage('No seat could be assigned — none available.');
+              setAssignToRequestId(null);
+            })
+          }
+        />
+      )}
+
       <div className="card mb-4 p-5">
         <h2 className="mb-3 text-sm font-semibold text-slate-900">Requests</h2>
         <NewRequestForm gameId={gameId} onCreated={load} />
@@ -351,12 +394,13 @@ export default function GameDetailPage() {
             <thead className="bg-slate-50">
               <tr>
                 <th className={thClass}>Requester</th>
-                <th className={thClass}>Type</th>
+                <th className={thClass}>For</th>
                 <th className={thClass}>Qty</th>
+                <th className={thClass}>Sales opp</th>
+                <th className={thClass}>Score</th>
+                <th className={thClass}>Seats</th>
                 <th className={thClass}>Status</th>
                 <th className={thClass}>Rank</th>
-                <th className={thClass}>Score</th>
-                <th className={thClass}>Assignments</th>
                 <th className={thClass}></th>
               </tr>
             </thead>
@@ -385,79 +429,49 @@ export default function GameDetailPage() {
                       <Badge status={r.cr9cd_beneficiary_type != null ? contactTypeChoice.toValue(r.cr9cd_beneficiary_type) : undefined} />
                     </td>
                     <td className={clsx(tdClass, 'tabular-nums')}>{r.cr9cd_quantity}</td>
+                    <td className={clsx(tdClass, 'tabular-nums')}>${(r.cr9cd_sales_opportunity_usd ?? 0).toLocaleString()}</td>
+                    <td className={clsx(tdClass, 'tabular-nums')}>{r.cr9cd_priority_score != null ? r.cr9cd_priority_score.toFixed(3) : '—'}</td>
+                    <td className={clsx(tdClass, 'tabular-nums')}>
+                      {reqAssignments.length}/{r.cr9cd_quantity ?? 0}
+                    </td>
                     <td className={tdClass}>
                       <Badge status={r.cr9cd_status != null ? requestStatusChoice.toValue(r.cr9cd_status) : 'submitted'} />
                     </td>
                     <td className={clsx(tdClass, 'tabular-nums')}>{r.cr9cd_priority_rank ?? '—'}</td>
-                    <td className={clsx(tdClass, 'tabular-nums')}>{r.cr9cd_priority_score != null ? r.cr9cd_priority_score.toFixed(3) : '—'}</td>
-                    <td className={tdClass}>
-                      <div className="space-y-1.5">
-                        {reqAssignments.map((a) => (
-                          <div key={a.cr9cd_assignmentid} className="flex flex-wrap items-center gap-1.5">
-                            <Badge status={a.cr9cd_status != null ? assignmentStatusChoice.toValue(a.cr9cd_status) : 'proposed'} />
-                            <span className="text-xs text-slate-400">{a.cr9cd_seatname}</span>
-                            {a.cr9cd_status != null && assignmentStatusChoice.toValue(a.cr9cd_status) === 'proposed' && (
-                              <button
-                                className="text-xs font-medium text-emerald-600 hover:text-emerald-700"
-                                disabled={busy}
-                                onClick={() => run(() => approveAssignment(a.cr9cd_assignmentid))}
-                              >
-                                Approve
-                              </button>
-                            )}
-                            {a.cr9cd_status != null && ['proposed', 'approved'].includes(assignmentStatusChoice.toValue(a.cr9cd_status)) && (
-                              <button
-                                className="text-xs font-medium text-slate-500 hover:text-slate-700"
-                                disabled={busy}
-                                onClick={() => run(() => declineAssignment(a.cr9cd_assignmentid))}
-                              >
-                                Decline
-                              </button>
-                            )}
-                            {a.cr9cd_status != null && assignmentStatusChoice.toValue(a.cr9cd_status) === 'approved' && (
-                              <AttendanceForm assignmentId={a.cr9cd_assignmentid} onDone={load} />
-                            )}
-                            <button
-                              className="text-xs font-medium text-rose-500 hover:text-rose-700"
-                              disabled={busy}
-                              title="Hard-delete this assignment (use for a mistaken entry, not a real decline)"
-                              onClick={() =>
-                                run(async () => {
-                                  if (!window.confirm('Permanently delete this assignment? Use this for data-entry mistakes only.')) return;
-                                  await deleteAssignment(a.cr9cd_assignmentid);
-                                })
-                              }
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </td>
                     <td className={clsx(tdClass, 'text-right')}>
                       <div className="flex flex-wrap items-center justify-end gap-2">
                         {outstanding > 0 && availableSeats.length > 0 && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={busy}
-                            onClick={() =>
-                              run(async () => {
-                                const { assigned } = await assignOutstandingTickets({
-                                  requestId: r.cr9cd_ticketrequestid,
-                                  gameId,
-                                  quantity: outstanding,
-                                  beneficiaryContactId: r._cr9cd_beneficiary_contact_value ?? null,
-                                  availableSeatIds: availableSeats.map((s) => s.cr9cd_seatid),
-                                });
-                                if (assigned < outstanding) {
-                                  setMessage(`Assigned ${assigned} of ${outstanding} requested ticket(s) — not enough seats available.`);
-                                }
-                              })
-                            }
-                          >
-                            Assign {outstanding} ticket{outstanding === 1 ? '' : 's'}
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={busy}
+                              onClick={() =>
+                                run(async () => {
+                                  const { assigned } = await assignOutstandingTickets({
+                                    requestId: r.cr9cd_ticketrequestid,
+                                    gameId,
+                                    quantity: outstanding,
+                                    beneficiaryContactId: r._cr9cd_beneficiary_contact_value ?? null,
+                                    availableSeatIds: availableSeats.map((s) => s.cr9cd_seatid),
+                                  });
+                                  if (assigned < outstanding) {
+                                    setMessage(`Assigned ${assigned} of ${outstanding} requested ticket(s) — not enough seats available.`);
+                                  }
+                                })
+                              }
+                            >
+                              Assign {outstanding} ticket{outstanding === 1 ? '' : 's'}
+                            </Button>
+                            <button
+                              className="text-xs font-medium text-brand-600 hover:text-brand-700"
+                              disabled={busy}
+                              title="Assign one seat to a specific contact"
+                              onClick={() => setAssignToRequestId(r.cr9cd_ticketrequestid)}
+                            >
+                              Assign to…
+                            </button>
+                          </>
                         )}
                         <button className="text-xs font-medium text-slate-500 hover:text-slate-700" onClick={() => setEditingRequestId(r.cr9cd_ticketrequestid)}>
                           Edit
@@ -486,7 +500,7 @@ export default function GameDetailPage() {
               })}
               {requests.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-6 text-center text-sm text-slate-400">
+                  <td colSpan={9} className="px-4 py-6 text-center text-sm text-slate-400">
                     No requests yet.
                   </td>
                 </tr>
@@ -497,9 +511,88 @@ export default function GameDetailPage() {
       </div>
 
       <div className="card mb-4 p-5">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">Score &amp; Rank</h2>
+        <h2 className="mb-3 text-sm font-semibold text-slate-900">Assignments</h2>
+        {assignments.length === 0 ? (
+          <div className="py-6 text-center">
+            <div className="text-sm font-medium text-slate-500">No assignments yet</div>
+            <div className="mt-1 text-sm text-slate-400">Assign seats to a request to see them here.</div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className={thClass}>Beneficiary</th>
+                  <th className={thClass}>Seat</th>
+                  <th className={thClass}>Type</th>
+                  <th className={thClass}>Status</th>
+                  <th className={thClass}></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {assignments.map((a) => {
+                  const status = a.cr9cd_status != null ? assignmentStatusChoice.toValue(a.cr9cd_status) : 'proposed';
+                  return (
+                    <tr key={a.cr9cd_assignmentid} className="hover:bg-slate-50">
+                      <td className={clsx(tdClass, 'font-medium text-slate-900')}>{a.cr9cd_beneficiary_contactname || '—'}</td>
+                      <td className={tdClass}>{a.cr9cd_seatname || '—'}</td>
+                      <td className={tdClass}>{(a._cr9cd_seat_value && seatTypeById.get(a._cr9cd_seat_value)) || 'Standard'}</td>
+                      <td className={tdClass}>
+                        <Badge status={status} />
+                      </td>
+                      <td className={clsx(tdClass, 'text-right')}>
+                        <div className="flex flex-wrap items-center justify-end gap-3">
+                          {status === 'proposed' && (
+                            <button
+                              className="text-xs font-medium text-emerald-600 hover:text-emerald-700"
+                              disabled={busy}
+                              onClick={() => run(() => approveAssignment(a.cr9cd_assignmentid))}
+                            >
+                              Approve
+                            </button>
+                          )}
+                          {status === 'approved' && <AttendanceForm assignmentId={a.cr9cd_assignmentid} onDone={load} />}
+                          {['proposed', 'approved'].includes(status) && (
+                            <button
+                              className="text-xs font-medium text-slate-500 hover:text-slate-700"
+                              disabled={busy}
+                              onClick={() => run(() => declineAssignment(a.cr9cd_assignmentid))}
+                            >
+                              Unassign
+                            </button>
+                          )}
+                          <button
+                            className="text-xs font-medium text-rose-500 hover:text-rose-700"
+                            disabled={busy}
+                            title="Hard-delete this assignment (use for a mistaken entry, not a real unassign)"
+                            onClick={() =>
+                              run(async () => {
+                                if (!window.confirm('Permanently delete this assignment? Use this for data-entry mistakes only.')) return;
+                                await deleteAssignment(a.cr9cd_assignmentid);
+                              })
+                            }
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="card mb-4 p-5">
+        <div className="mb-3">
+          <h2 className="text-sm font-semibold text-slate-900">Priority ranking</h2>
+          <p className="text-sm text-slate-500">Score all open requests against the active scoring config.</p>
+        </div>
         <div className="flex flex-wrap gap-2">
           <Button
+            variant="danger"
             disabled={busy}
             loading={busy}
             onClick={() =>
@@ -681,7 +774,7 @@ function EditRequestForm({ request, onDone }: { request: Cr9cd_ticketrequests; o
           <option value="cancelled">Cancelled</option>
         </Select>
       </td>
-      <td colSpan={2} className={tdClass}>
+      <td colSpan={3} className={tdClass}>
         <TextInput placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
       </td>
       <td colSpan={2} className={clsx(tdClass, 'text-right')}>
@@ -761,8 +854,16 @@ function ReserveModal({
   const [quantity, setQuantity] = useState(1);
   const [ticketType, setTicketType] = useState('');
   const [expiresDate, setExpiresDate] = useState(() => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  const [reservedById, setReservedById] = useState('');
+  const [employees, setEmployees] = useState<Cr9cd_contact_beneficiaries[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    Cr9cd_contact_beneficiariesService
+      .getAll({ filter: `cr9cd_type eq ${contactTypeChoice.toCode('employee')}`, orderBy: ['cr9cd_name asc'] })
+      .then((r) => setEmployees(r.data ?? []));
+  }, []);
 
   async function submit() {
     if (!personName.trim()) return;
@@ -778,6 +879,7 @@ function ReserveModal({
         quantity,
         ticketType: ticketType || undefined,
         expiresAt,
+        reservedByContactId: reservedById || undefined,
       });
       onReserved();
     } catch (err) {
@@ -792,7 +894,7 @@ function ReserveModal({
       open
       onClose={onClose}
       title="Reserve seats"
-      description="Offer available seats to a named person with a deadline. Unclaimed holds auto-expire back to the pool."
+      description="Hold seats for a person until a deadline. Unclaimed seats return to the pool automatically."
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -811,8 +913,18 @@ function ReserveModal({
         <Field label="Email">
           <TextInput value={personEmail} onChange={(e) => setPersonEmail(e.target.value)} placeholder="Optional" />
         </Field>
+        <Field label="Reserved by" hint="Employee placing the hold">
+          <Select value={reservedById} onChange={(e) => setReservedById(e.target.value)}>
+            <option value="">— Unassigned —</option>
+            {employees.map((emp) => (
+              <option key={emp.cr9cd_contact_beneficiaryid} value={emp.cr9cd_contact_beneficiaryid}>
+                {emp.cr9cd_name}
+              </option>
+            ))}
+          </Select>
+        </Field>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Number of seats">
+          <Field label="Number of seats" required>
             <TextInput type="number" min={1} value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} />
           </Field>
           {availableByType.length > 1 && (
@@ -828,7 +940,7 @@ function ReserveModal({
             </Field>
           )}
         </div>
-        <Field label="Reserve by">
+        <Field label="Reserve by" required hint="Seats are released back to the pool after this date">
           <TextInput type="date" value={expiresDate} onChange={(e) => setExpiresDate(e.target.value)} />
         </Field>
         {error && <p className="text-sm text-rose-600">{error}</p>}
@@ -977,7 +1089,7 @@ function AttendanceForm({ assignmentId, onDone }: { assignmentId: string; onDone
   if (!open) {
     return (
       <button className="text-xs font-medium text-brand-600 hover:text-brand-700" onClick={() => setOpen(true)} disabled={busy}>
-        Reconcile
+        Edit attendance
       </button>
     );
   }
@@ -1025,5 +1137,25 @@ function AttendanceForm({ assignmentId, onDone }: { assignmentId: string; onDone
         Cancelled
       </button>
     </span>
+  );
+}
+
+// Assign a single available seat to a specific contact (frame: "assign a seat to a specific contact"),
+// distinct from the bulk "Assign N tickets" action that assigns to the request's own beneficiary.
+function AssignToContactModal({ onClose, onPick }: { onClose: () => void; onPick: (contactId: string) => void }) {
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Assign to contact"
+      description="Pick the contact who should receive one available seat for this request."
+      footer={
+        <Button variant="secondary" onClick={onClose}>
+          Cancel
+        </Button>
+      }
+    >
+      <ContactPicker onSelect={(sel) => onPick(sel.id)} />
+    </Modal>
   );
 }

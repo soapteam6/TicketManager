@@ -39,7 +39,7 @@ const STATUS_TONE: Record<string, BadgeTone> = {
   // assignment status
   proposed: 'violet',
   // waitlist
-  active: 'blue',
+  active: 'red',
   promoted: 'green',
   expired: 'zinc',
   // season status

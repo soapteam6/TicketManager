@@ -376,7 +376,7 @@ function NewTeamModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
             <TextInput value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="T-Mobile Arena" />
           </Field>
         </div>
-        <Field label="Official website" hint="Optional — used later to pull the schedule">
+        <Field label="Official website" hint="Used later to pull the schedule (Import schedule with AI)">
           <TextInput value={officialUrl} onChange={(e) => setOfficialUrl(e.target.value)} placeholder="https://www.vegasgoldenknights.com/schedule/" />
         </Field>
         <Field label="Default tickets / game" hint="Seats auto-created on schedule import">
@@ -388,19 +388,9 @@ function NewTeamModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
   );
 }
 
-// Editable team settings: identity, official website, default tickets, and delete — mirrors the
-// original TeamSettings panel, ported into a Modal to match the rest of the restored interaction pattern.
-function TeamSettingsModal({
-  team,
-  onClose,
-  onSaved,
-  onDeleted,
-}: {
-  team: Cr9cd_teams;
-  onClose: () => void;
-  onSaved: () => void;
-  onDeleted: () => void;
-}) {
+// Editable team settings section, rendered inline at the top of the Team detail modal (frame:
+// "TEAM SETTINGS" with Save settings on the left and Delete team on the right).
+function TeamSettingsSection({ team, onSaved, onDeleted }: { team: Cr9cd_teams; onSaved: () => void; onDeleted: () => void }) {
   const [name, setName] = useState(team.cr9cd_name ?? '');
   const [abbreviation, setAbbreviation] = useState(team.cr9cd_abbreviation ?? '');
   const [sport, setSport] = useState(team.cr9cd_sport ?? '');
@@ -409,7 +399,6 @@ function TeamSettingsModal({
   const [tickets, setTickets] = useState(String(team.cr9cd_default_tickets_per_game ?? 0));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState(false);
 
   async function save() {
     setBusy(true);
@@ -450,63 +439,38 @@ function TeamSettingsModal({
   }
 
   return (
-    <Modal
-      open
-      onClose={onClose}
-      title={`${team.cr9cd_name} — settings`}
-      size="lg"
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Close
-          </Button>
-          <Button loading={busy} onClick={save}>
-            Save settings
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Name">
-            <TextInput value={name} onChange={(e) => setName(e.target.value)} />
-          </Field>
-          <Field label="Abbreviation">
-            <TextInput value={abbreviation} onChange={(e) => setAbbreviation(e.target.value)} />
-          </Field>
-          <Field label="Sport / league">
-            <TextInput value={sport} onChange={(e) => setSport(e.target.value)} />
-          </Field>
-          <Field label="Venue">
-            <TextInput value={venue} onChange={(e) => setVenue(e.target.value)} />
-          </Field>
-          <Field label="Official website" hint="Used by schedule import" className="sm:col-span-2">
-            <TextInput value={officialUrl} onChange={(e) => setOfficialUrl(e.target.value)} placeholder="https://www.team.com/schedule" />
-          </Field>
-          <Field label="Default tickets / game" hint="Seats auto-created on import">
-            <TextInput type="number" min="0" value={tickets} onChange={(e) => setTickets(e.target.value)} />
-          </Field>
-        </div>
-        {error && <p className="text-sm text-rose-600">{error}</p>}
-        <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
-          {confirmDelete ? (
-            <>
-              <span className="text-xs text-rose-700">Delete team and everything scheduled under it?</span>
-              <Button size="sm" variant="danger" loading={busy} onClick={remove}>
-                Confirm delete
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => setConfirmDelete(false)}>
-                Cancel
-              </Button>
-            </>
-          ) : (
-            <Button size="sm" variant="danger" onClick={() => setConfirmDelete(true)}>
-              Delete team
-            </Button>
-          )}
-        </div>
+    <section>
+      <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Team settings</h4>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Field label="Name">
+          <TextInput value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <Field label="Abbreviation">
+          <TextInput value={abbreviation} onChange={(e) => setAbbreviation(e.target.value)} />
+        </Field>
+        <Field label="Sport / league">
+          <TextInput value={sport} onChange={(e) => setSport(e.target.value)} />
+        </Field>
+        <Field label="Venue">
+          <TextInput value={venue} onChange={(e) => setVenue(e.target.value)} />
+        </Field>
+        <Field label="Official website" hint="Used by the AI schedule import" className="sm:col-span-2">
+          <TextInput value={officialUrl} onChange={(e) => setOfficialUrl(e.target.value)} placeholder="https://www.team.com/schedule" />
+        </Field>
+        <Field label="Default tickets / game" hint="Seats auto-created on import">
+          <TextInput type="number" min="0" value={tickets} onChange={(e) => setTickets(e.target.value)} />
+        </Field>
       </div>
-    </Modal>
+      {error && <p className="mt-3 text-sm text-rose-600">{error}</p>}
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <Button loading={busy} onClick={save}>
+          Save settings
+        </Button>
+        <Button variant="danger" loading={busy} onClick={remove}>
+          Delete team
+        </Button>
+      </div>
+    </section>
   );
 }
 
@@ -757,14 +721,18 @@ function AddGameModal({ seasonId, onClose, onCreated }: { seasonId: string; onCl
   );
 }
 
-function TeamSeasons({
+// Team detail modal — opens when a team card is clicked. Holds the inline Team settings section
+// and the Seasons management (frame: title = team name, "Close" footer).
+function TeamDetailModal({
   team,
   allSeasons,
+  onClose,
   onSeasonsChanged,
   onTeamChanged,
 }: {
   team: Cr9cd_teams;
   allSeasons: Cr9cd_seasons[];
+  onClose: () => void;
   onSeasonsChanged: () => void;
   onTeamChanged: () => void;
 }) {
@@ -774,7 +742,6 @@ function TeamSeasons({
   const [showCreateSeason, setShowCreateSeason] = useState(false);
   const [addGameSeasonId, setAddGameSeasonId] = useState<string | null>(null);
   const [aiImportSeasonId, setAiImportSeasonId] = useState<string | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
 
   const seasons = allSeasons.filter((s) => s._cr9cd_team_value === team.cr9cd_teamid);
   const seasonIds = seasons.map((s) => s.cr9cd_seasonid).join(',');
@@ -811,40 +778,58 @@ function TeamSeasons({
     }
   }
 
-  return (
-    <div className="card mb-4 p-5">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="text-base font-semibold text-slate-900">{team.cr9cd_name}</h3>
-          <p className="text-sm text-slate-500">
-            {team.cr9cd_sport} &middot; {team.cr9cd_venue}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={() => setShowSettings(true)}>
-            Settings
-          </Button>
-          <Button size="sm" onClick={() => setShowCreateSeason(true)}>
-            New season
-          </Button>
-        </div>
-      </div>
+  const teamSubtitle = [team.cr9cd_sport, team.cr9cd_venue].filter(Boolean).join(' · ');
 
-      {seasons.map((season) => (
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={team.cr9cd_name ?? 'Team'}
+      description={teamSubtitle || undefined}
+      size="xl"
+      footer={
+        <Button variant="secondary" onClick={onClose}>
+          Close
+        </Button>
+      }
+    >
+      <div className="space-y-6">
+        <TeamSettingsSection
+          team={team}
+          onSaved={onTeamChanged}
+          onDeleted={() => {
+            onTeamChanged();
+            onClose();
+          }}
+        />
+
+        <section className="border-t border-slate-200 pt-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Seasons</h4>
+            <Button size="sm" onClick={() => setShowCreateSeason(true)}>
+              New season
+            </Button>
+          </div>
+
+          {seasons.map((season) => (
         <div key={season.cr9cd_seasonid} className="mb-4 rounded-lg border border-slate-200 p-4">
           <div className="mb-2 flex flex-wrap items-center gap-3">
-            <strong className="text-sm text-slate-900">{season.cr9cd_name}</strong>
-            <Badge status={season.cr9cd_status != null ? seasonStatusChoice.toValue(season.cr9cd_status) : 'draft'} />
-            {season.cr9cd_start_date && (
-              <span className="text-xs text-slate-400">
-                {formatDateOnly(season.cr9cd_start_date)}
-                {season.cr9cd_end_date ? ` – ${formatDateOnly(season.cr9cd_end_date)}` : ''}
-              </span>
-            )}
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <strong className="text-sm text-slate-900">{season.cr9cd_name}</strong>
+                <Badge status={season.cr9cd_status != null ? seasonStatusChoice.toValue(season.cr9cd_status) : 'draft'} />
+              </div>
+              {season.cr9cd_start_date && (
+                <div className="text-xs text-slate-400">
+                  {formatDateOnly(season.cr9cd_start_date)}
+                  {season.cr9cd_end_date ? ` – ${formatDateOnly(season.cr9cd_end_date)}` : ''}
+                </div>
+              )}
+            </div>
             <div className="ml-auto flex items-center gap-2">
               <ScheduleTemplateButtons seasonId={season.cr9cd_seasonid} onImported={loadGames} />
               <Button size="sm" variant="secondary" onClick={() => setAiImportSeasonId(season.cr9cd_seasonid)}>
-                Import (AI)
+                Import (paste)
               </Button>
               <ExportButton seasonId={season.cr9cd_seasonid} />
               <Button size="sm" variant="secondary" onClick={() => setAddGameSeasonId(season.cr9cd_seasonid)}>
@@ -852,11 +837,11 @@ function TeamSeasons({
               </Button>
               {(season.cr9cd_status != null ? seasonStatusChoice.toValue(season.cr9cd_status) : 'draft') !== 'active' ? (
                 <Button size="sm" variant="secondary" disabled={busy} onClick={() => setSeasonStatus(season.cr9cd_seasonid, 'active')}>
-                  Mark active
+                  Activate
                 </Button>
               ) : (
                 <Button size="sm" variant="secondary" disabled={busy} onClick={() => setSeasonStatus(season.cr9cd_seasonid, 'completed')}>
-                  Mark complete
+                  Complete
                 </Button>
               )}
               <Button size="sm" variant="secondary" onClick={() => setEditingSeasonId(season.cr9cd_seasonid)}>
@@ -905,7 +890,14 @@ function TeamSeasons({
         </div>
       ))}
 
-      {seasons.length === 0 && <div className="mb-2 text-sm text-slate-400">No seasons yet — add one to start scheduling.</div>}
+          {seasons.length === 0 && (
+            <div className="py-8 text-center">
+              <div className="text-sm font-medium text-slate-500">No seasons yet</div>
+              <div className="mt-1 text-sm text-slate-400">Create a season to start scheduling games.</div>
+            </div>
+          )}
+        </section>
+      </div>
 
       {showCreateSeason && (
         <CreateSeasonModal
@@ -949,22 +941,7 @@ function TeamSeasons({
           onImported={loadGames}
         />
       )}
-
-      {showSettings && (
-        <TeamSettingsModal
-          team={team}
-          onClose={() => setShowSettings(false)}
-          onSaved={async () => {
-            setShowSettings(false);
-            await onTeamChanged();
-          }}
-          onDeleted={async () => {
-            setShowSettings(false);
-            await onTeamChanged();
-          }}
-        />
-      )}
-    </div>
+    </Modal>
   );
 }
 
@@ -975,6 +952,7 @@ export default function TeamsPage() {
   const [loading, setLoading] = useState(true);
   const [showNewTeam, setShowNewTeam] = useState(false);
   const [showNotify, setShowNotify] = useState(false);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
 
   const loadSeasons = useCallback(async () => {
     const result = await Cr9cd_seasonsService.getAll({ orderBy: ['cr9cd_name asc'] });
@@ -989,6 +967,8 @@ export default function TeamsPage() {
   useEffect(() => {
     Promise.all([loadTeams(), loadSeasons()]).then(() => setLoading(false));
   }, [loadTeams, loadSeasons]);
+
+  const selectedTeam = selectedTeamId ? teams.find((t) => t.cr9cd_teamid === selectedTeamId) ?? null : null;
 
   return (
     <div>
@@ -1012,10 +992,42 @@ export default function TeamsPage() {
         <div className="card flex items-center justify-center p-12">
           <Spinner label="Loading teams…" />
         </div>
+      ) : teams.length === 0 ? (
+        <div className="card p-12 text-center text-sm text-slate-400">No teams yet — add one to get started.</div>
       ) : (
-        teams.map((team) => (
-          <TeamSeasons key={team.cr9cd_teamid} team={team} allSeasons={allSeasons} onSeasonsChanged={loadSeasons} onTeamChanged={loadTeams} />
-        ))
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {teams.map((team) => {
+            const seasonCount = allSeasons.filter((s) => s._cr9cd_team_value === team.cr9cd_teamid).length;
+            const subtitle = [team.cr9cd_sport, team.cr9cd_venue].filter(Boolean).join(' · ');
+            return (
+              <button
+                key={team.cr9cd_teamid}
+                type="button"
+                onClick={() => setSelectedTeamId(team.cr9cd_teamid)}
+                className="card p-5 text-left transition hover:border-brand-300 hover:shadow-md"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="truncate text-base font-semibold text-slate-900">{team.cr9cd_name}</h3>
+                  {team.cr9cd_abbreviation && <Badge tone="slate">{team.cr9cd_abbreviation}</Badge>}
+                </div>
+                {subtitle && <p className="mt-1 truncate text-sm text-slate-500">{subtitle}</p>}
+                <p className="mt-3 text-xs text-slate-400">
+                  {seasonCount} season{seasonCount === 1 ? '' : 's'}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {selectedTeam && (
+        <TeamDetailModal
+          team={selectedTeam}
+          allSeasons={allSeasons}
+          onClose={() => setSelectedTeamId(null)}
+          onSeasonsChanged={loadSeasons}
+          onTeamChanged={loadTeams}
+        />
       )}
 
       {showNewTeam && (

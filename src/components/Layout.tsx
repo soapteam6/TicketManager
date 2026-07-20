@@ -126,6 +126,17 @@ const NAV: NavSection[] = [
       },
     ],
   },
+  {
+    heading: 'Admin',
+    items: [
+      {
+        to: '/integration-logs',
+        label: 'Integration Logs',
+        adminOnly: true,
+        icon: <Icon path="M4 6h16M4 10h16M4 14h16M4 18h16" />,
+      },
+    ],
+  },
 ];
 
 export function Layout() {

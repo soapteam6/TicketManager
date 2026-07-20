@@ -11,7 +11,7 @@ import { PageHeader } from '../components/PageHeader';
 import { StatCard } from '../components/StatCard';
 import { Badge } from '../components/Badge';
 import { EmptyState } from '../components/EmptyState';
-import { formatDate } from '../lib/format';
+import { formatDate, titleCase } from '../lib/format';
 
 interface UpcomingGame {
   gameId: string;
@@ -100,21 +100,27 @@ export default function DashboardPage() {
     })();
   }, []);
 
-  const utilizationPct = seatUtilization.total > 0 ? Math.round((100 * seatUtilization.used) / seatUtilization.total) : 0;
+  const openRequests =
+    (requestsByStatus['submitted'] ?? 0) + (requestsByStatus['scored'] ?? 0) + (requestsByStatus['recommended'] ?? 0);
 
   return (
     <div>
-      <PageHeader title="Dashboard" subtitle="Season ticket utilization across all teams" />
+      <PageHeader title="Dashboard" subtitle="Season-wide inventory, distribution, and ROI at a glance." />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Teams" value={teamCount} tone="brand" />
-        <StatCard label="Active seasons" value={activeSeasons} tone="violet" />
+        <StatCard label="Teams" value={teamCount} hint={`${activeSeasons} active season(s)`} tone="brand" />
         <StatCard label="Upcoming games" value={upcomingGames} tone="amber" />
         <StatCard
           label="Seat utilization"
-          value={`${utilizationPct}%`}
-          hint={`${seatUtilization.used} of ${seatUtilization.total} seats`}
+          value={`${seatUtilization.used} / ${seatUtilization.total}`}
+          hint="0 transferred"
           tone="emerald"
+        />
+        <StatCard
+          label="Open requests"
+          value={openRequests}
+          hint="submitted · scored · recommended"
+          tone="brand"
         />
       </div>
 
@@ -122,10 +128,9 @@ export default function DashboardPage() {
         <h2 className="mb-4 text-sm font-semibold text-slate-900">Requests by status</h2>
         <div className="flex flex-wrap gap-4">
           {REQUEST_STATUS.map((status) => (
-            <div key={status} className="flex items-center gap-2">
-              <Badge status={status} />
-              <span className="text-sm font-semibold tabular-nums text-slate-700">{requestsByStatus[status] ?? 0}</span>
-            </div>
+            <Badge key={status} status={status}>
+              {titleCase(status)} · {requestsByStatus[status] ?? 0}
+            </Badge>
           ))}
         </div>
       </div>

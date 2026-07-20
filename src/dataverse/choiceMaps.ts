@@ -17,6 +17,10 @@ import type {
   IntegrationAdapter,
   IntegrationStatus,
   ReservationStatus,
+  NotificationType,
+  NotificationChannel,
+  NotificationAudience,
+  NotificationStatus,
 } from '../domain/enums';
 
 interface ChoiceMap<T extends string> {
@@ -158,4 +162,30 @@ export const integrationStatusChoice = choiceMap<IntegrationStatus>([
   ['success', 100000000],
   ['error', 100000001],
   ['skipped', 100000002],
+]);
+
+export const notificationTypeChoice = choiceMap<NotificationType>([
+  ['reminder', 100000000],
+  ['announcement', 100000001],
+  ['availability', 100000002],
+  ['game_link', 100000003],
+]);
+
+export const notificationChannelChoice = choiceMap<NotificationChannel>([
+  ['email', 100000000],
+  ['sms', 100000001],
+  ['in_app', 100000002],
+]);
+
+export const notificationAudienceChoice = choiceMap<NotificationAudience>([
+  ['everyone', 100000000],
+  ['sales_team', 100000001],
+  ['employees', 100000002],
+  ['holders', 100000003],
+]);
+
+export const notificationStatusChoice = choiceMap<NotificationStatus>([
+  ['draft', 100000000],
+  ['scheduled', 100000001],
+  ['sent', 100000002],
 ]);

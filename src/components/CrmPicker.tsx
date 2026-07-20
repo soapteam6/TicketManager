@@ -3,6 +3,7 @@ import { searchAccounts, listContactsForAccount, listOpportunitiesForAccount } f
 import type { CrmAccountSummary, CrmContactSummary, CrmOpportunitySummary } from '../services/crmService';
 import { TextInput } from './Field';
 import { Button } from './Button';
+import { Badge } from './Badge';
 import { Spinner } from './Spinner';
 import { formatUsd } from '../lib/format';
 
@@ -141,22 +142,29 @@ export default function CrmPicker({ onSelect }: { onSelect: (selection: CrmSelec
   }
 
   return (
-    <div className="relative mb-3">
-      <TextInput placeholder="Search CRM accounts by name…" value={query} onChange={(e) => setQuery(e.target.value)} />
-      {loading && (
-        <div className="mt-1">
-          <Spinner size="sm" label="Searching…" />
-        </div>
-      )}
-      {accounts.length > 0 && (
-        <ul className="card absolute z-10 mt-1 w-full divide-y divide-slate-100 py-1">
-          {accounts.map((a) => (
-            <li key={a.id} className="cursor-pointer px-3 py-2 text-sm text-slate-700 hover:bg-slate-50" onClick={() => pickAccount(a)}>
-              {a.name}
-            </li>
-          ))}
-        </ul>
-      )}
+    <div className="card mb-3 p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-slate-900">Dynamics 365 CRM</h3>
+        <Badge tone="green">Live Dynamics</Badge>
+      </div>
+      <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">1. Search company (account)</h4>
+      <div className="relative">
+        <TextInput placeholder="Type a company name…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        {loading && (
+          <div className="mt-1">
+            <Spinner size="sm" label="Searching…" />
+          </div>
+        )}
+        {accounts.length > 0 && (
+          <ul className="card absolute z-10 mt-1 w-full divide-y divide-slate-100 py-1">
+            {accounts.map((a) => (
+              <li key={a.id} className="cursor-pointer px-3 py-2 text-sm text-slate-700 hover:bg-slate-50" onClick={() => pickAccount(a)}>
+                {a.name}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

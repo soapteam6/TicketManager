@@ -68,13 +68,23 @@ export default function ScoringConfigPage() {
       key: 'version',
       header: 'Version',
       render: (h) => (
-        <span className="inline-flex items-center gap-2">
-          <span className="font-medium text-slate-900">v{h.cr9cd_version}</span>
-          {loadedId === h.cr9cd_scoringconfigid && <Badge tone="blue">Editing</Badge>}
-        </span>
+        <div className="flex flex-col gap-1">
+          <span className="inline-flex items-center gap-2">
+            <span className="font-semibold text-slate-900">{h.cr9cd_name || `v${h.cr9cd_version}`}</span>
+            {loadedId === h.cr9cd_scoringconfigid && <Badge tone="blue">Editing</Badge>}
+          </span>
+          <span className="text-xs text-slate-500">
+            v{h.cr9cd_version} · {h.createdon ? new Date(h.createdon).toLocaleDateString() : '—'}
+          </span>
+        </div>
       ),
     },
-    { key: 'active', header: 'Active', render: (h) => (h.cr9cd_is_active ? <Badge tone="green">Active</Badge> : null) },
+    {
+      key: 'active',
+      header: 'Active',
+      render: (h) =>
+        h.cr9cd_is_active ? <Badge tone="red">Active</Badge> : <Badge tone="zinc" status="inactive">Inactive</Badge>,
+    },
     { key: 'created', header: 'Created', render: (h) => (h.createdon ? new Date(h.createdon).toLocaleString() : '—') },
     {
       key: 'actions',
@@ -144,8 +154,8 @@ export default function ScoringConfigPage() {
   return (
     <div>
       <PageHeader
-        title="Scoring Configuration"
-        subtitle="Tune the priority-ranking factors used when scoring requests for a game"
+        title="Scoring Engine"
+        subtitle="Tune the factor weights and parameters that drive priority ranking."
         actions={
           activeVersion != null ? (
             <Badge tone="blue">Currently active: v{activeVersion}</Badge>
@@ -155,10 +165,10 @@ export default function ScoringConfigPage() {
 
       <div className="card mb-6 p-5">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-900">Weights</h2>
-          <Badge tone={totalOk ? 'green' : 'red'}>
-            Total {totalWeight.toFixed(3)} {totalOk ? '(valid)' : '(should sum to ~1.00)'}
-          </Badge>
+          <h2 className="text-sm font-semibold text-slate-900">Factor weights</h2>
+          <span className={`text-sm tabular-nums ${totalOk ? 'text-slate-600' : 'text-rose-600'}`}>
+            Total: {totalWeight.toFixed(2)}
+          </span>
         </div>
         <div className="space-y-3">
           {FACTOR_KEYS.map((key) => (

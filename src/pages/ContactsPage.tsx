@@ -286,7 +286,7 @@ export default function ContactsPage() {
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50">
               <tr>
-                {['Name', 'Type', 'Tier', 'Company', 'Lifetime $', 'Attended', 'No-shows', ''].map((h) => (
+                {['Name', 'Type', 'Tier', 'Company', 'Lifetime $', 'Attended', 'No-shows', 'Score', ''].map((h) => (
                   <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     {h}
                   </th>
@@ -307,6 +307,25 @@ export default function ContactsPage() {
                   <td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-700">{formatUsd(c.cr9cd_lifetime_business_generated)}</td>
                   <td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-700">{c.cr9cd_attended_count ?? 0}</td>
                   <td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-700">{c.cr9cd_no_show_count ?? 0}</td>
+                  {(() => {
+                    const attended = c.cr9cd_attended_count ?? 0;
+                    const noShow = c.cr9cd_no_show_count ?? 0;
+                    const total = attended + noShow;
+                    if (total === 0) {
+                      return <td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-400">—</td>;
+                    }
+                    const rate = attended / total;
+                    return (
+                      <td
+                        className={clsx(
+                          'whitespace-nowrap px-4 py-3 tabular-nums font-medium',
+                          rate >= 0.8 ? 'text-emerald-600' : rate >= 0.5 ? 'text-amber-600' : 'text-rose-600',
+                        )}
+                      >
+                        {`${Math.round(rate * 100)}%`}
+                      </td>
+                    );
+                  })()}
                   <td className="whitespace-nowrap px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-3">
                       <ContactHistory contact={c} />
@@ -337,7 +356,7 @@ export default function ContactsPage() {
               ))}
               {contacts.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-400">
+                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-slate-400">
                     No contacts yet.
                   </td>
                 </tr>

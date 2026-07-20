@@ -3631,6 +3631,20 @@ export const dataSourcesInfo = {
     "dataSourceType": "Dataverse",
     "apis": {}
   },
+  "cr9cd_notifications": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "cr9cd_notificationid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
+  "cr9cd_notificationtemplates": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "cr9cd_notificationtemplateid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
   "cr9cd_teams": {
     "tableId": "",
     "version": "",
@@ -3978,46 +3992,6 @@ export const dataSourcesInfo = {
         ],
         "responseInfo": {
           "200": {
-            "type": "object"
-          }
-        }
-      }
-    }
-  },
-  "powerappv2__runaprompt_parsejson_respondtoapowerapporflow": {
-    "tableId": "",
-    "version": "",
-    "primaryKey": "",
-    "dataSourceType": "Connector",
-    "apis": {
-      "Run": {
-        "path": "/{connectionId}/triggers/manual/run",
-        "method": "POST",
-        "parameters": [
-          {
-            "name": "connectionId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "input",
-            "in": "body",
-            "required": true,
-            "type": "object"
-          },
-          {
-            "name": "api-version",
-            "in": "query",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "responseInfo": {
-          "200": {
-            "type": "object"
-          },
-          "default": {
             "type": "object"
           }
         }

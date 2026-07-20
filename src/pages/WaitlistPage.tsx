@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Cr9cd_gamesService } from '../generated/services/Cr9cd_gamesService';
 import { Cr9cd_waitlistentriesService } from '../generated/services/Cr9cd_waitlistentriesService';
+import { Cr9cd_ticketrequestsService } from '../generated/services/Cr9cd_ticketrequestsService';
 import type { Cr9cd_games } from '../generated/models/Cr9cd_gamesModel';
 import type { Cr9cd_waitlistentries } from '../generated/models/Cr9cd_waitlistentriesModel';
 import { waitlistStatusChoice, gameKindChoice } from '../dataverse/choiceMaps';
@@ -21,9 +22,18 @@ export default function WaitlistPage() {
   const [entries, setEntries] = useState<Cr9cd_waitlistentries[]>([]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [qtyByRequestId, setQtyByRequestId] = useState<Record<string, number>>({});
 
   useEffect(() => {
     Cr9cd_gamesService.getAll({ orderBy: ['cr9cd_game_date desc'] }).then((result) => setGames(result.data ?? []));
+  }, []);
+
+  useEffect(() => {
+    Cr9cd_ticketrequestsService.getAll({ select: ['cr9cd_ticketrequestid', 'cr9cd_quantity'] }).then((result) => {
+      const map: Record<string, number> = {};
+      for (const r of result.data ?? []) map[r.cr9cd_ticketrequestid] = r.cr9cd_quantity ?? 0;
+      setQtyByRequestId(map);
+    });
   }, []);
 
   const load = useCallback(() => {
@@ -53,12 +63,13 @@ export default function WaitlistPage() {
     },
     { key: 'position', header: 'Position', render: (e) => e.cr9cd_position ?? '—', align: 'center' },
     { key: 'request', header: 'Request', render: (e) => e.cr9cd_ticket_requestname },
+    { key: 'qty', header: 'Qty', align: 'center', render: (e) => (e._cr9cd_ticket_request_value && qtyByRequestId[e._cr9cd_ticket_request_value] != null ? qtyByRequestId[e._cr9cd_ticket_request_value] : '—') },
+    { key: 'reason', header: 'Reason', render: (e) => <span className="text-slate-500">{e.cr9cd_reason}</span> },
     {
       key: 'status',
       header: 'Status',
       render: (e) => <Badge status={e.cr9cd_status != null ? waitlistStatusChoice.toValue(e.cr9cd_status) : 'active'} />,
     },
-    { key: 'reason', header: 'Reason', render: (e) => <span className="text-slate-500">{e.cr9cd_reason}</span> },
     {
       key: 'actions',
       header: '',
@@ -92,7 +103,7 @@ export default function WaitlistPage() {
 
   return (
     <div>
-      <PageHeader title="Waitlist" subtitle="Queued requests waiting on seat availability" />
+      <PageHeader title="Waitlist" subtitle="Requests queued when inventory runs short for a game." />
 
       <div className="card mb-4 p-4">
         <Select value={gameId} onChange={(e) => setGameId(e.target.value)} className="max-w-md">
