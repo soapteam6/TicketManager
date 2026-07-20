@@ -3624,6 +3624,13 @@ export const dataSourcesInfo = {
     "dataSourceType": "Dataverse",
     "apis": {}
   },
+  "cr9cd_reservations": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "cr9cd_reservationid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
   "cr9cd_teams": {
     "tableId": "",
     "version": "",

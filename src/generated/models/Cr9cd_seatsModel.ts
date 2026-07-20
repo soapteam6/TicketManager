@@ -30,6 +30,7 @@ export interface Cr9cd_seatsBase {
   cr9cd_seatid: string;
   cr9cd_section?: string;
   cr9cd_status?: Cr9cd_seatscr9cd_status;
+  cr9cd_ticket_type?: string;
   importsequencenumber?: number;
   overriddencreatedon?: string;
   ownerid: string;

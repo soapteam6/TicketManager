@@ -15,6 +15,8 @@ const DYNAMICS_CRM_ORG = 'https://org83e945f6.crm.dynamics.com';
 export interface CrmAccountSummary {
   id: string;
   name: string;
+  // The Dynamics account owner (owning rep), from the _ownerid_value formatted value; null if unavailable.
+  ownerName: string | null;
 }
 
 export interface CrmContactSummary {
@@ -53,15 +55,25 @@ async function listRecords<T = Record<string, unknown>>(entityName: string, sele
   return value ?? [];
 }
 
+// Account search is restricted to PARENT accounts (ais_isparent) and surfaces the account owner
+// (owning rep) from the _ownerid_value formatted-value annotation when the connector returns it.
 export async function searchAccounts(query: string): Promise<CrmAccountSummary[]> {
   if (query.trim().length < 2) return [];
-  const rows = await listRecords<{ accountid: string; name: string }>(
+  const rows = await listRecords<{
+    accountid: string;
+    name: string;
+    '_ownerid_value@OData.Community.Display.V1.FormattedValue'?: string;
+  }>(
     'accounts',
-    'name,accountid',
-    `contains(name, '${escapeODataString(query)}')`,
+    'name,accountid,_ownerid_value',
+    `contains(name, '${escapeODataString(query)}') and ais_isparent eq true`,
     10
   );
-  return rows.map((a) => ({ id: a.accountid, name: a.name }));
+  return rows.map((a) => ({
+    id: a.accountid,
+    name: a.name,
+    ownerName: a['_ownerid_value@OData.Community.Display.V1.FormattedValue'] ?? null,
+  }));
 }
 
 export async function listContactsForAccount(accountId: string): Promise<CrmContactSummary[]> {

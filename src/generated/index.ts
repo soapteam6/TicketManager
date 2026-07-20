@@ -13,6 +13,7 @@ export * as Cr9cd_contact_beneficiariesModel from './models/Cr9cd_contact_benefi
 export * as Cr9cd_gamesModel from './models/Cr9cd_gamesModel';
 export * as Cr9cd_integrationlogsModel from './models/Cr9cd_integrationlogsModel';
 export * as Cr9cd_requestcontactsModel from './models/Cr9cd_requestcontactsModel';
+export * as Cr9cd_reservationsModel from './models/Cr9cd_reservationsModel';
 export * as Cr9cd_scoringconfigsModel from './models/Cr9cd_scoringconfigsModel';
 export * as Cr9cd_seasonsModel from './models/Cr9cd_seasonsModel';
 export * as Cr9cd_seatsModel from './models/Cr9cd_seatsModel';
@@ -34,6 +35,7 @@ export * from './services/Cr9cd_contact_beneficiariesService';
 export * from './services/Cr9cd_gamesService';
 export * from './services/Cr9cd_integrationlogsService';
 export * from './services/Cr9cd_requestcontactsService';
+export * from './services/Cr9cd_reservationsService';
 export * from './services/Cr9cd_scoringconfigsService';
 export * from './services/Cr9cd_seasonsService';
 export * from './services/Cr9cd_seatsService';

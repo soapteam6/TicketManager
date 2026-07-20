@@ -58,7 +58,10 @@ export default function CrmPicker({ onSelect }: { onSelect: (selection: CrmSelec
     return (
       <div className="card mb-3 p-4">
         <div className="mb-3 flex items-center gap-3">
-          <strong className="text-sm text-slate-900">{selectedAccount.name}</strong>
+          <div>
+            <strong className="text-sm text-slate-900">{selectedAccount.name}</strong>
+            {selectedAccount.ownerName && <div className="text-xs text-slate-500">Owner: {selectedAccount.ownerName}</div>}
+          </div>
           <Button
             size="sm"
             variant="ghost"

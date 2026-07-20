@@ -22,6 +22,8 @@ import { Badge } from '../components/Badge';
 import { TextInput, Select, Field, TextArea } from '../components/Field';
 import { Spinner } from '../components/Spinner';
 import { Modal } from '../components/Modal';
+import NotifyAvailabilityModal from '../components/NotifyAvailabilityModal';
+import { useAuth } from '../auth/AuthContext';
 
 function ExportButton({ seasonId }: { seasonId: string }) {
   const [busy, setBusy] = useState(false);
@@ -629,6 +631,7 @@ function EditSeasonModal({ season, onClose, onSaved }: { season: Cr9cd_seasons; 
           <Select value={status} onChange={(e) => setStatus(e.target.value as SeasonStatus)}>
             <option value="draft">Draft</option>
             <option value="active">Active</option>
+            <option value="completed">Completed</option>
             <option value="archived">Archived</option>
           </Select>
         </Field>
@@ -798,6 +801,16 @@ function TeamSeasons({
     await Promise.all([loadGames(), onSeasonsChanged()]);
   }
 
+  async function setSeasonStatus(seasonId: string, status: SeasonStatus) {
+    setBusy(true);
+    try {
+      await Cr9cd_seasonsService.update(seasonId, { cr9cd_status: seasonStatusChoice.toCode(status) });
+      await onSeasonsChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="card mb-4 p-5">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -837,6 +850,15 @@ function TeamSeasons({
               <Button size="sm" variant="secondary" onClick={() => setAddGameSeasonId(season.cr9cd_seasonid)}>
                 Add game
               </Button>
+              {(season.cr9cd_status != null ? seasonStatusChoice.toValue(season.cr9cd_status) : 'draft') !== 'active' ? (
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => setSeasonStatus(season.cr9cd_seasonid, 'active')}>
+                  Mark active
+                </Button>
+              ) : (
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => setSeasonStatus(season.cr9cd_seasonid, 'completed')}>
+                  Mark complete
+                </Button>
+              )}
               <Button size="sm" variant="secondary" onClick={() => setEditingSeasonId(season.cr9cd_seasonid)}>
                 Edit
               </Button>
@@ -947,10 +969,12 @@ function TeamSeasons({
 }
 
 export default function TeamsPage() {
+  const { user } = useAuth();
   const [teams, setTeams] = useState<Cr9cd_teams[]>([]);
   const [allSeasons, setAllSeasons] = useState<Cr9cd_seasons[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewTeam, setShowNewTeam] = useState(false);
+  const [showNotify, setShowNotify] = useState(false);
 
   const loadSeasons = useCallback(async () => {
     const result = await Cr9cd_seasonsService.getAll({ orderBy: ['cr9cd_name asc'] });
@@ -971,8 +995,19 @@ export default function TeamsPage() {
       <PageHeader
         title="Teams & Seasons"
         subtitle="Manage seasons and schedules for each team"
-        actions={<Button onClick={() => setShowNewTeam(true)}>New team</Button>}
+        actions={
+          <>
+            {user?.isAdmin && (
+              <Button variant="secondary" onClick={() => setShowNotify(true)}>
+                Send availability
+              </Button>
+            )}
+            <Button onClick={() => setShowNewTeam(true)}>New team</Button>
+          </>
+        }
       />
+
+      {showNotify && <NotifyAvailabilityModal onClose={() => setShowNotify(false)} />}
       {loading ? (
         <div className="card flex items-center justify-center p-12">
           <Spinner label="Loading teams…" />

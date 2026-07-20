@@ -8,7 +8,8 @@ import type { TicketStatus, ContactType, FuturePriority } from '../domain/enums'
 export interface RecordAttendanceInput {
   assignmentId: string;
   ticketStatus: TicketStatus;
-  designation: ContactType;
+  // Optional -- defaults to the beneficiary contact's type (employee/customer) when omitted.
+  designation?: ContactType;
   businessGenerated: number;
   followUpNotes?: string;
   futurePriority?: FuturePriority;
@@ -32,9 +33,20 @@ export async function recordAttendance(input: RecordAttendanceInput): Promise<vo
     top: 1,
   });
 
+  // Resolve designation: caller-supplied, else the beneficiary's contact type, else 'customer'.
+  let designation = input.designation;
+  if (!designation) {
+    if (contactId) {
+      const contactResult = await Cr9cd_contact_beneficiariesService.get(contactId, { select: ['cr9cd_type'] });
+      designation = contactResult.data?.cr9cd_type != null ? contactTypeChoice.toValue(contactResult.data.cr9cd_type) : 'customer';
+    } else {
+      designation = 'customer';
+    }
+  }
+
   const fields = {
     cr9cd_ticket_status: ticketStatusChoice.toCode(input.ticketStatus),
-    cr9cd_designation: contactTypeChoice.toCode(input.designation),
+    cr9cd_designation: contactTypeChoice.toCode(designation),
     cr9cd_business_generated: input.businessGenerated,
     cr9cd_follow_up_notes: input.followUpNotes,
     ...(input.futurePriority ? { cr9cd_future_priority: futurePriorityChoice.toCode(input.futurePriority) } : {}),

@@ -16,6 +16,7 @@ import type {
   TicketStatus,
   IntegrationAdapter,
   IntegrationStatus,
+  ReservationStatus,
 } from '../domain/enums';
 
 interface ChoiceMap<T extends string> {
@@ -54,6 +55,7 @@ export const seasonStatusChoice = choiceMap<SeasonStatus>([
   ['draft', 100000000],
   ['active', 100000001],
   ['archived', 100000002],
+  ['completed', 100000003],
 ]);
 
 export const gameStatusChoice = choiceMap<GameStatus>([
@@ -132,6 +134,7 @@ export const ticketStatusChoice = choiceMap<TicketStatus>([
   ['declined', 100000001],
   ['no_show', 100000002],
   ['attended', 100000003],
+  ['cancelled', 100000004],
 ]);
 
 export const integrationAdapterChoice = choiceMap<IntegrationAdapter>([
@@ -141,6 +144,14 @@ export const integrationAdapterChoice = choiceMap<IntegrationAdapter>([
   ['schedule_import', 100000003],
   ['crm', 100000004],
   ['directory', 100000005],
+  ['notification', 100000006],
+]);
+
+export const reservationStatusChoice = choiceMap<ReservationStatus>([
+  ['offered', 100000000],
+  ['reserved', 100000001],
+  ['expired', 100000002],
+  ['released', 100000003],
 ]);
 
 export const integrationStatusChoice = choiceMap<IntegrationStatus>([

@@ -4,6 +4,7 @@ import { Cr9cd_contact_beneficiariesService } from '../generated/services/Cr9cd_
 import { Cr9cd_gamesService } from '../generated/services/Cr9cd_gamesService';
 import { Cr9cd_seatsService } from '../generated/services/Cr9cd_seatsService';
 import type { Cr9cd_contact_beneficiaries } from '../generated/models/Cr9cd_contact_beneficiariesModel';
+import type { Cr9cd_scoringconfigs } from '../generated/models/Cr9cd_scoringconfigsModel';
 import { bindRef } from '../dataverse/bind';
 import { requestStatusChoice, contactTypeChoice, valueTierChoice, futurePriorityChoice, seatStatusChoice } from '../dataverse/choiceMaps';
 import { DEFAULT_SCORING_WEIGHTS, DEFAULT_SCORING_PARAMS } from '../domain/constants';
@@ -56,6 +57,21 @@ export async function getActiveScoringConfig(): Promise<ScoringConfigRecord> {
     weights: parseWeights(row.cr9cd_weights),
     params: parseParams(row.cr9cd_params),
   };
+}
+
+// Pull a stored config row's weights + params into editable form (for loading an archived config into the editor).
+export function readScoringConfigRow(row: Cr9cd_scoringconfigs): { weights: Record<FactorKey, number>; params: ScoringParams } {
+  return { weights: parseWeights(row.cr9cd_weights), params: parseParams(row.cr9cd_params) };
+}
+
+// Delete a saved config. The active config is protected -- activate another version first.
+export async function deleteScoringConfig(configId: string): Promise<void> {
+  const existing = await Cr9cd_scoringconfigsService.get(configId);
+  if (!existing.data) throw new Error('Configuration not found');
+  if (existing.data.cr9cd_is_active) {
+    throw new Error('Cannot delete the active configuration. Activate another version first.');
+  }
+  await Cr9cd_scoringconfigsService.delete(configId);
 }
 
 // No platform-enforced "only one active" constraint (see memory-bank.md) -- deactivate everyone else, then activate the target.

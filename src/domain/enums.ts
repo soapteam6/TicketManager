@@ -1,7 +1,9 @@
 // Central enums used across the app (Dataverse Choice columns map to these).
 
-export const SEASON_STATUS = ['draft', 'active', 'archived'] as const;
+export const SEASON_STATUS = ['draft', 'active', 'completed', 'archived'] as const;
 export type SeasonStatus = (typeof SEASON_STATUS)[number];
+// Statuses surfaced as filters in the games list (default 'active').
+export const SEASON_FILTER_STATUS = ['active', 'completed'] as const;
 
 export const GAME_STATUS = ['scheduled', 'transfer_pending', 'completed', 'cancelled'] as const;
 export type GameStatus = (typeof GAME_STATUS)[number];
@@ -55,13 +57,25 @@ export const ACTIVE_ASSIGNMENT_STATUSES: AssignmentStatus[] = ['proposed', 'appr
 export const WAITLIST_STATUS = ['active', 'promoted', 'expired', 'cancelled'] as const;
 export type WaitlistStatus = (typeof WAITLIST_STATUS)[number];
 
-export const TICKET_STATUS = ['accepted', 'declined', 'no_show', 'attended'] as const;
+export const TICKET_STATUS = ['accepted', 'declined', 'no_show', 'attended', 'cancelled'] as const;
 export type TicketStatus = (typeof TICKET_STATUS)[number];
+// The simplified attendance-reconcile outcome set (subset of TICKET_STATUS).
+export const ATTENDANCE_OUTCOMES = ['attended', 'no_show', 'cancelled'] as const;
+export type AttendanceOutcome = (typeof ATTENDANCE_OUTCOMES)[number];
+
+export const RESERVATION_STATUS = ['offered', 'reserved', 'expired', 'released'] as const;
+export type ReservationStatus = (typeof RESERVATION_STATUS)[number];
+// Reservation statuses that actively hold a seat.
+export const ACTIVE_RESERVATION_STATUSES: ReservationStatus[] = ['offered', 'reserved'];
+
+// Broadcast audiences for the "send availability" distribution feature.
+export const NOTIFY_AUDIENCE = ['everyone', 'sales_team'] as const;
+export type NotifyAudience = (typeof NOTIFY_AUDIENCE)[number];
 
 export const TRANSFER_PLATFORM = ['ticketmaster', 'axs', 'seatgeek', 'mock'] as const;
 export type TransferPlatform = (typeof TRANSFER_PLATFORM)[number];
 
-export const INTEGRATION_ADAPTER = ['ticketing', 'email_intake', 'narrative', 'schedule_import', 'crm', 'directory'] as const;
+export const INTEGRATION_ADAPTER = ['ticketing', 'email_intake', 'narrative', 'schedule_import', 'crm', 'directory', 'notification'] as const;
 export type IntegrationAdapter = (typeof INTEGRATION_ADAPTER)[number];
 
 export const INTEGRATION_STATUS = ['success', 'error', 'skipped'] as const;

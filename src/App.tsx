@@ -10,6 +10,7 @@ import EventsPage from './pages/EventsPage';
 import RequestsPage from './pages/RequestsPage';
 import ContactsPage from './pages/ContactsPage';
 import WaitlistPage from './pages/WaitlistPage';
+import NotificationsPage from './pages/NotificationsPage';
 import ScoringConfigPage from './pages/ScoringConfigPage';
 
 export default function App() {
@@ -26,6 +27,7 @@ export default function App() {
             <Route path="/requests" element={<RequestsPage />} />
             <Route path="/contacts" element={<ContactsPage />} />
             <Route path="/waitlist" element={<WaitlistPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
             <Route
               path="/scoring"
               element={

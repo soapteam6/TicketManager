@@ -8,7 +8,8 @@ export const Cr9cd_integrationlogscr9cd_adapter = {
   100000002: 'Narrative',
   100000003: 'Schedule Import',
   100000004: 'CRM',
-  100000005: 'Directory'
+  100000005: 'Directory',
+  100000006: 'Notification'
 } as const;
 export type Cr9cd_integrationlogscr9cd_adapter = keyof typeof Cr9cd_integrationlogscr9cd_adapter;
 export const Cr9cd_integrationlogscr9cd_status = {

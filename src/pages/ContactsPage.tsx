@@ -12,6 +12,7 @@ import { Badge } from '../components/Badge';
 import { Field, TextInput, Select } from '../components/Field';
 import { Modal } from '../components/Modal';
 import { formatUsd } from '../lib/format';
+import { useAuth } from '../auth/AuthContext';
 
 function NewContactForm({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState('');
@@ -244,6 +245,7 @@ function ContactHistory({ contact }: { contact: Cr9cd_contact_beneficiaries }) {
 }
 
 export default function ContactsPage() {
+  const { user } = useAuth();
   const [contacts, setContacts] = useState<Cr9cd_contact_beneficiaries[]>([]);
   const [typeFilter, setTypeFilter] = useState<'' | ContactType>('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -311,22 +313,24 @@ export default function ContactsPage() {
                       <button className="text-xs font-medium text-slate-500 hover:text-slate-700" onClick={() => setEditingId(c.cr9cd_contact_beneficiaryid)}>
                         Edit
                       </button>
-                      <button
-                        className={clsx('text-xs font-medium text-rose-500 hover:text-rose-700', busyId === c.cr9cd_contact_beneficiaryid && 'opacity-50')}
-                        disabled={busyId === c.cr9cd_contact_beneficiaryid}
-                        onClick={async () => {
-                          if (!window.confirm(`Delete contact "${c.cr9cd_name}"? This cannot be undone.`)) return;
-                          setBusyId(c.cr9cd_contact_beneficiaryid);
-                          try {
-                            await Cr9cd_contact_beneficiariesService.delete(c.cr9cd_contact_beneficiaryid);
-                            await load();
-                          } finally {
-                            setBusyId(null);
-                          }
-                        }}
-                      >
-                        Delete
-                      </button>
+                      {user?.isAdmin && (
+                        <button
+                          className={clsx('text-xs font-medium text-rose-500 hover:text-rose-700', busyId === c.cr9cd_contact_beneficiaryid && 'opacity-50')}
+                          disabled={busyId === c.cr9cd_contact_beneficiaryid}
+                          onClick={async () => {
+                            if (!window.confirm(`Delete contact "${c.cr9cd_name}"? This cannot be undone.`)) return;
+                            setBusyId(c.cr9cd_contact_beneficiaryid);
+                            try {
+                              await Cr9cd_contact_beneficiariesService.delete(c.cr9cd_contact_beneficiaryid);
+                              await load();
+                            } finally {
+                              setBusyId(null);
+                            }
+                          }}
+                        >
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

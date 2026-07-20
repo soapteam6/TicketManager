@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Cr9cd_scoringconfigsService } from '../generated/services/Cr9cd_scoringconfigsService';
 import type { Cr9cd_scoringconfigs } from '../generated/models/Cr9cd_scoringconfigsModel';
-import { getActiveScoringConfig, createScoringConfig, activateScoringConfig } from '../services/scoringService';
+import { getActiveScoringConfig, createScoringConfig, activateScoringConfig, deleteScoringConfig, readScoringConfigRow } from '../services/scoringService';
 import { FACTOR_KEYS } from '../domain/enums';
 import { FACTOR_LABELS, DEFAULT_SCORING_WEIGHTS, DEFAULT_SCORING_PARAMS } from '../domain/constants';
 import type { FactorKey } from '../domain/enums';
@@ -17,15 +17,26 @@ export default function ScoringConfigPage() {
   const [weights, setWeights] = useState<Record<FactorKey, number>>({ ...DEFAULT_SCORING_WEIGHTS });
   const [params, setParams] = useState<ScoringParams>({ ...DEFAULT_SCORING_PARAMS });
   const [busy, setBusy] = useState(false);
+  const [loadedId, setLoadedId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const active = await getActiveScoringConfig();
     setActiveVersion(active.version || null);
     setWeights(active.weights);
     setParams(active.params);
+    setLoadedId(active.id || null);
     const historyResult = await Cr9cd_scoringconfigsService.getAll({ orderBy: ['cr9cd_version desc'] });
     setHistory(historyResult.data ?? []);
   }, []);
+
+  // Load an archived/saved config's weights & parameters into the editor above.
+  function loadConfig(row: Cr9cd_scoringconfigs) {
+    const { weights: w, params: p } = readScoringConfigRow(row);
+    setWeights(w);
+    setParams(p);
+    setLoadedId(row.cr9cd_scoringconfigid);
+  }
 
   useEffect(() => {
     load();
@@ -53,32 +64,80 @@ export default function ScoringConfigPage() {
   ];
 
   const columns: Column<Cr9cd_scoringconfigs>[] = [
-    { key: 'version', header: 'Version', render: (h) => <span className="font-medium text-slate-900">v{h.cr9cd_version}</span> },
+    {
+      key: 'version',
+      header: 'Version',
+      render: (h) => (
+        <span className="inline-flex items-center gap-2">
+          <span className="font-medium text-slate-900">v{h.cr9cd_version}</span>
+          {loadedId === h.cr9cd_scoringconfigid && <Badge tone="blue">Editing</Badge>}
+        </span>
+      ),
+    },
     { key: 'active', header: 'Active', render: (h) => (h.cr9cd_is_active ? <Badge tone="green">Active</Badge> : null) },
     { key: 'created', header: 'Created', render: (h) => (h.createdon ? new Date(h.createdon).toLocaleString() : '—') },
     {
       key: 'actions',
       header: '',
       align: 'right',
-      render: (h) =>
-        !h.cr9cd_is_active && (
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                await activateScoringConfig(h.cr9cd_scoringconfigid);
-                await load();
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            Activate
-          </Button>
-        ),
+      render: (h) => {
+        if (confirmDeleteId === h.cr9cd_scoringconfigid) {
+          return (
+            <div className="flex items-center justify-end gap-1.5">
+              <Button
+                size="sm"
+                variant="danger"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    await deleteScoringConfig(h.cr9cd_scoringconfigid);
+                    setConfirmDeleteId(null);
+                    await load();
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                Delete
+              </Button>
+              <Button size="sm" variant="secondary" disabled={busy} onClick={() => setConfirmDeleteId(null)}>
+                Cancel
+              </Button>
+            </div>
+          );
+        }
+        return (
+          <div className="flex items-center justify-end gap-1.5">
+            <Button size="sm" variant="secondary" onClick={() => loadConfig(h)}>
+              Load
+            </Button>
+            {!h.cr9cd_is_active && (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    await activateScoringConfig(h.cr9cd_scoringconfigid);
+                    await load();
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                Activate
+              </Button>
+            )}
+            {!h.cr9cd_is_active && (
+              <Button size="sm" variant="ghost" disabled={busy} onClick={() => setConfirmDeleteId(h.cr9cd_scoringconfigid)}>
+                Delete
+              </Button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -144,7 +203,8 @@ export default function ScoringConfigPage() {
         </div>
       </div>
 
-      <h2 className="mb-3 text-sm font-semibold text-slate-900">Version history</h2>
+      <h2 className="mb-1 text-sm font-semibold text-slate-900">Saved configurations</h2>
+      <p className="mb-3 text-xs text-slate-500">Load a configuration to pull its weights &amp; parameters into the editor above. Non-active versions can be deleted.</p>
       <DataTable columns={columns} rows={history} keyFn={(h) => h.cr9cd_scoringconfigid} emptyTitle="No versions yet" />
     </div>
   );

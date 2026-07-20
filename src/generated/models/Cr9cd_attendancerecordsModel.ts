@@ -17,7 +17,8 @@ export const Cr9cd_attendancerecordscr9cd_ticket_status = {
   100000000: 'Accepted',
   100000001: 'Declined',
   100000002: 'No Show',
-  100000003: 'Attended'
+  100000003: 'Attended',
+  100000004: 'Cancelled'
 } as const;
 export type Cr9cd_attendancerecordscr9cd_ticket_status = keyof typeof Cr9cd_attendancerecordscr9cd_ticket_status;
 export const Cr9cd_attendancerecordsstatecode = {

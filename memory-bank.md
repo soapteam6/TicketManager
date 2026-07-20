@@ -245,3 +245,11 @@ Verified: `tsc -b`, `npm run build`, `npm test` all clean. **The one real unknow
 Deployed 2026-07-17 (`npm run build && npx power-apps push` succeeded) — live app now has AI-assisted schedule-paste import via the AI Prompt cloud flow.
 
 To redeploy at any point: `npm run build && npx power-apps push` from the project root.
+
+---
+
+Deployed 2026-07-20 (`npm run build && npx power-apps push` succeeded) — live app now includes the 13 features ported from the teammate's `main` branch onto this Code App (`code-app` branch). Summary:
+- **Code-only**: waitlist move-to/promote-from + show-all-games; admin delete requests/contacts; dashboard upcoming-games availability card; scoring load-archived-config + delete-non-active; Notification Manager mock page (`/notifications`, "Communications" nav).
+- **Schema + code** (6 Dataverse changes applied to `org5c824bd0` via Web API, generated code hand-synced in the per-table style — pac's newer consolidated codegen was incompatible and reverted): new `cr9cd_reservation` table (seat reservations w/ lazy auto-expiry); `cr9cd_ticket_type` on seat; `cr9cd_account_owner` on ticketrequest; season `Completed` status; attendance `Cancelled` outcome; integration adapter `Notification`.
+- **Notes**: seat model kept row-per-seat (ticket_type as a seat column, not a count pool); reservation game lookup is parental/cascade, seat lookup referential-restrict (Dataverse single-parent limit); F6 "free-text employee name" was N/A (Code App already uses free contact selection); account-owner surfacing depends on the cross-org connector returning `_ownerid_value` formatted values.
+- **Verified**: `tsc -b`, `npm run build`, `npm test` (5/5) all clean. NOT yet browser-click-tested end-to-end at deploy time.

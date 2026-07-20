@@ -32,3 +32,5 @@ dist-ssr
 solutions/*.zip
 plugins/**/bin/
 plugins/**/obj/
+__pycache__/
+*.pyc

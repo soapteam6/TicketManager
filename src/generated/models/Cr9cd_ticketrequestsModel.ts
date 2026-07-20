@@ -49,6 +49,7 @@ export interface Cr9cd_ticketrequestsBase {
   cr9cd_quantity?: number;
   cr9cd_requester_company?: string;
   cr9cd_requester_email?: string;
+  cr9cd_account_owner?: string;
   cr9cd_requester_name?: string;
   cr9cd_requester_phone?: string;
   cr9cd_sales_opportunity_usd?: number;

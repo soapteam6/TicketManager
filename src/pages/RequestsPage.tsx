@@ -18,12 +18,18 @@ import { Modal } from '../components/Modal';
 import ContactPicker, { type ContactSelection } from '../components/ContactPicker';
 import CrmPicker from '../components/CrmPicker';
 import { upsertBeneficiaryFromCrmContact } from '../services/crmService';
+import { deleteRequest } from '../services/requestsService';
+import { moveRequestToWaitlist } from '../services/waitlistService';
+import { useAuth } from '../auth/AuthContext';
 
 export default function RequestsPage() {
+  const { user } = useAuth();
   const [status, setStatus] = useState<RequestStatus | ''>('');
   const [requests, setRequests] = useState<Cr9cd_ticketrequests[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   function load() {
     setLoading(true);
@@ -65,6 +71,11 @@ export default function RequestsPage() {
     { key: 'qty', header: 'Qty', align: 'right', render: (r) => r.cr9cd_quantity ?? 1 },
     { key: 'sales', header: 'Sales opp', align: 'right', render: (r) => formatUsd(r.cr9cd_sales_opportunity_usd) },
     {
+      key: 'owner',
+      header: 'Account owner',
+      render: (r) => r.cr9cd_account_owner || <span className="text-slate-400">—</span>,
+    },
+    {
       key: 'score',
       header: 'Score',
       align: 'right',
@@ -74,6 +85,70 @@ export default function RequestsPage() {
       key: 'status',
       header: 'Status',
       render: (r) => <Badge status={r.cr9cd_status != null ? requestStatusChoice.toValue(r.cr9cd_status) : 'submitted'} />,
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right' as const,
+      render: (r: Cr9cd_ticketrequests) => {
+        const id = r.cr9cd_ticketrequestid;
+        if (confirmDeleteId === id) {
+          return (
+            <div className="flex items-center justify-end gap-1.5">
+              <Button
+                size="sm"
+                variant="danger"
+                disabled={busyId === id}
+                loading={busyId === id}
+                onClick={async () => {
+                  setBusyId(id);
+                  try {
+                    await deleteRequest(id);
+                    setConfirmDeleteId(null);
+                    load();
+                  } finally {
+                    setBusyId(null);
+                  }
+                }}
+              >
+                Delete
+              </Button>
+              <Button size="sm" variant="secondary" disabled={busyId === id} onClick={() => setConfirmDeleteId(null)}>
+                Cancel
+              </Button>
+            </div>
+          );
+        }
+        const status = r.cr9cd_status != null ? requestStatusChoice.toValue(r.cr9cd_status) : 'submitted';
+        return (
+          <div className="flex items-center justify-end gap-1.5">
+            {status !== 'waitlisted' && r._cr9cd_game_value && (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busyId === id}
+                loading={busyId === id}
+                onClick={async () => {
+                  setBusyId(id);
+                  try {
+                    await moveRequestToWaitlist(r._cr9cd_game_value!, id, 'Moved to waitlist');
+                    load();
+                  } finally {
+                    setBusyId(null);
+                  }
+                }}
+              >
+                Waitlist
+              </Button>
+            )}
+            {user?.isAdmin && (
+              <Button size="sm" variant="ghost" onClick={() => setConfirmDeleteId(id)}>
+                Delete
+              </Button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -121,6 +196,7 @@ function NewRequestModal({ onClose, onCreated }: { onClose: () => void; onCreate
   const [salesOpp, setSalesOpp] = useState(0);
   const [notes, setNotes] = useState('');
   const [opportunity, setOpportunity] = useState<{ id: string; name: string } | null>(null);
+  const [accountOwner, setAccountOwner] = useState<string | null>(null);
   const [showCrmPicker, setShowCrmPicker] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -160,6 +236,7 @@ function NewRequestModal({ onClose, onCreated }: { onClose: () => void; onCreate
         cr9cd_sales_opportunity_usd: salesOpp,
         cr9cd_notes: notes || undefined,
         cr9cd_status: requestStatusChoice.toCode('submitted'),
+        ...(accountOwner ? { cr9cd_account_owner: accountOwner } : {}),
         ...(opportunity ? { cr9cd_crm_opportunity_id: opportunity.id, cr9cd_crm_opportunity_name: opportunity.name } : {}),
       } as Parameters<typeof Cr9cd_ticketrequestsService.create>[0]);
       onCreated();
@@ -235,6 +312,7 @@ function NewRequestModal({ onClose, onCreated }: { onClose: () => void; onCreate
                         setOpportunity({ id: crmOpportunity.id, name: crmOpportunity.name });
                         setSalesOpp(crmOpportunity.manualRepCredit ?? crmOpportunity.estimatedValue ?? 0);
                       }
+                      setAccountOwner(account.ownerName);
                       selectContact({ id, name: crmContact.fullName, type: 'customer' });
                     } finally {
                       setBusy(false);
@@ -256,6 +334,7 @@ function NewRequestModal({ onClose, onCreated }: { onClose: () => void; onCreate
                 onClick={() => {
                   setContact(null);
                   setOpportunity(null);
+                  setAccountOwner(null);
                 }}
               >
                 Change

@@ -61,6 +61,11 @@
           "logicalName": "cr9cd_seat",
           "isHidden": false
         },
+        "reservations": {
+          "entitySetName": "cr9cd_reservations",
+          "logicalName": "cr9cd_reservation",
+          "isHidden": false
+        },
         "beneficiarycontacts": {
           "entitySetName": "cr9cd_contact_beneficiaries",
           "logicalName": "cr9cd_contact_beneficiary",

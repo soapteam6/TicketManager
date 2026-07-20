@@ -1,9 +1,14 @@
 import { Cr9cd_waitlistentriesService } from '../generated/services/Cr9cd_waitlistentriesService';
 import { Cr9cd_seatsService } from '../generated/services/Cr9cd_seatsService';
 import { Cr9cd_ticketrequestsService } from '../generated/services/Cr9cd_ticketrequestsService';
+import { Cr9cd_assignmentsService } from '../generated/services/Cr9cd_assignmentsService';
 import { bindRef } from '../dataverse/bind';
-import { waitlistStatusChoice, seatStatusChoice, requestStatusChoice } from '../dataverse/choiceMaps';
+import { waitlistStatusChoice, seatStatusChoice, requestStatusChoice, assignmentStatusChoice } from '../dataverse/choiceMaps';
+import type { AssignmentStatus } from '../domain/enums';
 import { assignSeat } from './assignmentsService';
+
+// Statuses that actively hold a seat -- mirrors ACTIVE_ASSIGNMENT_STATUSES elsewhere.
+const ACTIVE_ASSIGNMENT_STATUSES: AssignmentStatus[] = ['proposed', 'approved', 'transferred'];
 
 // Idempotent: returns the existing active entry's id if one already exists for this request/game.
 export async function addToWaitlist(gameId: string, requestId: string, reason?: string): Promise<string> {
@@ -34,6 +39,44 @@ export async function addToWaitlist(gameId: string, requestId: string, reason?: 
 
   await Cr9cd_ticketrequestsService.update(requestId, { cr9cd_status: requestStatusChoice.toCode('waitlisted') });
   return created.data.cr9cd_waitlistentryid;
+}
+
+// Moves a request onto the waitlist: cancels its active assignments and returns their held seats to
+// the pool, then queues the request. Unlike a decline, this does NOT auto-promote the queue -- the
+// operator is deliberately parking this request, and the freed seats stay available for a later pass.
+export async function moveRequestToWaitlist(gameId: string, requestId: string, reason?: string): Promise<string> {
+  const activeFilter = ACTIVE_ASSIGNMENT_STATUSES.map((s) => `cr9cd_status eq ${assignmentStatusChoice.toCode(s)}`).join(' or ');
+  const assignmentsResult = await Cr9cd_assignmentsService.getAll({
+    filter: `_cr9cd_ticket_request_value eq ${requestId} and (${activeFilter})`,
+    select: ['cr9cd_assignmentid', '_cr9cd_seat_value'],
+  });
+  for (const a of assignmentsResult.data ?? []) {
+    await Cr9cd_assignmentsService.update(a.cr9cd_assignmentid, { cr9cd_status: assignmentStatusChoice.toCode('cancelled') });
+    const seatId = a._cr9cd_seat_value;
+    if (seatId) {
+      await Cr9cd_seatsService.update(seatId, { cr9cd_status: seatStatusChoice.toCode('available') });
+    }
+  }
+  return addToWaitlist(gameId, requestId, reason);
+}
+
+// Restores a single waitlist entry back to an open request: cancels the entry and returns the request
+// to 'scored' (if it still carries a priority score) or 'submitted' so it can be re-processed.
+export async function restoreFromWaitlist(entryId: string): Promise<void> {
+  const entryResult = await Cr9cd_waitlistentriesService.get(entryId);
+  const entry = entryResult.data;
+  if (!entry) throw new Error('Waitlist entry not found');
+
+  await Cr9cd_waitlistentriesService.update(entryId, { cr9cd_status: waitlistStatusChoice.toCode('cancelled') });
+
+  const requestId = entry._cr9cd_ticket_request_value;
+  if (requestId) {
+    const requestResult = await Cr9cd_ticketrequestsService.get(requestId, { select: ['cr9cd_priority_score'] });
+    const hadScore = requestResult.data?.cr9cd_priority_score != null;
+    await Cr9cd_ticketrequestsService.update(requestId, {
+      cr9cd_status: requestStatusChoice.toCode(hadScore ? 'scored' : 'submitted'),
+    });
+  }
 }
 
 // Walks the active queue in position order, filling outstanding need from newly-available seats.
