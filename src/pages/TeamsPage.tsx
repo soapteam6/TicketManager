@@ -11,17 +11,17 @@ import { bindRef } from '../dataverse/bind';
 import { seasonStatusChoice, gameStatusChoice, gameKindChoice, seatStatusChoice } from '../dataverse/choiceMaps';
 import { exportSeasonTracker } from '../services/exportService';
 import { exportScheduleTemplate, importScheduleTemplate } from '../services/scheduleTemplateService';
-import { extractScheduleFromText, type ExtractedGame } from '../services/aiScheduleImportService';
 import { countSeasonDependents, deleteSeason } from '../services/seasonsService';
 import { countTeamDependents, deleteTeam } from '../services/teamsService';
-import { dateOnlyToIso, isoToDateOnlyInput, formatDateOnly, formatDateTime } from '../lib/format';
+import { dateOnlyToIso, isoToDateOnlyInput, formatDateOnly } from '../lib/format';
 import type { GameKind, SeasonStatus } from '../domain/enums';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
-import { TextInput, Select, Field, TextArea } from '../components/Field';
+import { TextInput, Select, Field } from '../components/Field';
 import { Spinner } from '../components/Spinner';
 import { Modal } from '../components/Modal';
+import { AiCreateButton } from '../components/AiCreateModal';
 import NotifyAvailabilityModal from '../components/NotifyAvailabilityModal';
 import { useAuth } from '../auth/AuthContext';
 
@@ -97,217 +97,6 @@ function ScheduleTemplateButtons({ seasonId, onImported }: { seasonId: string; o
       />
       {message && <span className="text-xs text-slate-500">{message}</span>}
     </div>
-  );
-}
-
-// AI schedule import: paste the schedule text off a team's official site, an AI Prompt cloud
-// flow extracts the home games, preview, then import -- mirrors the original's ScheduleImportModal
-// (which called Claude directly); this environment has no Anthropic access, so it goes through the
-// "PowerAppV2 -> Run a prompt" cloud flow instead. Dedupes against games already in this season by
-// date+opponent, same spirit as the alternate-key uniqueness the original schema had.
-function AiScheduleImportModal({
-  team,
-  seasonId,
-  existingGames,
-  onClose,
-  onImported,
-}: {
-  team: Cr9cd_teams;
-  seasonId: string;
-  existingGames: Cr9cd_games[];
-  onClose: () => void;
-  onImported: () => void;
-}) {
-  const [pastedText, setPastedText] = useState('');
-  const [ticketMode, setTicketMode] = useState<'per_game' | 'total'>('per_game');
-  const [perGame, setPerGame] = useState(String(team.cr9cd_default_tickets_per_game ?? 0));
-  const [totalTickets, setTotalTickets] = useState('');
-  const [games, setGames] = useState<ExtractedGame[] | null>(null);
-  const [parsing, setParsing] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [error, setError] = useState('');
-  const [result, setResult] = useState<{ imported: number; skipped: number; seatsCreated: number } | null>(null);
-
-  const gameCount = games?.length ?? 0;
-  const spreadPerGame = ticketMode === 'total' && gameCount > 0 ? Math.floor((Number(totalTickets) || 0) / gameCount) : null;
-  const spreadRemainder = ticketMode === 'total' && gameCount > 0 ? (Number(totalTickets) || 0) % gameCount : 0;
-
-  const existingKeys = new Set(
-    existingGames.map((g) => `${g.cr9cd_game_date ? new Date(g.cr9cd_game_date).toDateString() : ''}|${(g.cr9cd_opponent ?? '').trim().toLowerCase()}`)
-  );
-
-  async function parse() {
-    if (!pastedText.trim()) return;
-    setParsing(true);
-    setError('');
-    try {
-      const extracted = await extractScheduleFromText(team.cr9cd_name ?? 'Team', pastedText);
-      setGames(extracted);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setParsing(false);
-    }
-  }
-
-  async function doImport() {
-    if (!games) return;
-    setImporting(true);
-    setError('');
-    try {
-      let imported = 0;
-      let skipped = 0;
-      let seatsCreated = 0;
-      for (let i = 0; i < games.length; i++) {
-        const g = games[i];
-        const key = `${new Date(g.gameDate).toDateString()}|${g.opponent.trim().toLowerCase()}`;
-        if (existingKeys.has(key)) {
-          skipped++;
-          continue;
-        }
-        const seatCount =
-          ticketMode === 'total' ? (spreadPerGame ?? 0) + (i < spreadRemainder ? 1 : 0) : Number(perGame) || 0;
-        const created = await Cr9cd_gamesService.create({
-          cr9cd_game_date: new Date(g.gameDate).toISOString(),
-          cr9cd_opponent: g.opponent,
-          cr9cd_promotions: g.promotions ?? '',
-          'cr9cd_Season@odata.bind': bindRef('cr9cd_seasons', seasonId),
-          cr9cd_status: gameStatusChoice.toCode('scheduled'),
-          cr9cd_kind: gameKindChoice.toCode('game'),
-          cr9cd_total_seats: seatCount,
-        } as Parameters<typeof Cr9cd_gamesService.create>[0]);
-        imported++;
-        const gameId = created.data?.cr9cd_gameid;
-        if (gameId && seatCount > 0) {
-          for (let s = 1; s <= seatCount; s++) {
-            await Cr9cd_seatsService.create({
-              'cr9cd_Game@odata.bind': bindRef('cr9cd_games', gameId),
-              cr9cd_section: 'GA',
-              cr9cd_row: '1',
-              cr9cd_seat_number: String(s),
-              cr9cd_status: seatStatusChoice.toCode('available'),
-            } as Parameters<typeof Cr9cd_seatsService.create>[0]);
-            seatsCreated++;
-          }
-        }
-      }
-      setResult({ imported, skipped, seatsCreated });
-      onImported();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setImporting(false);
-    }
-  }
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title="Import schedule (AI)"
-      description={`Paste ${team.cr9cd_name ?? 'the team'}'s home schedule from its official site — an AI flow turns it into games.`}
-      size="lg"
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Close
-          </Button>
-          {!games ? (
-            <Button loading={parsing} disabled={!pastedText.trim()} onClick={parse}>
-              Parse schedule
-            </Button>
-          ) : (
-            <Button loading={importing} disabled={!!result} onClick={doImport}>
-              Import {games.length} game{games.length === 1 ? '' : 's'}
-            </Button>
-          )}
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <Field label="Paste the schedule" hint="Copy the schedule off the team's official site and paste it here">
-          <TextArea
-            rows={8}
-            value={pastedText}
-            onChange={(e) => setPastedText(e.target.value)}
-            className="font-mono text-xs"
-            placeholder={'Fri Oct 10  7:00 PM  vs Colorado Avalanche  (Home Opener)\nSat Oct 18  7:00 PM  vs Calgary Flames\n…'}
-          />
-        </Field>
-        <div className="rounded-lg border border-slate-200 p-3">
-          <div className="mb-2 flex gap-1 text-sm">
-            <button
-              type="button"
-              onClick={() => setTicketMode('per_game')}
-              className={`rounded-md px-3 py-1.5 font-medium ${ticketMode === 'per_game' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-            >
-              Tickets per game
-            </button>
-            <button
-              type="button"
-              onClick={() => setTicketMode('total')}
-              className={`rounded-md px-3 py-1.5 font-medium ${ticketMode === 'total' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-            >
-              Total (spread evenly)
-            </button>
-          </div>
-          {ticketMode === 'per_game' ? (
-            <Field label="Tickets per game" hint="Seats auto-created for every new game">
-              <TextInput type="number" min="0" value={perGame} onChange={(e) => setPerGame(e.target.value)} />
-            </Field>
-          ) : (
-            <Field
-              label="Total tickets for the season"
-              hint={
-                gameCount > 0
-                  ? `≈ ${spreadPerGame} per game across ${gameCount} games (remainder goes to the earliest games)`
-                  : 'Spread evenly once the schedule is parsed'
-              }
-            >
-              <TextInput type="number" min="0" value={totalTickets} onChange={(e) => setTotalTickets(e.target.value)} placeholder="e.g. 800" />
-            </Field>
-          )}
-        </div>
-
-        {parsing && (
-          <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-4">
-            <Spinner size="sm" />
-            <span className="text-sm text-slate-600">Parsing the schedule…</span>
-          </div>
-        )}
-
-        {games && (
-          <div>
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{games.length} home games found</div>
-            <div className="max-h-64 overflow-auto rounded-lg border border-slate-200">
-              <table className="w-full text-sm">
-                <tbody className="divide-y divide-slate-100">
-                  {games.map((g, i) => {
-                    const key = `${new Date(g.gameDate).toDateString()}|${g.opponent.trim().toLowerCase()}`;
-                    const isDup = existingKeys.has(key);
-                    return (
-                      <tr key={i} className={isDup ? 'opacity-50' : undefined}>
-                        <td className="px-3 py-1.5 text-slate-500">{formatDateTime(g.gameDate)}</td>
-                        <td className="px-3 py-1.5 font-medium text-slate-800">vs {g.opponent}</td>
-                        <td className="px-3 py-1.5 text-xs text-slate-400">{g.promotions ?? ''}</td>
-                        <td className="px-3 py-1.5 text-xs text-slate-400">{isDup ? 'Already in season' : ''}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {result && (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-            Imported {result.imported} game(s) ({result.skipped} skipped as duplicates), created {result.seatsCreated} seats.
-          </div>
-        )}
-        {error && <p className="text-sm text-rose-600">{error}</p>}
-      </div>
-    </Modal>
   );
 }
 
@@ -741,7 +530,6 @@ function TeamDetailModal({
   const [editingSeasonId, setEditingSeasonId] = useState<string | null>(null);
   const [showCreateSeason, setShowCreateSeason] = useState(false);
   const [addGameSeasonId, setAddGameSeasonId] = useState<string | null>(null);
-  const [aiImportSeasonId, setAiImportSeasonId] = useState<string | null>(null);
 
   const seasons = allSeasons.filter((s) => s._cr9cd_team_value === team.cr9cd_teamid);
   const seasonIds = seasons.map((s) => s.cr9cd_seasonid).join(',');
@@ -828,9 +616,6 @@ function TeamDetailModal({
             </div>
             <div className="ml-auto flex items-center gap-2">
               <ScheduleTemplateButtons seasonId={season.cr9cd_seasonid} onImported={loadGames} />
-              <Button size="sm" variant="secondary" onClick={() => setAiImportSeasonId(season.cr9cd_seasonid)}>
-                Import (paste)
-              </Button>
               <ExportButton seasonId={season.cr9cd_seasonid} />
               <Button size="sm" variant="secondary" onClick={() => setAddGameSeasonId(season.cr9cd_seasonid)}>
                 Add game
@@ -932,15 +717,6 @@ function TeamDetailModal({
         />
       )}
 
-      {aiImportSeasonId && (
-        <AiScheduleImportModal
-          team={team}
-          seasonId={aiImportSeasonId}
-          existingGames={games[aiImportSeasonId] ?? []}
-          onClose={() => setAiImportSeasonId(null)}
-          onImported={loadGames}
-        />
-      )}
     </Modal>
   );
 }
@@ -982,12 +758,14 @@ export default function TeamsPage() {
                 Send availability
               </Button>
             )}
+            <AiCreateButton onChanged={async () => { await Promise.all([loadTeams(), loadSeasons()]); }} />
             <Button onClick={() => setShowNewTeam(true)}>New team</Button>
           </>
         }
       />
 
       {showNotify && <NotifyAvailabilityModal onClose={() => setShowNotify(false)} />}
+
       {loading ? (
         <div className="card flex items-center justify-center p-12">
           <Spinner label="Loading teams…" />

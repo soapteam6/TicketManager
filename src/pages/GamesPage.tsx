@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Cr9cd_gamesService } from '../generated/services/Cr9cd_gamesService';
 import { Cr9cd_seasonsService } from '../generated/services/Cr9cd_seasonsService';
@@ -13,6 +13,7 @@ import { DataTable, type Column } from '../components/DataTable';
 import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
 import { Field, Select } from '../components/Field';
+import { AiCreateButton } from '../components/AiCreateModal';
 import NotifyAvailabilityModal from '../components/NotifyAvailabilityModal';
 import { useAuth } from '../auth/AuthContext';
 
@@ -37,9 +38,9 @@ export default function GamesPage() {
   const [seasonStatus, setSeasonStatus] = useState<SeasonStatus | ''>('active');
   const [onlyAvailable, setOnlyAvailable] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     setLoading(true);
-    Promise.all([
+    return Promise.all([
       Cr9cd_gamesService.getAll({ filter: `cr9cd_kind eq ${gameKindChoice.toCode('game')}`, orderBy: ['cr9cd_game_date asc'] }),
       Cr9cd_seasonsService.getAll({ select: ['cr9cd_seasonid', 'cr9cd_teamname', 'cr9cd_status', '_cr9cd_team_value'] }),
       Cr9cd_teamsService.getAll({ select: ['cr9cd_teamid', 'cr9cd_name'], orderBy: ['cr9cd_name asc'] }),
@@ -72,6 +73,10 @@ export default function GamesPage() {
       setLoading(false);
     });
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const filteredGames = useMemo(
     () =>
@@ -162,6 +167,7 @@ export default function GamesPage() {
                 Send availability
               </Button>
             )}
+            <AiCreateButton onChanged={load} />
           </div>
         }
       />

@@ -15,6 +15,7 @@ import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
 import { Field, Select, TextInput, TextArea, EnumOptions } from '../components/Field';
 import { Modal } from '../components/Modal';
+import { AiCreateButton } from '../components/AiCreateModal';
 
 // Custom events (title/description/date/tickets) — one-off ticketed events that aren't team games.
 export default function EventsPage() {
@@ -83,6 +84,7 @@ export default function EventsPage() {
                 <EnumOptions values={GAME_STATUS} includeBlank blankLabel="All statuses" />
               </Select>
             </Field>
+            <AiCreateButton onChanged={load} />
             <Button onClick={() => setShowNew(true)}>New event</Button>
           </>
         }
