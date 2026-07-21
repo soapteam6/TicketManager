@@ -42,18 +42,22 @@ export default function GamesPage() {
     setLoading(true);
     return Promise.all([
       Cr9cd_gamesService.getAll({ filter: `cr9cd_kind eq ${gameKindChoice.toCode('game')}`, orderBy: ['cr9cd_game_date asc'] }),
-      Cr9cd_seasonsService.getAll({ select: ['cr9cd_seasonid', 'cr9cd_teamname', 'cr9cd_status', '_cr9cd_team_value'] }),
+      // Don't $select cr9cd_teamname — it's a codegen phantom column that 400s and makes the SDK return
+      // []. Derive the team name from the teams list via _cr9cd_team_value instead.
+      Cr9cd_seasonsService.getAll({ select: ['cr9cd_seasonid', 'cr9cd_status', '_cr9cd_team_value'] }),
       Cr9cd_teamsService.getAll({ select: ['cr9cd_teamid', 'cr9cd_name'], orderBy: ['cr9cd_name asc'] }),
       Cr9cd_seatsService.getAll({ select: ['cr9cd_status', '_cr9cd_game_value'] }),
     ]).then(([gamesResult, seasonsResult, teamsResult, seatsResult]) => {
       setGames(gamesResult.data ?? []);
-      setTeams((teamsResult.data ?? []).map((t) => ({ id: t.cr9cd_teamid, name: t.cr9cd_name ?? 'Team' })));
+      const teamList = (teamsResult.data ?? []).map((t) => ({ id: t.cr9cd_teamid, name: t.cr9cd_name ?? 'Team' }));
+      setTeams(teamList);
+      const teamNameById = new Map(teamList.map((t) => [t.id, t.name]));
 
       const seasons: Record<string, SeasonInfo> = {};
       for (const s of seasonsResult.data ?? []) {
         seasons[s.cr9cd_seasonid] = {
           teamId: s._cr9cd_team_value,
-          teamName: s.cr9cd_teamname ?? '',
+          teamName: (s._cr9cd_team_value ? teamNameById.get(s._cr9cd_team_value) : '') ?? '',
           status: s.cr9cd_status != null ? seasonStatusChoice.toValue(s.cr9cd_status) : 'draft',
         };
       }

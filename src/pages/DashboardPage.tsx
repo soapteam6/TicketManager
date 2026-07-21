@@ -53,8 +53,14 @@ export default function DashboardPage() {
       const teamBySeason = new Map<string, string>();
       if (seasonIds.length > 0) {
         const seasonsFilter = seasonIds.map((id) => `cr9cd_seasonid eq ${id}`).join(' or ');
-        const seasonsForGames = await Cr9cd_seasonsService.getAll({ filter: seasonsFilter, select: ['cr9cd_seasonid', 'cr9cd_teamname'] });
-        for (const s of seasonsForGames.data ?? []) teamBySeason.set(s.cr9cd_seasonid, s.cr9cd_teamname ?? '');
+        // cr9cd_teamname is a phantom $select column (400s -> silent []); join to teams via _cr9cd_team_value.
+        const [seasonsForGames, teamsResult] = await Promise.all([
+          Cr9cd_seasonsService.getAll({ filter: seasonsFilter, select: ['cr9cd_seasonid', '_cr9cd_team_value'] }),
+          Cr9cd_teamsService.getAll({ select: ['cr9cd_teamid', 'cr9cd_name'] }),
+        ]);
+        const teamNameById = new Map((teamsResult.data ?? []).map((t) => [t.cr9cd_teamid, t.cr9cd_name ?? '']));
+        for (const s of seasonsForGames.data ?? [])
+          teamBySeason.set(s.cr9cd_seasonid, (s._cr9cd_team_value ? teamNameById.get(s._cr9cd_team_value) : '') ?? '');
       }
 
       // Group seats by game to derive per-game total + available, and overall utilization.

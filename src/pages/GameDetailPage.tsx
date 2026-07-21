@@ -47,6 +47,7 @@ import type { ContactType, GameStatus, GameKind, AttendanceOutcome, ReservationS
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
 import { Badge, type BadgeTone } from '../components/Badge';
+import { ScoreCell, ScoreBreakdownButton } from '../components/ScoreBreakdownButton';
 import { TextInput, Select, Field } from '../components/Field';
 import { Modal } from '../components/Modal';
 import { Spinner } from '../components/Spinner';
@@ -430,7 +431,9 @@ export default function GameDetailPage() {
                     </td>
                     <td className={clsx(tdClass, 'tabular-nums')}>{r.cr9cd_quantity}</td>
                     <td className={clsx(tdClass, 'tabular-nums')}>${(r.cr9cd_sales_opportunity_usd ?? 0).toLocaleString()}</td>
-                    <td className={clsx(tdClass, 'tabular-nums')}>{r.cr9cd_priority_score != null ? r.cr9cd_priority_score.toFixed(3) : '—'}</td>
+                    <td className={clsx(tdClass, 'tabular-nums')}>
+                      <ScoreCell request={r} />
+                    </td>
                     <td className={clsx(tdClass, 'tabular-nums')}>
                       {reqAssignments.length}/{r.cr9cd_quantity ?? 0}
                     </td>
@@ -625,6 +628,7 @@ export default function GameDetailPage() {
                 <span className="w-6 shrink-0 text-right tabular-nums text-slate-400">{r.rank}.</span>
                 <span className="flex-1 text-slate-700">{r.requesterName}</span>
                 <span className="tabular-nums text-slate-500">{r.finalScore.toFixed(3)}</span>
+                <ScoreBreakdownButton score={r.finalScore} requesterName={r.requesterName} breakdown={r.breakdown} />
                 <Badge tone={r.recommendation === 'award' ? 'green' : 'amber'}>{r.recommendation}</Badge>
               </li>
             ))}

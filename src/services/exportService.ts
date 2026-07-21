@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import { Cr9cd_seasonsService } from '../generated/services/Cr9cd_seasonsService';
+import { Cr9cd_teamsService } from '../generated/services/Cr9cd_teamsService';
 import { Cr9cd_gamesService } from '../generated/services/Cr9cd_gamesService';
 import { Cr9cd_ticketrequestsService } from '../generated/services/Cr9cd_ticketrequestsService';
 import { Cr9cd_assignmentsService } from '../generated/services/Cr9cd_assignmentsService';
@@ -54,13 +55,16 @@ export async function exportSeasonTracker(seasonId?: string): Promise<void> {
     games = gamesResult.data ?? [];
   } else {
     fileLabel = 'all-seasons';
-    const [gamesResult, seasonsResult] = await Promise.all([
+    // cr9cd_teamname is a phantom $select column (400s -> silent []); join to teams via _cr9cd_team_value.
+    const [gamesResult, seasonsResult, teamsResult] = await Promise.all([
       Cr9cd_gamesService.getAll({ orderBy: ['cr9cd_game_date asc'] }),
-      Cr9cd_seasonsService.getAll({ select: ['cr9cd_seasonid', 'cr9cd_name', 'cr9cd_teamname'] }),
+      Cr9cd_seasonsService.getAll({ select: ['cr9cd_seasonid', 'cr9cd_name', '_cr9cd_team_value'] }),
+      Cr9cd_teamsService.getAll({ select: ['cr9cd_teamid', 'cr9cd_name'] }),
     ]);
     games = gamesResult.data ?? [];
+    const teamNameById = new Map((teamsResult.data ?? []).map((t) => [t.cr9cd_teamid, t.cr9cd_name ?? '']));
     for (const s of seasonsResult.data ?? []) {
-      teamNameBySeasonId[s.cr9cd_seasonid] = s.cr9cd_teamname ?? '';
+      teamNameBySeasonId[s.cr9cd_seasonid] = (s._cr9cd_team_value ? teamNameById.get(s._cr9cd_team_value) : '') ?? '';
       seasonNameBySeasonId[s.cr9cd_seasonid] = s.cr9cd_name ?? '';
     }
   }

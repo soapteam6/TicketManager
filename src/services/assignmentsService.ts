@@ -175,10 +175,46 @@ export async function reassignAssignment(assignmentId: string, newSeatId: string
   return { status: 'assigned', assignmentId };
 }
 
+// Deletes this game's PROPOSED assignments and frees their seats. Approved/transferred assignments are
+// human-confirmed and left untouched. Called at the start of recommendForGame so re-running is
+// idempotent: a second click re-proposes from a clean slate instead of stacking duplicate assignments.
+async function clearProposedAssignments(gameId: string): Promise<void> {
+  const proposed = await Cr9cd_assignmentsService.getAll({
+    filter: `_cr9cd_game_value eq ${gameId} and cr9cd_status eq ${assignmentStatusChoice.toCode('proposed')}`,
+    select: ['cr9cd_assignmentid', '_cr9cd_seat_value'],
+  });
+  for (const a of proposed.data ?? []) {
+    await Cr9cd_assignmentsService.delete(a.cr9cd_assignmentid);
+    if (a._cr9cd_seat_value) {
+      await Cr9cd_seatsService.update(a._cr9cd_seat_value, { cr9cd_status: seatStatusChoice.toCode('available') });
+    }
+  }
+}
+
+// Seats each request already holds via surviving active (approved/transferred) assignments — used so
+// recommend only assigns the SHORTFALL and never double-covers an already-satisfied request.
+async function heldSeatCountByRequest(gameId: string): Promise<Map<string, number>> {
+  const result = await Cr9cd_assignmentsService.getAll({
+    filter: `_cr9cd_game_value eq ${gameId} and (${activeStatusFilter()})`,
+    select: ['_cr9cd_ticket_request_value'],
+  });
+  const counts = new Map<string, number>();
+  for (const a of result.data ?? []) {
+    const rid = a._cr9cd_ticket_request_value;
+    if (rid) counts.set(rid, (counts.get(rid) ?? 0) + 1);
+  }
+  return counts;
+}
+
 // Scores the game, then greedily assigns available seats to award-recommended requests in rank
 // order (splitting a multi-seat request across seats if needed), waitlisting everyone else.
+// Idempotent: clears prior proposals first and only tops up each request to its requested quantity,
+// so clicking Recommend repeatedly converges to the same allocation instead of duplicating seats.
 export async function recommendForGame(gameId: string): Promise<{ awarded: number; waitlisted: number }> {
+  await clearProposedAssignments(gameId);
+
   const ranking = await scoreGame(gameId);
+  const heldByRequest = await heldSeatCountByRequest(gameId);
 
   const seatsResult = await Cr9cd_seatsService.getAll({
     filter: `_cr9cd_game_value eq ${gameId} and cr9cd_status eq ${seatStatusChoice.toCode('available')}`,
@@ -191,13 +227,22 @@ export async function recommendForGame(gameId: string): Promise<{ awarded: numbe
   let waitlisted = 0;
 
   for (const ranked of ranking.ranked) {
+    const alreadyHeld = heldByRequest.get(ranked.requestId) ?? 0;
+    const needed = Math.max(0, ranked.quantity - alreadyHeld);
+
+    // Already fully covered by surviving (approved) seats — nothing to assign.
+    if (needed === 0) {
+      awarded++;
+      continue;
+    }
+
     if (ranked.recommendation !== 'award') {
       await addToWaitlist(gameId, ranked.requestId, 'Below cutline for available inventory');
       waitlisted++;
       continue;
     }
 
-    let remainingQty = ranked.quantity;
+    let remainingQty = needed;
     let anyAssigned = false;
     while (remainingQty > 0 && seatCursor < availableSeatIds.length) {
       const seatId = availableSeatIds[seatCursor++];

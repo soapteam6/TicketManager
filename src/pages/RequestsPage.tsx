@@ -20,6 +20,7 @@ import { Field, Select, TextInput, TextArea, EnumOptions } from '../components/F
 import { Modal } from '../components/Modal';
 import ContactPicker, { type ContactSelection } from '../components/ContactPicker';
 import CrmPicker from '../components/CrmPicker';
+import { ScoreCell } from '../components/ScoreBreakdownButton';
 import { upsertBeneficiaryFromCrmContact } from '../services/crmService';
 import { deleteRequest } from '../services/requestsService';
 import { moveRequestToWaitlist } from '../services/waitlistService';
@@ -136,7 +137,7 @@ export default function RequestsPage() {
       key: 'score',
       header: 'Score',
       align: 'right',
-      render: (r) => (r.cr9cd_priority_score != null ? r.cr9cd_priority_score.toFixed(3) : '—'),
+      render: (r) => <ScoreCell request={r} />,
     },
     {
       key: 'status',
@@ -272,16 +273,26 @@ function NewRequestModal({ onClose, onCreated }: { onClose: () => void; onCreate
       Cr9cd_gamesService.getAll({
         filter: `cr9cd_status eq ${gameStatusChoice.toCode('scheduled')}`,
         orderBy: ['cr9cd_game_date asc'],
+        // The Team dropdown resolves game -> season -> team, so the season lookup
+        // (_cr9cd_season_value) MUST be projected. A bare getAll() can omit it, which silently
+        // collapses every game's team to '' and leaves the Team dropdown empty.
+        select: ['cr9cd_gameid', 'cr9cd_kind', 'cr9cd_status', 'cr9cd_opponent', 'cr9cd_title', 'cr9cd_game_date', '_cr9cd_season_value'],
       }),
-      Cr9cd_seasonsService.getAll({ select: ['cr9cd_seasonid', 'cr9cd_teamname', '_cr9cd_team_value'] }),
+      // NOTE: do NOT $select cr9cd_teamname — it's a codegen pseudo-column that doesn't exist on the
+      // Web API, so selecting it 400s and the SDK silently returns []. Join to the team via _cr9cd_team_value.
+      Cr9cd_seasonsService.getAll({ select: ['cr9cd_seasonid', '_cr9cd_team_value'] }),
       Cr9cd_teamsService.getAll({ select: ['cr9cd_teamid', 'cr9cd_name'], orderBy: ['cr9cd_name asc'] }),
-    ]).then(([gamesResult, seasonsResult, teamsResult]) => {
-      setGames(gamesResult.data ?? []);
-      setTeams(teamsResult.data ?? []);
-      const map: Record<string, string> = {};
-      for (const s of seasonsResult.data ?? []) map[s.cr9cd_seasonid] = s._cr9cd_team_value ?? '';
-      setSeasonToTeamId(map);
-    });
+    ])
+      .then(([gamesResult, seasonsResult, teamsResult]) => {
+        setGames(gamesResult.data ?? []);
+        setTeams(teamsResult.data ?? []);
+        const map: Record<string, string> = {};
+        for (const s of seasonsResult.data ?? []) map[s.cr9cd_seasonid] = s._cr9cd_team_value ?? '';
+        setSeasonToTeamId(map);
+      })
+      // Without this, any query failure leaves games/teams empty with no visible error — which reads
+      // as "the dropdown is just broken." Surface it in the modal's error line instead.
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
 
   function selectContact(selection: ContactSelection) {
