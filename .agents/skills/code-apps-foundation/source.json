@@ -1,0 +1,40 @@
+{
+  "installed_on": "2026-10-23",
+  "skill": "code-apps-foundation",
+  "repository": {
+    "remote": "https://github.com/soapteam6/TicketManager.git",
+    "default_branch": "main",
+    "baseline_commit": "eb5fba57ccaef2daf24ca55bbfc24903d174fedf",
+    "app_root": "packages/client",
+    "react_dependency": "^18.3.1",
+    "resolved_react": "18.3.1"
+  },
+  "update_policy": "Pinned review snapshots. Compare upstream commits and applicability before any deliberate update; no installer or auto-updater.",
+  "sources": [
+    {
+      "repository": "https://github.com/microsoft/power-platform-skills",
+      "commit": "9d2486d27d93c9006b66ee941065be621afa5d6f",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "plugins/code-apps/skills/create-code-app/SKILL.md",
+          "sha256": "b7950adfce51b2e599c17a3bca385e9e52b620e23cff789048b369817d4fc81e",
+          "url": "https://github.com/microsoft/power-platform-skills/blob/9d2486d27d93c9006b66ee941065be621afa5d6f/plugins/code-apps/skills/create-code-app/SKILL.md"
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+          "url": "https://github.com/microsoft/power-platform-skills/blob/9d2486d27d93c9006b66ee941065be621afa5d6f/LICENSE"
+        }
+      ]
+    }
+  ],
+  "attribution": "Custom local-development adaptation of Microsoft Corporation create-code-app guidance.",
+  "changes": "Retain local React/TypeScript/Vite orientation and app implementation concepts. Exclude authentication, environment initialization, connector discovery, deployment, forced scaffolding/overwrites, plugin dependencies and standing command approvals. No upstream scripts installed or executed.",
+  "installed_from": {
+    "repository": "https://github.com/soapteam6/std-field-visit-capture",
+    "commit": "2d6439640ea4f5f577a94305709e4de6ed1e0480",
+    "path": "code-apps-foundation/source.json"
+  },
+  "adaptation": "Repository references and architecture applicability adapted for TicketManager. Upstream pins, attribution, licenses and bundled reference snapshots retained. Provenance source refers to the reviewed source checkout at the pinned installation commit."
+}

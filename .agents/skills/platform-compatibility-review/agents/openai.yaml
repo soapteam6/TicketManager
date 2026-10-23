@@ -1,0 +1,4 @@
+interface:
+  display_name: "Platform Compatibility Review"
+  short_description: "Conditional Code Apps platform review"
+  default_prompt: "Use $platform-compatibility-review for the relevant parts of this repository task."

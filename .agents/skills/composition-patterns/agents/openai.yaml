@@ -1,0 +1,4 @@
+interface:
+  display_name: "Composition Patterns"
+  short_description: "Compose reusable React UI and state"
+  default_prompt: "Use $composition-patterns for the relevant parts of this repository task."

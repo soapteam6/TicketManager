@@ -1,0 +1,97 @@
+{
+  "installed_on": "2026-10-23",
+  "skill": "react-best-practices",
+  "repository": {
+    "remote": "https://github.com/soapteam6/TicketManager.git",
+    "default_branch": "main",
+    "baseline_commit": "eb5fba57ccaef2daf24ca55bbfc24903d174fedf",
+    "app_root": "packages/client",
+    "react_dependency": "^18.3.1",
+    "resolved_react": "18.3.1"
+  },
+  "update_policy": "Pinned review snapshots. Compare upstream commits and applicability before any deliberate update; no installer or auto-updater.",
+  "sources": [
+    {
+      "repository": "https://github.com/vercel-labs/agent-skills",
+      "commit": "063bee94c3f4df8453406c830b0a7df0f2860278",
+      "license": "MIT (repository README and React/composition skill metadata)",
+      "files": [
+        {
+          "path": "skills/react-best-practices/SKILL.md",
+          "sha256": "71ed7794962fa6e803ee83030517b5b93a9f70fbfeb431ec4535c5480a8d8355",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/react-best-practices/SKILL.md"
+        },
+        {
+          "path": "README.md",
+          "sha256": "7c02f64b08fc6c4eef03c01d64f3e2ed478193ccfcbd14edba379abe23304651",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/README.md"
+        },
+        {
+          "path": "skills/react-best-practices/rules/async-parallel.md",
+          "sha256": "6d2f841896279e976dfcdc1ac89e70771ac188baadfd43c096b5706cb838b961",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/react-best-practices/rules/async-parallel.md"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rerender-derived-state-no-effect.md",
+          "sha256": "cb11ec76f50aa7b6847269f02d79b120c889a30d9ecd2c1d578f75144419c77a",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/react-best-practices/rules/rerender-derived-state-no-effect.md"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rerender-functional-setstate.md",
+          "sha256": "5e68df6b2ae8058e67f476ff1ac67bde159f5a9d18df439e46eabcdeb7b52e58",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/react-best-practices/rules/rerender-functional-setstate.md"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rerender-lazy-state-init.md",
+          "sha256": "4ae844740f266fc8cbf050701230286624a2440ec5be67b9a63d9edc3c580573",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/react-best-practices/rules/rerender-lazy-state-init.md"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rerender-no-inline-components.md",
+          "sha256": "1cc32907a770272524ba682eef9e7efdd8ad4533b6f89b718a1fcd7d1d0eb6a3",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/react-best-practices/rules/rerender-no-inline-components.md"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rerender-use-deferred-value.md",
+          "sha256": "8c3579576a61a949884167745dcfaf1d5426ba305cc61fd0a79602d70fda4909",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/react-best-practices/rules/rerender-use-deferred-value.md"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rendering-conditional-render.md",
+          "sha256": "2ec2fa23c4148285144687050c52369adba3da2fbe3d486f8d3e0aad8f06f2bc",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/react-best-practices/rules/rendering-conditional-render.md"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rendering-content-visibility.md",
+          "sha256": "64eee6d5b916fe74df33363994b27fc7f71bea3bcedc7ee04bda23107ca3e6e4",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/react-best-practices/rules/rendering-content-visibility.md"
+        },
+        {
+          "path": "skills/react-best-practices/rules/js-index-maps.md",
+          "sha256": "5df1bdc2cfabb2c98abd55d26762e5c18189535c2e686184f426082e62920391",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/react-best-practices/rules/js-index-maps.md"
+        },
+        {
+          "path": "skills/react-best-practices/rules/js-set-map-lookups.md",
+          "sha256": "a7fd781a6ba9ad49065961b6f9a90ef486bf6b648390e1a08704025f98e1642b",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/react-best-practices/rules/js-set-map-lookups.md"
+        }
+      ]
+    }
+  ],
+  "attribution": "Adapted from Vercel / Vercel Engineering. Upstream agent-skills declares MIT but supplies no standalone license file at this pin. Preserve this attribution; included MIT text comes from Vercel Labs web-interface-guidelines.",
+  "changes": "Rewrite entry workflow for installed client-side Code Apps; retain only reviewed, linked instruction rules with whitespace normalization. Omit server/Next.js/React-version migration rules, compiled duplicate AGENTS, templates, metadata and build/install tooling. Interpret library examples through installed web APIs.",
+  "bundled_normalization": {
+    "files": [
+      "rules/rerender-functional-setstate.md",
+      "rules/rerender-lazy-state-init.md"
+    ],
+    "change": "Strip trailing whitespace only; retain wording, license terms and attribution. Upstream SHA-256 values describe original source bytes."
+  },
+  "installed_from": {
+    "repository": "https://github.com/soapteam6/std-field-visit-capture",
+    "commit": "2d6439640ea4f5f577a94305709e4de6ed1e0480",
+    "path": "react-best-practices/source.json"
+  },
+  "adaptation": "Repository references and architecture applicability adapted for TicketManager. Upstream pins, attribution, licenses and bundled reference snapshots retained. Provenance source refers to the reviewed source checkout at the pinned installation commit."
+}

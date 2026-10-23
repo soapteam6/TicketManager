@@ -1,0 +1,4 @@
+interface:
+  display_name: "Business App Ui Design"
+  short_description: "Design UI using existing app components"
+  default_prompt: "Use $business-app-ui-design for the relevant parts of this repository task."

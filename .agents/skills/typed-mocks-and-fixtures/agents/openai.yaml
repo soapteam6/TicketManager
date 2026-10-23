@@ -1,0 +1,4 @@
+interface:
+  display_name: "Typed Mocks And Fixtures"
+  short_description: "Build typed synthetic service fixtures"
+  default_prompt: "Use $typed-mocks-and-fixtures for the relevant parts of this repository task."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Apps Foundation"
+  short_description: "Conditional Code Apps migration guidance"
+  default_prompt: "Use $code-apps-foundation for the relevant parts of this repository task."

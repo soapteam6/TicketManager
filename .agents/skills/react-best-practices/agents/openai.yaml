@@ -1,0 +1,4 @@
+interface:
+  display_name: "React Best Practices"
+  short_description: "Improve client-side React performance"
+  default_prompt: "Use $react-best-practices for the relevant parts of this repository task."

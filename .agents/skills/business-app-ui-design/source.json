@@ -1,0 +1,23 @@
+{
+  "installed_on": "2026-10-23",
+  "skill": "business-app-ui-design",
+  "repository": {
+    "remote": "https://github.com/soapteam6/TicketManager.git",
+    "default_branch": "main",
+    "baseline_commit": "eb5fba57ccaef2daf24ca55bbfc24903d174fedf",
+    "app_root": "packages/client",
+    "react_dependency": "^18.3.1",
+    "resolved_react": "18.3.1"
+  },
+  "update_policy": "Pinned review snapshots. Compare upstream commits and applicability before any deliberate update; no installer or auto-updater.",
+  "sources": [],
+  "attribution": "Custom repository-local technical guidance derived from the listed component and contract structure; no external skill content copied.",
+  "changes": "Introduce focused existing-component UI design guidance without a new framework, runtime change or standing authorization.",
+  "scenario_review": "Distinguish progress stamped on Visit/account/contact fields during a throwing save from warnings on a resolved SaveResult; do not assume all save steps are idempotent.",
+  "installed_from": {
+    "repository": "https://github.com/soapteam6/std-field-visit-capture",
+    "commit": "2d6439640ea4f5f577a94305709e4de6ed1e0480",
+    "path": "business-app-ui-design/source.json"
+  },
+  "adaptation": "Repository references and architecture applicability adapted for TicketManager. Upstream pins, attribution, licenses and bundled reference snapshots retained. Provenance source refers to the reviewed source checkout at the pinned installation commit."
+}

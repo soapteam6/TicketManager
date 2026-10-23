@@ -1,0 +1,57 @@
+{
+  "installed_on": "2026-10-23",
+  "skill": "web-design-guidelines",
+  "repository": {
+    "remote": "https://github.com/soapteam6/TicketManager.git",
+    "default_branch": "main",
+    "baseline_commit": "eb5fba57ccaef2daf24ca55bbfc24903d174fedf",
+    "app_root": "packages/client",
+    "react_dependency": "^18.3.1",
+    "resolved_react": "18.3.1"
+  },
+  "update_policy": "Pinned review snapshots. Compare upstream commits and applicability before any deliberate update; no installer or auto-updater.",
+  "sources": [
+    {
+      "repository": "https://github.com/vercel-labs/agent-skills",
+      "commit": "063bee94c3f4df8453406c830b0a7df0f2860278",
+      "license": "MIT (repository README and React/composition skill metadata)",
+      "files": [
+        {
+          "path": "skills/web-design-guidelines/SKILL.md",
+          "sha256": "f4647ca866a3accf763777f83e7682954f0187cd6bea7eea0399796652414e8f",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/web-design-guidelines/SKILL.md"
+        },
+        {
+          "path": "README.md",
+          "sha256": "7c02f64b08fc6c4eef03c01d64f3e2ed478193ccfcbd14edba379abe23304651",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/README.md"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/vercel-labs/web-interface-guidelines",
+      "commit": "434b7f91364665f2f733b310ec54809bf8f37937",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "command.md",
+          "sha256": "d246b026f4f29b5823a9cc857f9edf3d2507002e055e32040cadeaf3b38e0234",
+          "url": "https://github.com/vercel-labs/web-interface-guidelines/blob/434b7f91364665f2f733b310ec54809bf8f37937/command.md"
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "6cd1609c9c12233507cdd2ce0d32e9a721e3c27494951be06b90090deeeb7af2",
+          "url": "https://github.com/vercel-labs/web-interface-guidelines/blob/434b7f91364665f2f733b310ec54809bf8f37937/LICENSE"
+        }
+      ]
+    }
+  ],
+  "attribution": "Adapted from Vercel / Vercel Engineering. Upstream agent-skills declares MIT but supplies no standalone license file at this pin. Preserve this attribution; included MIT text comes from Vercel Labs web-interface-guidelines.",
+  "changes": "Replace mutable fetch-latest behavior with a bundled pinned guideline snapshot; add client SPA and existing-component applicability caveats. Preserve the referenced snapshot verbatim.",
+  "installed_from": {
+    "repository": "https://github.com/soapteam6/std-field-visit-capture",
+    "commit": "2d6439640ea4f5f577a94305709e4de6ed1e0480",
+    "path": "web-design-guidelines/source.json"
+  },
+  "adaptation": "Repository references and architecture applicability adapted for TicketManager. Upstream pins, attribution, licenses and bundled reference snapshots retained. Provenance source refers to the reviewed source checkout at the pinned installation commit."
+}

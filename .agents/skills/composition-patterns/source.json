@@ -1,0 +1,75 @@
+{
+  "installed_on": "2026-10-23",
+  "skill": "composition-patterns",
+  "repository": {
+    "remote": "https://github.com/soapteam6/TicketManager.git",
+    "default_branch": "main",
+    "baseline_commit": "eb5fba57ccaef2daf24ca55bbfc24903d174fedf",
+    "app_root": "packages/client",
+    "react_dependency": "^18.3.1",
+    "resolved_react": "18.3.1"
+  },
+  "update_policy": "Pinned review snapshots. Compare upstream commits and applicability before any deliberate update; no installer or auto-updater.",
+  "sources": [
+    {
+      "repository": "https://github.com/vercel-labs/agent-skills",
+      "commit": "063bee94c3f4df8453406c830b0a7df0f2860278",
+      "license": "MIT (repository README and React/composition skill metadata)",
+      "files": [
+        {
+          "path": "skills/composition-patterns/SKILL.md",
+          "sha256": "e38e0eaa609316b10423a9a138ed95e35099accd3f735585295c8a8f165c28a3",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/composition-patterns/SKILL.md"
+        },
+        {
+          "path": "README.md",
+          "sha256": "7c02f64b08fc6c4eef03c01d64f3e2ed478193ccfcbd14edba379abe23304651",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/README.md"
+        },
+        {
+          "path": "skills/composition-patterns/rules/architecture-avoid-boolean-props.md",
+          "sha256": "007555ebb020f4d552582a2c4db194db71a1fd33094012e5187bcfa4f8c392d5",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/composition-patterns/rules/architecture-avoid-boolean-props.md"
+        },
+        {
+          "path": "skills/composition-patterns/rules/architecture-compound-components.md",
+          "sha256": "f246af13dc269b521cf20eb8ad99a0cb645beac381c8c9b117262c34612c8457",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/composition-patterns/rules/architecture-compound-components.md"
+        },
+        {
+          "path": "skills/composition-patterns/rules/patterns-children-over-render-props.md",
+          "sha256": "7c45a0d21b3c4126a32cba916ee31adeae195386ad1dbbe6634aedb7457aa0ad",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/composition-patterns/rules/patterns-children-over-render-props.md"
+        },
+        {
+          "path": "skills/composition-patterns/rules/patterns-explicit-variants.md",
+          "sha256": "8c19e596e61807549d01ce8c6954c6358199f97a8511c0c02c625ec0efda8c0e",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/composition-patterns/rules/patterns-explicit-variants.md"
+        },
+        {
+          "path": "skills/composition-patterns/rules/state-context-interface.md",
+          "sha256": "09e73afbf9285fa416679cc864a287b9e8b821d0969272ab784295386d8c9bc3",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/composition-patterns/rules/state-context-interface.md"
+        },
+        {
+          "path": "skills/composition-patterns/rules/state-decouple-implementation.md",
+          "sha256": "76a8c1eb29a70d8996ab3f71260345af2f7bc89deab815a421d6c87c6591a9c3",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/composition-patterns/rules/state-decouple-implementation.md"
+        },
+        {
+          "path": "skills/composition-patterns/rules/state-lift-state.md",
+          "sha256": "74c54038a6c554c748fe31cec673b80861b5d920b7553cf78cdf10d18b4b759b",
+          "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/composition-patterns/rules/state-lift-state.md"
+        }
+      ]
+    }
+  ],
+  "attribution": "Adapted from Vercel / Vercel Engineering. Upstream agent-skills declares MIT but supplies no standalone license file at this pin. Preserve this attribution; included MIT text comes from Vercel Labs web-interface-guidelines.",
+  "changes": "Rewrite entry workflow for installed client-side Code Apps; retain only reviewed, linked instruction rules verbatim. Omit server/Next.js/React-version migration rules, compiled duplicate AGENTS, templates, metadata and build/install tooling. Interpret library examples through installed web APIs.",
+  "installed_from": {
+    "repository": "https://github.com/soapteam6/std-field-visit-capture",
+    "commit": "2d6439640ea4f5f577a94305709e4de6ed1e0480",
+    "path": "composition-patterns/source.json"
+  },
+  "adaptation": "Repository references and architecture applicability adapted for TicketManager. Upstream pins, attribution, licenses and bundled reference snapshots retained. Provenance source refers to the reviewed source checkout at the pinned installation commit."
+}

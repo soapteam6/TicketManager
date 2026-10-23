@@ -1,0 +1,55 @@
+{
+  "installed_on": "2026-10-23",
+  "skill": "platform-compatibility-review",
+  "repository": {
+    "remote": "https://github.com/soapteam6/TicketManager.git",
+    "default_branch": "main",
+    "baseline_commit": "eb5fba57ccaef2daf24ca55bbfc24903d174fedf",
+    "app_root": "packages/client",
+    "react_dependency": "^18.3.1",
+    "resolved_react": "18.3.1"
+  },
+  "update_policy": "Pinned review snapshots. Compare upstream commits and applicability before any deliberate update; no installer or auto-updater.",
+  "sources": [
+    {
+      "repository": "https://github.com/MicrosoftDocs/powerapps-docs",
+      "commit": "c3a8c43bfabbbbf1b6dd018fbb37bce6f6b7cd59",
+      "license": "CC-BY-4.0",
+      "files": [
+        {
+          "path": "powerapps-docs/developer/code-apps/overview.md",
+          "sha256": "387cca683053d72af99cea6f9ccf256d3e53f91d3b12f7a98cce1ca4ddd8e486",
+          "url": "https://github.com/MicrosoftDocs/powerapps-docs/blob/c3a8c43bfabbbbf1b6dd018fbb37bce6f6b7cd59/powerapps-docs/developer/code-apps/overview.md"
+        },
+        {
+          "path": "powerapps-docs/developer/code-apps/architecture.md",
+          "sha256": "d0285804b010eff85d841ae13ae95162868a69d2bd42f5fe58183f68843d2b1d",
+          "url": "https://github.com/MicrosoftDocs/powerapps-docs/blob/c3a8c43bfabbbbf1b6dd018fbb37bce6f6b7cd59/powerapps-docs/developer/code-apps/architecture.md"
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "7183ef9749eb9b75e710a81a4c812a9405cc184f087500581a973e5929ac3f5e",
+          "url": "https://github.com/MicrosoftDocs/powerapps-docs/blob/c3a8c43bfabbbbf1b6dd018fbb37bce6f6b7cd59/LICENSE"
+        }
+      ]
+    }
+  ],
+  "canonical_documentation": [
+    "https://learn.microsoft.com/en-us/power-apps/developer/code-apps/overview",
+    "https://learn.microsoft.com/en-us/power-apps/developer/code-apps/architecture"
+  ],
+  "attribution": "Microsoft Learn / Microsoft Corporation; article authors Jordan Chodak (jordanchodakWork), contributor Jim Daly. Custom paraphrase and repository-specific extension; no Microsoft endorsement implied.",
+  "changes": "Paraphrase architecture/platform facts into an offline technical workflow; add repository-specific boundaries and synthetic validation. Do not copy publishing, admin setup or authentication workflows.",
+  "bundled_normalization": {
+    "files": [
+      "LICENSE"
+    ],
+    "change": "Strip trailing whitespace only; retain wording, license terms and attribution. Upstream SHA-256 values describe original source bytes."
+  },
+  "installed_from": {
+    "repository": "https://github.com/soapteam6/std-field-visit-capture",
+    "commit": "2d6439640ea4f5f577a94305709e4de6ed1e0480",
+    "path": "platform-compatibility-review/source.json"
+  },
+  "adaptation": "Repository references and architecture applicability adapted for TicketManager. Upstream pins, attribution, licenses and bundled reference snapshots retained. Provenance source refers to the reviewed source checkout at the pinned installation commit."
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Web Design Guidelines"
+  short_description: "Review accessible business UI code"
+  default_prompt: "Use $web-design-guidelines for the relevant parts of this repository task."
