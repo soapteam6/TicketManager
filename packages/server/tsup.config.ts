@@ -3,7 +3,7 @@ import { defineConfig } from 'tsup';
 // Bundles the server (and the @ais/shared source it imports) into a single ESM file
 // so production runs with plain `node dist/index.js` — no path-alias resolver needed.
 export default defineConfig({
-  entry: ['src/index.ts'],
+  entry: ['src/index.ts', 'src/review-demo.ts'],
   format: ['esm'],
   target: 'node20',
   platform: 'node',

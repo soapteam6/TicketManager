@@ -12,14 +12,12 @@ import {
   approveAssignment,
   declineAssignment,
   reassign,
-  recommendForGame,
   seatLabel,
 } from './assignments-service.js';
-import { transferAssignment, transferGame } from './transfer-service.js';
 import { recordAttendance } from './attendance-service.js';
 
 export const assignmentsRouter = Router();
-assignmentsRouter.use(requireAuth);
+assignmentsRouter.use(requireAuth, requireRole('admin'));
 
 assignmentsRouter.get('/', (req: Request, res: Response) => {
   const gameId = req.query.gameId ? Number(req.query.gameId) : undefined;
@@ -42,6 +40,8 @@ assignmentsRouter.get('/', (req: Request, res: Response) => {
       seatLabel: seat ? seatLabel(seat) : null,
       ticketType: seat?.ticketType ?? null,
       requesterName: contact?.fullName ?? req?.requesterName ?? null,
+      requesterPhone: contact?.phone ?? req?.requesterPhone ?? null,
+      requesterEmail: contact?.email ?? req?.requesterEmail ?? null,
       quantity: req?.quantity ?? null,
       attendanceStatus: att?.ticketStatus ?? null,
     })),
@@ -72,8 +72,7 @@ assignmentsRouter.post('/:id/reassign', requireRole('admin'), validate(idParam, 
 
 assignmentsRouter.post('/:id/transfer', requireRole('admin'), validate(idParam, 'params'), async (req: Request, res: Response) => {
   const { id } = req.params as unknown as { id: number };
-  const result = await transferAssignment(id);
-  res.json(result);
+  throw badRequest('Use manual transfer recording after completing transfer in the provider app; this app cannot deliver tickets.');
 });
 
 assignmentsRouter.post(
@@ -89,7 +88,7 @@ assignmentsRouter.post(
 
 // --- Game-scoped: GET/POST /games/:gameId/assignments ---
 export const gameAssignmentsRouter = Router({ mergeParams: true });
-gameAssignmentsRouter.use(requireAuth);
+gameAssignmentsRouter.use(requireAuth, requireRole('admin'));
 
 gameAssignmentsRouter.get('/', (req: Request, res: Response) => {
   const gameId = Number((req.params as Record<string, string>).gameId);
@@ -109,6 +108,8 @@ gameAssignmentsRouter.get('/', (req: Request, res: Response) => {
       seatLabel: seat ? seatLabel(seat) : null,
       ticketType: seat?.ticketType ?? null,
       requesterName: contact?.fullName ?? req?.requesterName ?? null,
+      requesterPhone: contact?.phone ?? req?.requesterPhone ?? null,
+      requesterEmail: contact?.email ?? req?.requesterEmail ?? null,
       quantity: req?.quantity ?? null,
       attendanceStatus: att?.ticketStatus ?? null,
     })),
@@ -118,7 +119,7 @@ gameAssignmentsRouter.get('/', (req: Request, res: Response) => {
 gameAssignmentsRouter.post('/recommend', requireRole('admin'), validate(recommendSchema), (req: Request, res: Response) => {
   const gameId = Number((req.params as Record<string, string>).gameId);
   if (!Number.isInteger(gameId) || gameId <= 0) throw badRequest('Invalid game id');
-  res.json(recommendForGame(gameId, Boolean(req.body.approve), req.user!.id));
+  throw badRequest('Scores are advisory. Select a request and record a coordinator allocation decision.');
 });
 
 // --- Game-scoped: POST /games/:gameId/transfer ---
@@ -128,6 +129,5 @@ gameTransferRouter.use(requireAuth, requireRole('admin'));
 gameTransferRouter.post('/', validate(transferSchema), async (req: Request, res: Response) => {
   const gameId = Number((req.params as Record<string, string>).gameId);
   if (!Number.isInteger(gameId) || gameId <= 0) throw badRequest('Invalid game id');
-  const result = await transferGame(gameId, req.body.assignmentIds);
-  res.json(result);
+  throw badRequest('Record individual manual transfers after completing them in the provider app.');
 });

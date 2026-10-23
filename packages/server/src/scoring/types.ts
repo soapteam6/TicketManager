@@ -9,6 +9,9 @@ export interface ScoringRequestInput {
   quantity: number;
   salesOpportunityUsd: number;
   createdAt: number;
+  businessRationale?: string | null;
+  opportunityName?: string | null;
+  seasonAwardCount?: number;
   // Beneficiary history rollups:
   tier: ValueTier;
   attendedCount: number;

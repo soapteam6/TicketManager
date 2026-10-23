@@ -9,8 +9,9 @@ import { Field, TextArea } from '@/components/Field';
 import { ErrorNote } from '@/components/QueryState';
 
 const OUTCOME_LABELS: Record<(typeof ATTENDANCE_OUTCOMES)[number], string> = {
+  unknown: 'Unknown / no evidence',
   attended: 'Attended',
-  no_show: 'No-show',
+  no_show: 'Confirmed no-show',
   cancelled: 'Cancelled',
 };
 
@@ -27,7 +28,7 @@ export function AttendanceModal({
   const qc = useQueryClient();
   const initialOutcome = ATTENDANCE_OUTCOMES.includes(assignment.attendanceStatus as never)
     ? (assignment.attendanceStatus as string)
-    : 'attended';
+    : 'unknown';
   const [ticketStatus, setTicketStatus] = useState<string>(initialOutcome);
   const [followUpNotes, setFollowUpNotes] = useState('');
 
@@ -85,7 +86,7 @@ export function AttendanceModal({
           </div>
         </Field>
         <Field label="Notes">
-          <TextArea rows={3} value={followUpNotes} onChange={(e) => setFollowUpNotes(e.target.value)} placeholder="Optional" />
+          <TextArea required={ticketStatus === 'no_show'} rows={3} value={followUpNotes} onChange={(e) => setFollowUpNotes(e.target.value)} placeholder="Optional" />
         </Field>
         <ErrorNote error={record.error} />
       </form>

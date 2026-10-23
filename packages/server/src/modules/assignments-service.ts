@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { ACTIVE_ASSIGNMENT_STATUSES } from '@ais/shared';
 import { db } from '../db/client.js';
-import { assignments, seats, ticketRequests, waitlistEntries } from '../db/schema.js';
+import { assignments, seats, ticketRequests, waitlistEntries, contacts, requestContacts, reservations } from '../db/schema.js';
 import { conflict, notFound, isUniqueViolation } from '../lib/errors.js';
 import { scoreGame } from './scoring-service.js';
 import { addToWaitlist } from './waitlist-service.js';
@@ -50,12 +50,22 @@ export function assignSeat({ requestId, seatId, status, userId }: AssignParams):
     return db.transaction((): typeof assignments.$inferSelect => {
       const seat = db.select().from(seats).where(eq(seats.id, seatId)).get();
       if (!seat) throw notFound('Seat not found');
-      if (seat.status !== 'available' && seat.status !== 'held') throw conflict('Seat is not available');
+      if (seat.status !== 'available') throw conflict('Seat is not available');
 
       const req = db.select().from(ticketRequests).where(eq(ticketRequests.id, requestId)).get();
       if (!req) throw notFound('Request not found');
       if (req.gameId !== seat.gameId) throw conflict('Seat and request belong to different games');
 
+      if (['cancelled', 'declined'].includes(req.status)) throw conflict('Inactive requests cannot receive tickets');
+      if (outstandingNeed(req) === 0) throw conflict('Requested quantity has already been assigned');
+      const activeReservation = db.select().from(reservations).where(and(eq(reservations.seatId, seatId), inArray(reservations.status, ['offered', 'reserved']))).get();
+      if (activeReservation) throw conflict('Seat is held by a reservation');
+      const linked = db.select({ contact: contacts }).from(requestContacts).innerJoin(contacts, eq(contacts.id, requestContacts.contactId)).where(eq(requestContacts.requestId, req.id)).all().map((r) => r.contact);
+      if (req.beneficiaryContactId && !linked.some((c) => c.id === req.beneficiaryContactId)) {
+        const primary = db.select().from(contacts).where(eq(contacts.id, req.beneficiaryContactId)).get();
+        if (primary) linked.push(primary);
+      }
+      if (linked.some((c) => !c.isActive || !c.directoryActive)) throw conflict('Inactive beneficiaries cannot receive new allocations');
       const now = Date.now();
       const inserted = db
         .insert(assignments)
@@ -63,7 +73,7 @@ export function assignSeat({ requestId, seatId, status, userId }: AssignParams):
           requestId,
           seatId,
           gameId: seat.gameId,
-          beneficiaryContactId: req.beneficiaryContactId ?? null,
+          beneficiaryContactId: linked[Math.min(linked.length - 1, req.quantity - outstandingNeed(req))]?.id ?? req.beneficiaryContactId ?? null,
           status,
           assignedByUserId: userId > 0 ? userId : null,
           approvedByUserId: status === 'approved' && userId > 0 ? userId : null,
@@ -77,7 +87,7 @@ export function assignSeat({ requestId, seatId, status, userId }: AssignParams):
       db.update(seats).set({ status: 'assigned' }).where(eq(seats.id, seatId)).run();
       recomputeRequestStatus(requestId);
       return inserted;
-    });
+    }, { behavior: 'immediate' });
   } catch (err) {
     // A concurrent approval of the same seat trips the partial-unique index -> 409.
     if (isUniqueViolation(err)) throw conflict('Seat already has an active assignment');
@@ -90,6 +100,10 @@ export function approveAssignment(assignmentId: number, userId: number): typeof 
   if (!a) throw notFound('Assignment not found');
   if (a.status === 'approved' || a.status === 'transferred') return a;
   if (a.status !== 'proposed') throw conflict('Only proposed assignments can be approved');
+  if (a.beneficiaryContactId) {
+    const beneficiary = db.select().from(contacts).where(eq(contacts.id, a.beneficiaryContactId)).get();
+    if (!beneficiary?.isActive || !beneficiary.directoryActive) throw conflict('Inactive beneficiaries cannot receive new approvals');
+  }
   const now = Date.now();
   const updated = db
     .update(assignments)
@@ -105,12 +119,13 @@ export function approveAssignment(assignmentId: number, userId: number): typeof 
 export function declineAssignment(assignmentId: number): void {
   const a = db.select().from(assignments).where(eq(assignments.id, assignmentId)).get();
   if (!a) throw notFound('Assignment not found');
+  if (!ACTIVE_ASSIGNMENT_STATUSES.includes(a.status as typeof ACTIVE_ASSIGNMENT_STATUSES[number])) return;
   db.transaction(() => {
     db.update(assignments).set({ status: 'declined', updatedAt: Date.now() }).where(eq(assignments.id, assignmentId)).run();
     db.update(seats).set({ status: 'available' }).where(eq(seats.id, a.seatId)).run();
     recomputeRequestStatus(a.requestId);
   });
-  promoteWaitlist(a.gameId);
+  // Freed inventory awaits a coordinator decision; never auto-allocate the waitlist.
 }
 
 export function reassign(assignmentId: number, toSeatId: number, userId: number): typeof assignments.$inferSelect {
@@ -121,7 +136,8 @@ export function reassign(assignmentId: number, toSeatId: number, userId: number)
       const toSeat = db.select().from(seats).where(eq(seats.id, toSeatId)).get();
       if (!toSeat) throw notFound('Target seat not found');
       if (toSeat.gameId !== a.gameId) throw conflict('Target seat is in a different game');
-      if (toSeat.status !== 'available' && toSeat.status !== 'held') throw conflict('Target seat is not available');
+      if (!ACTIVE_ASSIGNMENT_STATUSES.includes(a.status as typeof ACTIVE_ASSIGNMENT_STATUSES[number])) throw conflict('Only active allocations can be moved');
+      if (toSeat.status !== 'available') throw conflict('Target seat is not available');
 
       // Free the old seat, move the assignment, occupy the new seat.
       db.update(seats).set({ status: 'available' }).where(eq(seats.id, a.seatId)).run();

@@ -13,7 +13,7 @@ import { createReservations, listReservations, claimReservation, releaseReservat
 // Convert an incoming expiry (YYYY-MM-DD or ISO datetime) to unix-ms. Date-only = end of that day.
 function toExpiryMs(value: string): number {
   const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
-  const ms = new Date(dateOnly ? `${value}T23:59:59` : value).getTime();
+  const ms = new Date(dateOnly ? `${value}T23:59:59Z` : value).getTime();
   if (Number.isNaN(ms)) throw badRequest('Invalid expiry date');
   return ms;
 }

@@ -48,7 +48,7 @@ describe('seat assignment integrity', () => {
     expect((threw as HttpError).status).toBe(409);
   });
 
-  it('frees the seat on decline and promotes the waitlist', () => {
+  it('frees the seat on decline without automatic allocation, then permits explicit coordinator promotion', () => {
     // Waitlist request B, then decline A's assignment -> B should get the freed seat.
     addToWaitlist(gameId, requestB);
     const aRow = db.select().from(ticketRequests).where(eq(ticketRequests.id, requestA)).get();
@@ -61,8 +61,13 @@ describe('seat assignment integrity', () => {
     expect(seatAssignment).toBeTruthy();
     declineAssignment(seatAssignment!.id);
 
-    // Promotion should have created a proposed assignment for B on the freed seat.
+    const beforeExplicitPromotion = sqlite.prepare("SELECT COUNT(*) AS n FROM assignments WHERE request_id=? AND status IN ('proposed','approved','transferred')").get(requestB);
+    expect(beforeExplicitPromotion).toEqual({ n: 0 });
+    // Only an explicit coordinator operation may promote a waitlisted request.
     promoteWaitlist(gameId);
+    // Repeating decline for the old assignment must not free B's new allocation.
+    declineAssignment(seatAssignment!.id);
+    expect(db.select().from(seats).where(eq(seats.id, seatId)).get()?.status).toBe('assigned');
     const bAssignments = sqlite
       .prepare(`SELECT COUNT(*) as c FROM assignments WHERE request_id = ? AND status IN ('proposed','approved','transferred')`)
       .get(requestB) as { c: number };

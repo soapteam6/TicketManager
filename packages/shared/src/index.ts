@@ -13,3 +13,5 @@ export * from './dto/request.js';
 export * from './dto/scoring.js';
 export * from './dto/assignment.js';
 export * from './dto/attendance.js';
+
+export * from './dto/review.js';

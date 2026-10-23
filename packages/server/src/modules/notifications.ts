@@ -7,6 +7,8 @@ import { seats, games } from '../db/schema.js';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { addMockOutbox } from './review.js';
+import { isReleased } from './release-service.js';
 import { logIntegration } from '../adapters/integration-log.js';
 
 export const notificationsRouter = Router();
@@ -20,13 +22,14 @@ const AUDIENCE_LABEL: Record<(typeof NOTIFY_AUDIENCE)[number], string> = {
 // Available seats across upcoming (scheduled / transfer-pending) games, and how many games have any.
 function availabilitySummary() {
   const rows = db
-    .select({ gameId: seats.gameId })
+    .select({ gameId: seats.gameId, game: games })
     .from(seats)
     .innerJoin(games, eq(seats.gameId, games.id))
     .where(and(eq(seats.status, 'available'), inArray(games.status, ['scheduled', 'transfer_pending'])))
     .all();
-  const availableSeats = rows.length;
-  const gamesWithAvailability = new Set(rows.map((r) => r.gameId)).size;
+  const released = rows.filter((r) => isReleased(r.game) && r.game.gameDate > Date.now());
+  const availableSeats = released.length;
+  const gamesWithAvailability = new Set(released.map((r) => r.gameId)).size;
   return { availableSeats, gamesWithAvailability };
 }
 
@@ -34,7 +37,7 @@ function defaultMessage(availableSeats: number, gamesWithAvailability: number): 
   if (availableSeats === 0) return 'No tickets are currently available.';
   return `${availableSeats} ticket${availableSeats === 1 ? '' : 's'} available across ${gamesWithAvailability} upcoming game${
     gamesWithAvailability === 1 ? '' : 's'
-  }. Reply to claim yours.`;
+  }. Express interest in the app. Requests do not guarantee tickets; a coordinator decides allocations.`;
 }
 
 // Preview: seat availability + a suggested message to pre-fill the composer.
@@ -52,12 +55,13 @@ const sendSchema = z.object({
 notificationsRouter.post('/availability', requireRole('admin'), validate(sendSchema), (req: Request, res: Response) => {
   const { audience, message } = req.body as z.infer<typeof sendSchema>;
   const summary = availabilitySummary();
+  addMockOutbox('availability', 'Tickets available — express interest', message, AUDIENCE_LABEL[audience]);
   logIntegration({
     adapter: 'notification',
     operation: `availability-broadcast:${audience}`,
     status: 'success',
     payload: { audience: AUDIENCE_LABEL[audience], ...summary },
-    response: { message },
+    response: { message, delivered: false, queuedLocally: true },
   });
-  res.json({ ok: true, audience, audienceLabel: AUDIENCE_LABEL[audience], ...summary });
+  res.json({ ok: true, delivered: false, queuedLocally: true, audience, audienceLabel: AUDIENCE_LABEL[audience], ...summary });
 });

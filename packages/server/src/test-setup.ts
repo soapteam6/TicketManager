@@ -6,3 +6,6 @@ process.env.JWT_SECRET = 'test-access-secret-0123456789abcdef';
 process.env.JWT_REFRESH_SECRET = 'test-refresh-secret-0123456789abcdef';
 process.env.SEED_ADMIN_EMAIL = 'admin@ais.local';
 process.env.SEED_ADMIN_PASSWORD = 'ChangeMe123!';
+
+process.env.LOCAL_MOCK_MODE = 'true';
+process.env.DIRECTORY_PROVIDER = 'mock';

@@ -10,7 +10,7 @@ import { notFound, conflict } from '../lib/errors.js';
 import { getActiveConfig } from './scoring-service.js';
 
 export const scoringRouter = Router();
-scoringRouter.use(requireAuth);
+scoringRouter.use(requireAuth, requireRole('admin'));
 
 function deserialize(row: typeof scoringConfigs.$inferSelect) {
   return {

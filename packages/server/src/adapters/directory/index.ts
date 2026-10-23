@@ -10,7 +10,7 @@ let instance: DirectoryAdapter | null = null;
 export function getDirectoryAdapter(): DirectoryAdapter {
   if (!instance) {
     const useGraph =
-      env.DIRECTORY_PROVIDER === 'graph' || (env.DIRECTORY_PROVIDER === 'auto' && crmConfigured);
+      !env.LOCAL_MOCK_MODE && (env.DIRECTORY_PROVIDER === 'graph' || (env.DIRECTORY_PROVIDER === 'auto' && crmConfigured));
     instance = useGraph ? new GraphDirectoryAdapter() : new MockDirectoryAdapter();
   }
   return instance;

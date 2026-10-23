@@ -35,7 +35,7 @@ export function TeamsPage() {
       header: 'Team',
       render: (t) => (
         <div>
-          <div className="font-medium text-slate-900">{t.name}</div>
+          <button type="button" className="text-left font-medium text-slate-900 hover:underline" onClick={(e) => { e.stopPropagation(); setSelected(t); }}>{t.name}</button>
           <div className="text-xs text-slate-400">{t.sport ?? '—'}</div>
         </div>
       ),
@@ -56,7 +56,7 @@ export function TeamsPage() {
         subtitle="Season-ticket holdings across all AIS teams."
         actions={
           <RoleGate roles={['admin']}>
-            <Button variant="secondary" onClick={() => setShowNotify(true)}>Send availability</Button>
+            <Button variant="secondary" onClick={() => setShowNotify(true)}>Preview availability</Button>
             <Button onClick={() => setShowNewTeam(true)}>New team</Button>
           </RoleGate>
         }
@@ -117,7 +117,7 @@ function NewTeamModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
       open
       onClose={onClose}
       title="New team"
-      description="Enter the team's details. The official website is used later to pull its schedule."
+      description="Enter the team's details. Schedules are entered manually or imported privately from CSV."
       size="lg"
       footer={
         <>
@@ -141,8 +141,8 @@ function NewTeamModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
             <TextInput value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="T-Mobile Arena" />
           </Field>
         </div>
-        <Field label="Official website" hint="Used later to pull the schedule (Import schedule with AI)">
-          <TextInput value={officialUrl} onChange={(e) => setOfficialUrl(e.target.value)} placeholder="https://www.vegasgoldenknights.com/schedule/" />
+        <Field label="Official website" hint="Reference only; no website retrieval is enabled">
+          <TextInput value={officialUrl} onChange={(e) => setOfficialUrl(e.target.value)} placeholder="https://example.invalid/schedule" />
         </Field>
         <Field label="Default tickets / game" hint="Seats auto-created on schedule import">
           <TextInput type="number" min="0" value={tickets} onChange={(e) => setTickets(e.target.value)} />
@@ -298,6 +298,8 @@ function CSVImportModal({ team, onClose, onImported }: { team: Team; onClose: ()
   const [fileName, setFileName] = useState('');
   const [dlLoading, setDlLoading] = useState(false);
   const [result, setResult] = useState<{ imported: number; skipped: number; seatsCreated: number; seasonLabel?: string; errors?: string[] } | null>(null);
+  const [csvPreview, setCsvPreview] = useState<{ games: {gameDate: string; opponent: string; tickets: number}[]; errors: string[] } | null>(null);
+  const previewCsv = useMutation({ mutationFn: async () => (await api.post(`/teams/${team.id}/schedule/import-csv`, { csv: csvText, preview: true })).data, onSuccess: setCsvPreview });
 
   async function downloadTemplate() {
     setDlLoading(true);
@@ -321,6 +323,7 @@ function CSVImportModal({ team, onClose, onImported }: { team: Team; onClose: ()
     if (!f) return;
     setFileName(f.name);
     setCsvText(await f.text());
+    setCsvPreview(null);
     setResult(null);
   }
 
@@ -346,12 +349,13 @@ function CSVImportModal({ team, onClose, onImported }: { team: Team; onClose: ()
       open
       onClose={onClose}
       title="Import schedule from CSV"
-      description="Download the template, fill in the games in a spreadsheet, then upload it."
+      description="Preview your synthetic CSV, then explicitly import private inventory. All dates and times are UTC."
       size="lg"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>Close</Button>
-          <Button loading={importCsv.isPending} disabled={!csvText || !!result} onClick={() => importCsv.mutate()}>Import CSV</Button>
+          <Button variant="secondary" loading={previewCsv.isPending} disabled={!csvText} onClick={() => previewCsv.mutate()}>Preview CSV</Button>
+          <Button loading={importCsv.isPending} disabled={!csvPreview || !!result} onClick={() => importCsv.mutate()}>Import CSV privately</Button>
         </>
       }
     >
@@ -368,6 +372,7 @@ function CSVImportModal({ team, onClose, onImported }: { team: Team; onClose: ()
         <div className="rounded-lg border border-slate-200 p-4">
           <div className="mb-2 text-sm font-medium text-slate-700">2. Upload your filled CSV</div>
           <input
+            aria-label="Synthetic schedule CSV file"
             type="file"
             accept=".csv,text/csv"
             onChange={onFile}
@@ -384,7 +389,8 @@ function CSVImportModal({ team, onClose, onImported }: { team: Team; onClose: ()
             )}
           </div>
         )}
-        <ErrorNote error={importCsv.error} />
+        {csvPreview && <div className="rounded-lg border p-3 text-sm"><h3 className="font-semibold">Private import preview · UTC</h3><ul>{csvPreview.games.map((g, i) => <li key={`${g.gameDate}-${i}`}>{g.gameDate} · {g.opponent} · {g.tickets} tickets</li>)}</ul>{csvPreview.errors.length > 0 && <p className="text-amber-800">Skipped rows: {csvPreview.errors.join('; ')}</p>}</div>}
+        <ErrorNote error={previewCsv.error || importCsv.error} />
       </div>
     </Modal>
   );
@@ -399,7 +405,7 @@ function AddGameModal({ team, onClose, onAdded }: { team: Team; onClose: () => v
 
   const add = useMutation({
     mutationFn: async () =>
-      (await api.post(`/teams/${team.id}/games`, { gameDate, opponent, promotions: promotions || undefined, tickets: Number(tickets) || 0 })).data,
+      (await api.post(`/teams/${team.id}/games`, { gameDate: `${gameDate}:00Z`, opponent, promotions: promotions || undefined, tickets: Number(tickets) || 0 })).data,
     onSuccess: () => {
       onAdded();
       onClose();
@@ -420,7 +426,7 @@ function AddGameModal({ team, onClose, onAdded }: { team: Team; onClose: () => v
     >
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Date &amp; start time" required>
+          <Field label="Date &amp; start time (UTC)" required>
             <TextInput type="datetime-local" value={gameDate} onChange={(e) => setGameDate(e.target.value)} required />
           </Field>
           <Field label="Tickets available" hint="Seats to create">
@@ -428,7 +434,7 @@ function AddGameModal({ team, onClose, onAdded }: { team: Team; onClose: () => v
           </Field>
         </div>
         <Field label="Opponent" required>
-          <TextInput value={opponent} onChange={(e) => setOpponent(e.target.value)} placeholder="e.g. Colorado Avalanche" required />
+          <TextInput value={opponent} onChange={(e) => setOpponent(e.target.value)} placeholder="Example Opponent…" required />
         </Field>
         <Field label="Promotions" hint="Optional">
           <TextInput value={promotions} onChange={(e) => setPromotions(e.target.value)} placeholder="e.g. Giveaway Night" />
@@ -492,7 +498,7 @@ function TeamSettings({ team, onDeleted }: { team: Team; onDeleted: () => void }
         <Field label="Venue">
           <TextInput value={venue} onChange={(e) => setVenue(e.target.value)} />
         </Field>
-        <Field label="Official website" hint="Used by the AI schedule import">
+        <Field label="Official website" hint="Reference only; no website retrieval is enabled">
           <TextInput value={officialUrl} onChange={(e) => setOfficialUrl(e.target.value)} placeholder="https://www.team.com/schedule" />
         </Field>
         <Field label="Default tickets / game" hint="Seats auto-created on import">
@@ -505,12 +511,12 @@ function TeamSettings({ team, onDeleted }: { team: Team; onDeleted: () => void }
         <div className="ml-auto flex items-center gap-2">
           {confirmDelete ? (
             <>
-              <span className="text-xs text-rose-700">Delete team and all its data?</span>
+              <span className="text-xs text-rose-700">Deactivate this team? History is retained.</span>
               <Button size="sm" variant="danger" loading={remove.isPending} onClick={() => remove.mutate()}>Confirm delete</Button>
               <Button size="sm" variant="secondary" onClick={() => setConfirmDelete(false)}>Cancel</Button>
             </>
           ) : (
-            <Button size="sm" variant="danger" onClick={() => setConfirmDelete(true)}>Delete team</Button>
+            <Button size="sm" variant="danger" onClick={() => setConfirmDelete(true)}>Deactivate team</Button>
           )}
         </div>
       </div>
@@ -519,7 +525,7 @@ function TeamSettings({ team, onDeleted }: { team: Team; onDeleted: () => void }
   );
 }
 
-// AI schedule import: browse the official site, preview extracted home games, then import.
+// Deterministic local CSV preview, followed by an explicit private import.
 function ScheduleImportModal({
   team,
   onClose,
@@ -565,7 +571,7 @@ function ScheduleImportModal({
       open
       onClose={onClose}
       title="Import schedule"
-      description={`Paste ${team.name}'s home schedule from its official site — it's turned into games in seconds.`}
+      description={`Preview ${team.name}'s synthetic CSV schedule locally. Dates and times are UTC. Import creates private inventory.`}
       size="lg"
       footer={
         <>
@@ -583,13 +589,13 @@ function ScheduleImportModal({
       }
     >
       <div className="space-y-4">
-        <Field label="Paste the schedule" hint="Copy the schedule off the team's official site and paste it here">
+        <Field label="Paste synthetic CSV schedule" hint="CSV columns: date,time,opponent,promotions,tickets. No AI or external retrieval is used.">
           <TextArea
             rows={8}
             value={pastedText}
-            onChange={(e) => setPastedText(e.target.value)}
+            onChange={(e) => { setPastedText(e.target.value); setGames(null); setResult(null); }}
             className="font-mono text-xs"
-            placeholder={'Fri Oct 10  7:00 PM  vs Colorado Avalanche  (Home Opener)\nSat Oct 18  7:00 PM  vs Calgary Flames\n…'}
+            placeholder={'date,time,opponent,promotions,tickets\n2026-11-20,19:00,Example Opponent,Demo night,4'}
           />
         </Field>
         <div className="rounded-lg border border-slate-200 p-3">
@@ -616,7 +622,7 @@ function ScheduleImportModal({
           ) : (
             <Field
               label="Total tickets for the season"
-              hint={gameCount > 0 ? `≈ ${spreadPerGame} per game across ${gameCount} games (remainder goes to the earliest games)` : 'Spread evenly once the schedule is fetched'}
+              hint={gameCount > 0 ? `≈ ${spreadPerGame} per game across ${gameCount} games (remainder goes to the earliest games)` : 'Spread evenly after the local preview'}
             >
               <TextInput type="number" min="0" value={totalTickets} onChange={(e) => setTotalTickets(e.target.value)} placeholder="e.g. 800" />
             </Field>

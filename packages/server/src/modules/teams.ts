@@ -8,8 +8,6 @@ import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { conflict, notFound, badRequest, isUniqueViolation } from '../lib/errors.js';
-import { narrativeEnabled } from '../env.js';
-import { extractScheduleFromText } from '../adapters/schedule/importer.js';
 import { logIntegration } from '../adapters/integration-log.js';
 
 // Teams are created with manual info (name/details typed by the admin). The official website is
@@ -107,7 +105,7 @@ teamsRouter.delete('/:id', requireRole('admin'), validate(idParam, 'params'), (r
   const existing = db.select().from(teams).where(eq(teams.id, id)).get();
   if (!existing) throw notFound('Team not found');
   // FK cascades remove the team's seasons, games, seats, requests, assignments, etc.
-  db.delete(teams).where(eq(teams.id, id)).run();
+  db.update(teams).set({ isActive: 0 }).where(eq(teams.id, id)).run();
   res.json({ ok: true });
 });
 
@@ -191,22 +189,20 @@ teamsRouter.post('/:id/schedule/import', requireRole('admin'), validate(idParam,
   if (!team) throw notFound('Team not found');
   const input = req.body as z.infer<typeof scheduleImportSchema>;
 
-  const doImport = input.preview === false && !!input.seasonId && Array.isArray(input.games) && input.games.length > 0;
+  const doImport = input.preview === false && Array.isArray(input.games) && input.games.length > 0;
 
   if (!doImport) {
-    // Preview: parse the pasted schedule text into structured games (one fast, low-cost call).
-    if (!narrativeEnabled) throw badRequest('Schedule parsing requires ANTHROPIC_API_KEY to be set in .env');
+    // Deterministic local preview: CSV only. Never call paid AI or retrieve a site.
     const text = input.pastedText?.trim();
-    if (!text) throw badRequest('Paste the schedule text to parse, or add games manually');
-    const started = Date.now();
-    try {
-      const extracted = await extractScheduleFromText(team.name, text);
-      logIntegration({ adapter: 'schedule_import', operation: 'parse_text', status: 'success', requestRef: String(team.id), response: { count: extracted.length }, durationMs: Date.now() - started });
-      res.json({ games: extracted, provider: 'claude', sourceUrl: 'pasted text' });
-    } catch (err) {
-      logIntegration({ adapter: 'schedule_import', operation: 'parse_text', status: 'error', requestRef: String(team.id), error: err instanceof Error ? err.message : String(err), durationMs: Date.now() - started });
-      throw badRequest(`Schedule parsing failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    if (!text) throw badRequest('Paste CSV rows (date,time,opponent,promotions,tickets), or add games manually');
+    const rows = parseCsv(text);
+    const extracted = rows.filter((r) => !r[0]?.toLowerCase().includes('date')).map((r) => {
+      const ms = parseCsvDateTime(r[0] ?? '', r[1] ?? '');
+      if (ms === null || !r[2]) throw badRequest('Each row requires a valid UTC date, time and opponent');
+      return { gameDate: new Date(ms).toISOString(), opponent: r[2], promotions: r[3] ?? null };
+    });
+    if (!extracted.length) throw badRequest('No games found; use the CSV template');
+    res.json({ games: extracted, provider: 'local-csv', sourceUrl: 'pasted synthetic CSV', published: false });
     return;
   }
 
@@ -302,7 +298,9 @@ function parseCsvDateTime(dateStr: string, timeStr: string): number | null {
     if (ap === 'pm' && hh < 12) hh += 12;
     if (ap === 'am' && hh === 12) hh = 0;
   }
-  const d = new Date(y, mo - 1, da, hh, mm, 0, 0);
+  const d = new Date(Date.UTC(y, mo - 1, da, hh, mm, 0, 0));
+  if (d.getUTCFullYear() !== y || d.getUTCMonth() !== mo - 1 || d.getUTCDate() !== da || hh > 23 || mm > 59) return null;
+  if (timeStr.trim() && !/^(\d{1,2})(?::\d{2})?\s*(am|pm)?$/i.test(timeStr.trim())) return null;
   return Number.isNaN(d.getTime()) ? null : d.getTime();
 }
 
@@ -322,7 +320,7 @@ teamsRouter.get('/:id/schedule/template.csv', requireRole('admin'), validate(idP
   res.send(csv + '\n');
 });
 
-const csvImportSchema = z.object({ csv: z.string().min(1) });
+const csvImportSchema = z.object({ csv: z.string().min(1), preview: z.boolean().optional() });
 
 teamsRouter.post('/:id/schedule/import-csv', requireRole('admin'), validate(idParam, 'params'), validate(csvImportSchema), (req: Request, res: Response) => {
   const { id } = req.params as unknown as { id: number };
@@ -342,11 +340,13 @@ teamsRouter.post('/:id/schedule/import-csv', requireRole('admin'), validate(idPa
     const ms = parseCsvDateTime(date, time);
     if (ms == null) { errors.push(`Row ${i + 1}: invalid date "${date}"`); continue; }
     if (!opponent) { errors.push(`Row ${i + 1}: missing opponent`); continue; }
-    const t = tickets.trim() ? Math.max(0, parseInt(tickets, 10) || 0) : team.defaultTicketsPerGame ?? 0;
+    if (tickets.trim() && (!/^\d+$/.test(tickets.trim()) || Number(tickets) > 1000)) { errors.push(`Row ${i + 1}: tickets must be an integer from 0 to 1000`); continue; }
+    const t = tickets.trim() ? Number(tickets) : team.defaultTicketsPerGame ?? 0;
     parsed.push({ ms, opponent, promotions: promotions || null, tickets: t });
   }
   if (parsed.length === 0) throw badRequest(`No valid games in the CSV.${errors.length ? ' ' + errors.slice(0, 3).join('; ') : ''}`);
 
+  if (req.body.preview) { res.json({ games: parsed.map((p) => ({ ...p, gameDate: new Date(p.ms).toISOString() })), errors, timezone: 'UTC', published: false }); return; }
   const season = getOrCreateSeasonForTeam(id, parsed.map((p) => ({ gameDate: new Date(p.ms).toISOString() })));
   const now = Date.now();
   let imported = 0;

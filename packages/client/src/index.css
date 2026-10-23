@@ -46,3 +46,8 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-slate-400;
 }
+
+:focus-visible { outline: 2px solid #0369a1; outline-offset: 3px; }
+button, a, input, select, textarea { touch-action: manipulation; }
+input[type=checkbox] { min-width: 1rem; min-height: 1rem; accent-color: #0369a1; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }

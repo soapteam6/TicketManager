@@ -2,10 +2,12 @@ import { config as loadDotenv } from 'dotenv';
 import { z } from 'zod';
 import { REPO_ROOT, fromRoot } from './lib/paths.js';
 
-loadDotenv({ path: fromRoot('.env') });
+// Mock/test runs must never load workspace secrets.
+if (process.env.NODE_ENV !== 'test' && process.env.LOCAL_MOCK_MODE !== 'true') loadDotenv({ path: fromRoot('.env') });
 
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  LOCAL_MOCK_MODE: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
   PORT: z.coerce.number().int().positive().default(4000),
   DATABASE_URL: z.string().default('./data/app.db'),
   JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
@@ -44,12 +46,16 @@ if (!parsed.success) {
 
 export const env = parsed.data;
 export const DB_PATH = env.DATABASE_URL === ':memory:' ? ':memory:' : fromRoot(env.DATABASE_URL);
+if (env.LOCAL_MOCK_MODE && DB_PATH !== ':memory:' && !DB_PATH.startsWith('/tmp/ticket-manager-review-')) {
+  throw new Error('Local mock mode requires :memory: or a dedicated /tmp/ticket-manager-review-* database.');
+}
+
 export const IS_PROD = env.NODE_ENV === 'production';
 export const IS_TEST = env.NODE_ENV === 'test';
 export { REPO_ROOT };
 
-export const narrativeEnabled = Boolean(env.ANTHROPIC_API_KEY && env.ANTHROPIC_API_KEY.trim().length > 0);
+export const narrativeEnabled = !env.LOCAL_MOCK_MODE && Boolean(env.ANTHROPIC_API_KEY && env.ANTHROPIC_API_KEY.trim().length > 0);
 
-export const crmConfigured = Boolean(
+export const crmConfigured = !env.LOCAL_MOCK_MODE && Boolean(
   env.DYNAMICS_URL && env.DYNAMICS_TENANT_ID && env.DYNAMICS_CLIENT_ID && env.DYNAMICS_CLIENT_SECRET
 );

@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import clsx from 'clsx';
 
 interface OverlayProps {
@@ -11,15 +11,32 @@ interface OverlayProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
-function useEscToClose(open: boolean, onClose: () => void) {
+function useDialog(open: boolean, onClose: () => void) {
+  const ref = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = ref.current;
+    const targets = () => Array.from(dialog?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]') ?? []);
+    (targets()[0] ?? dialog)?.focus();
+    const handle = (e: KeyboardEvent) => {
+      const dialogs = document.querySelectorAll('[role=dialog]');
+      if (dialogs[dialogs.length - 1] !== dialog) return;
+      if (e.key === 'Escape') { e.preventDefault(); closeRef.current(); }
+      if (e.key === 'Tab') {
+        const items = targets();
+        const first = items[0]; const last = items[items.length - 1];
+        if (!first) { e.preventDefault(); dialog?.focus(); }
+        else if (e.shiftKey && (document.activeElement === first || document.activeElement === dialog)) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+    window.addEventListener('keydown', handle);
+    return () => { window.removeEventListener('keydown', handle); previous?.focus(); };
+  }, [open]);
+  return ref;
 }
 
 const SIZE: Record<NonNullable<OverlayProps['size']>, string> = {
@@ -30,20 +47,25 @@ const SIZE: Record<NonNullable<OverlayProps['size']>, string> = {
 };
 
 export function Modal({ open, onClose, title, description, children, footer, size = 'md' }: OverlayProps) {
-  useEscToClose(open, onClose);
+  const dialogRef = useDialog(open, onClose);
+  const titleId = useId();
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-8">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 sm:p-8">
       <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div
+        ref={dialogRef}
+        tabIndex={-1}
+        aria-labelledby={title ? titleId : undefined}
         role="dialog"
         aria-modal="true"
         className={clsx('relative z-10 my-8 w-full rounded-xl bg-white shadow-xl', SIZE[size])}
       >
         {(title || description) && (
           <div className="border-b border-slate-200 px-6 py-4">
-            {title && <h2 className="text-lg font-semibold text-slate-900">{title}</h2>}
+            <button type="button" onClick={onClose} className="float-right rounded p-1 text-sm hover:bg-slate-100" aria-label="Close dialog">Close</button>
+            {title && <h2 id={titleId} className="text-lg font-semibold text-slate-900">{title}</h2>}
             {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
           </div>
         )}
@@ -60,7 +82,8 @@ export function Modal({ open, onClose, title, description, children, footer, siz
 
 // A right-side drawer, same API shape as Modal.
 export function Drawer({ open, onClose, title, description, children, footer, size = 'lg' }: OverlayProps) {
-  useEscToClose(open, onClose);
+  const dialogRef = useDialog(open, onClose);
+  const titleId = useId();
   if (!open) return null;
 
   const width: Record<NonNullable<OverlayProps['size']>, string> = {
@@ -74,6 +97,9 @@ export function Drawer({ open, onClose, title, description, children, footer, si
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div
+        ref={dialogRef}
+        tabIndex={-1}
+        aria-labelledby={title ? titleId : undefined}
         role="dialog"
         aria-modal="true"
         className={clsx(
@@ -84,7 +110,7 @@ export function Drawer({ open, onClose, title, description, children, footer, si
         {(title || description) && (
           <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4">
             <div>
-              {title && <h2 className="text-lg font-semibold text-slate-900">{title}</h2>}
+              {title && <h2 id={titleId} className="text-lg font-semibold text-slate-900">{title}</h2>}
               {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
             </div>
             <button

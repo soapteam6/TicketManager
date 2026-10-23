@@ -6,8 +6,8 @@ import {
   type ScoringParams,
   type GameRankingResult,
 } from '@ais/shared';
-import { db } from '../db/client.js';
-import { games, seats, ticketRequests, contacts, scoringConfigs } from '../db/schema.js';
+import { db, sqlite } from '../db/client.js';
+import { games, seats, ticketRequests, contacts, scoringConfigs, requestContacts } from '../db/schema.js';
 import { rankGameRequests } from '../scoring/engine.js';
 import type { ResolvedScoringConfig, ScoringRequestInput, ScoringGameInput } from '../scoring/types.js';
 import { getNarrativeAdapter, type NarrativeRequest, type NarrativeResult } from '../narrative/index.js';
@@ -23,8 +23,8 @@ export function getActiveConfig(): ResolvedScoringConfig {
   }
   return {
     id: row.id,
-    weights: JSON.parse(row.weights) as Record<FactorKey, number>,
-    params: JSON.parse(row.params) as ScoringParams,
+    weights: { ...DEFAULT_SCORING_WEIGHTS, ...JSON.parse(row.weights), attendanceRate: 0, leadTime: 0, premiumDemandBalance: 0, employeeCustomerBalance: 0 } as Record<FactorKey, number>,
+    params: { ...DEFAULT_SCORING_PARAMS, ...JSON.parse(row.params) } as ScoringParams,
   };
 }
 
@@ -41,7 +41,17 @@ function buildInputs(gameId: number): ScoringRequestInput[] {
     .where(and(eq(ticketRequests.gameId, gameId), inArray(ticketRequests.status, SCOREABLE_STATUSES)))
     .all();
 
-  return rows.map(({ req, contact }) => ({
+  const seasonId = db.select().from(games).where(eq(games.id, gameId)).get()!.seasonId;
+  return rows.map(({ req, contact }) => {
+    const selected = db.select({ contact: contacts }).from(requestContacts).innerJoin(contacts, eq(contacts.id, requestContacts.contactId)).where(eq(requestContacts.requestId, req.id)).all().map((r) => r.contact);
+    if (!selected.length && contact) selected.push(contact);
+    // A request may name multiple contacts; count distinct allocations, not seats.
+    const history = contact ? sqlite.prepare(`SELECT COUNT(DISTINCT a.request_id) AS count FROM assignments a
+      JOIN games g ON g.id=a.game_id LEFT JOIN contacts c ON c.id=a.beneficiary_contact_id
+      WHERE g.season_id=? AND a.request_id<>? AND a.status IN ('proposed','approved','transferred')
+      AND (a.beneficiary_contact_id=? OR a.request_id IN (SELECT request_id FROM request_contacts WHERE contact_id=?)
+        OR (? IS NOT NULL AND ?='customer' AND c.company=?))`).get(seasonId, req.id, contact.id, contact.id, contact.company, contact.type, contact.company) as { count: number } : { count: 0 };
+    return ({
     requestId: req.id,
     contactId: req.beneficiaryContactId ?? null,
     contactType: (contact?.type ?? req.beneficiaryType) as ScoringRequestInput['contactType'],
@@ -49,13 +59,16 @@ function buildInputs(gameId: number): ScoringRequestInput[] {
     quantity: req.quantity,
     salesOpportunityUsd: req.salesOpportunityUsd ?? 0,
     createdAt: req.createdAt,
+    businessRationale: req.notes,
+    opportunityName: req.crmOpportunityName,
+    seasonAwardCount: history.count,
     tier: (contact?.valueTier ?? 'prospect') as ScoringRequestInput['tier'],
-    attendedCount: contact?.attendedCount ?? 0,
+    attendedCount: selected.reduce((n,c) => n+c.attendedCount,0),
     awardedCount: contact?.awardedCount ?? 0,
-    noShowCount: contact?.noShowCount ?? 0,
+    noShowCount: selected.reduce((n,c) => n+c.noShowCount,0),
     lastTicketDate: contact?.lastTicketDate ?? null,
     futurePriorityFlag: (contact?.futurePriorityFlag ?? 'normal') as ScoringRequestInput['futurePriorityFlag'],
-  }));
+  }); });
 }
 
 // Score every competing request for a game, persist scores/ranks/breakdown, and return the ranking.
@@ -78,7 +91,8 @@ export function scoreGame(gameId: number): GameRankingResult {
           priorityRank: r.rank,
           scoringBreakdown: JSON.stringify(r.breakdown),
           scoringConfigId: config.id > 0 ? config.id : null,
-          status: 'scored',
+          // Ranking never turns waitlisted interest into an allocation.
+
           updatedAt: now,
         })
         .where(eq(ticketRequests.id, r.requestId))

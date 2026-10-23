@@ -62,6 +62,12 @@ export interface Game {
   teamName?: string | null;
   teamId?: number | null;
   availableSeats?: number;
+  releaseStatus?: 'private' | 'released' | 'scheduled';
+  releaseAt?: number | null;
+  released?: boolean;
+  requestCount?: number;
+  requestingPeople?: number;
+  requestedTickets?: number;
 }
 
 export interface Seat {
@@ -95,6 +101,8 @@ export interface Contact {
   futurePriorityFlag: FuturePriority;
   notes: string | null;
   isActive: number;
+  directoryActive?: number;
+  directoryUserId?: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -149,6 +157,8 @@ export interface Assignment {
   seatLabel?: string | null;
   ticketType?: string | null;
   requesterName?: string | null;
+  requesterPhone?: string | null;
+  requesterEmail?: string | null;
   quantity?: number | null;
   // The recorded attendance outcome, if reconciled (attended / no_show / cancelled).
   attendanceStatus?: string | null;
@@ -165,6 +175,8 @@ export interface WaitlistEntry {
   updatedAt: number;
   // Enriched on GET /waitlist
   requesterName?: string | null;
+  requesterPhone?: string | null;
+  requesterEmail?: string | null;
   quantity?: number | null;
   requestStatus?: string | null;
   opponent?: string | null;

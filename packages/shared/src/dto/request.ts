@@ -3,6 +3,7 @@ import { CONTACT_TYPE, REQUEST_STATUS } from '../enums.js';
 
 // One selected beneficiary — a CRM contact (customer) or an Entra directory user (employee).
 export const crmContactPickSchema = z.object({
+  localContactId: z.number().int().positive().optional(),
   crmContactId: z.string().optional(),
   crmAccountId: z.string().optional(),
   directoryUserId: z.string().optional(),
@@ -15,11 +16,12 @@ export const crmContactPickSchema = z.object({
 export type CrmContactPick = z.infer<typeof crmContactPickSchema>;
 
 export const createRequestSchema = z.object({
+  onBehalfUserId: z.number().int().positive().optional(),
   gameId: z.coerce.number().int().positive(),
   beneficiaryContactId: z.coerce.number().int().positive().optional().nullable(),
   beneficiaryType: z.enum(CONTACT_TYPE),
-  quantity: z.coerce.number().int().positive(),
-  notes: z.string().optional(),
+  quantity: z.coerce.number().int().positive().max(100),
+  notes: z.string().trim().min(1, 'Add a concise business justification').max(1000),
   salesOpportunityUsd: z.coerce.number().min(0).optional(),
   // Snapshot fields (used when the requester is not yet a system user, e.g. email intake).
   requesterName: z.string().optional(),
@@ -40,7 +42,7 @@ export const createRequestSchema = z.object({
 export type CreateRequestInput = z.infer<typeof createRequestSchema>;
 
 export const updateRequestSchema = z.object({
-  quantity: z.coerce.number().int().positive().optional(),
+  quantity: z.coerce.number().int().positive().max(100).optional(),
   notes: z.string().optional(),
   salesOpportunityUsd: z.coerce.number().min(0).optional(),
   beneficiaryContactId: z.coerce.number().int().positive().optional().nullable(),

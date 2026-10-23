@@ -63,6 +63,8 @@ export const games = sqliteTable(
     promotions: text('promotions'),
     notes: text('notes'),
     status: text('status').notNull().default('scheduled'),
+    releaseStatus: text('release_status').notNull().default('private'),
+    releaseAt: integer('release_at'),
     totalSeats: integer('total_seats').notNull().default(0),
     premiumScore: real('premium_score').notNull().default(0.5),
     // Custom-event fields: kind 'game' (team game) or 'event' (title/description).
@@ -117,6 +119,7 @@ export const contacts = sqliteTable('contacts', {
   crmContactId: text('crm_contact_id'),
   crmAccountId: text('crm_account_id'),
   directoryUserId: text('directory_user_id'),
+  directoryActive: integer('directory_active').notNull().default(1),
   isActive: integer('is_active').notNull().default(1),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),

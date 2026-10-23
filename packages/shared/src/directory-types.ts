@@ -1,5 +1,6 @@
 // An active user from the Entra (Azure AD) directory — used to pick employee beneficiaries.
 export interface DirectoryUser {
+  isActive?: boolean;
   id: string; // Entra object id
   displayName: string;
   email: string | null;

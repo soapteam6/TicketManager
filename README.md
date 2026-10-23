@@ -1,79 +1,56 @@
 # AIS Ticket Concierge
 
-Corporate season-ticket management & distribution for AIS. Replaces the manual Excel/Outlook
-process with an end-to-end workflow: request intake → configurable AI-assisted priority scoring →
-seat assignment (with hard duplicate-prevention) → waitlist → simulated ticket transfer →
-post-game attendance/ROI reconciliation → dashboards.
+Standalone React 18 / Vite client and Express / Drizzle / SQLite server for ticket inventory, discretionary allocation and attendance history.
 
-## Quick start (Windows, non-developer)
+## Run the synthetic review
 
-1. Install [Node.js 20+ LTS](https://nodejs.org).
-2. Double-click **`start-app.bat`**. It installs dependencies, sets up the database with demo
-   data, and opens the dashboard at http://localhost:5173.
-3. Log in with the seeded admin account:
-   - **Email:** `admin@ais.local`
-   - **Password:** `ChangeMe123!`
-
-Demo also seeds a sales rep (`rep@ais.local`) and an employee (`employee@ais.local`), password
-`ChangeMe123!`.
-
-## Manual start (developers)
+With the repository's dependencies installed (`npm ci` on a fresh checkout), run:
 
 ```bash
-npm install
-npm run setup     # copies .env, migrates, seeds base data (admin + scoring config)
-npm run dev       # server on :4000, client on :5173 (proxies /api)
+npm run dev:review
 ```
 
-The app starts as a **clean slate** — add teams by pasting their official website (Teams → New team).
-To load a full sample dataset (teams, contacts, requests, a reconciled game) for exploring, run
-`npm run seed:demo`.
+Open **http://localhost:5173/**. The API listens only on **127.0.0.1:4000**. This launcher builds the shared/server packages, ignores `.env`, forces mock integrations, and creates a fresh **in-memory** database. It does not open or alter `data/app.db`. Stop and restart to reset all fixture changes. No login credentials, paid API keys or directory connection are needed.
 
-Other scripts: `npm run db:reset` (wipe to a clean slate), `npm test` (server tests),
-`npm run build` then `npm start` (production), `npm run typecheck`.
+Use the visible **Synthetic persona** picker:
 
-## Architecture
+- **Demo Coordinator** stages/releases inventory, records interest on behalf of others, makes allocation decisions, records manual transfers, and confirms attendance.
+- **Demo Representative** sees released dates, requests tickets for active synthetic customers/contacts or self, and sees only their own requests.
+- **Demo Employee** sees released dates and records self interest only.
 
-npm-workspaces monorepo:
+Selectable personas are a local demonstration, not production security. The server enforces these mock role boundaries and rejects normal API use outside explicit local mock mode. **Real authentication is not implemented**; real operation requires a separately reviewed identity and authorization integration. The legacy `setup`, database scripts and Windows launcher are not the review entry point.
 
-- `packages/shared` — enums, constants (team seeds, scoring defaults), and zod DTOs shared by
-  server validation and client forms.
-- `packages/server` — Express + TypeScript API, SQLite via Drizzle ORM + better-sqlite3.
-- `packages/client` — React + Vite + TypeScript dashboard (Tailwind, React Query, Recharts).
+The fixture has a synthetic sports season, private/released games, a dated performance, active directory examples, synthetic customers with phone numbers, pre-release interest, and allocations from current/prior seasons. Dates are invented examples, not verified sports schedules. Sports setup supports manual entry, CSV import and a deterministic local CSV preview. New inventory starts private.
 
-### Key guarantees
-- **No duplicate seat assignment** — a partial-unique index
-  `assignments(seat_id) WHERE status IN ('proposed','approved','transferred')`, enforced inside an
-  immediate transaction. Concurrent approvals of the same seat → one wins, the other gets `409`.
-- **No over-allocation** — inventory is one row per physical seat; assignments consume distinct rows.
-- **Transparent priority** — a deterministic, admin-tunable weighted rules engine
-  (`packages/server/src/scoring/`) produces a per-factor breakdown. Optional Claude API narratives
-  explain the ranking; the app runs fully without an API key.
-- **Simulated-now / real-later integrations** — Outlook intake, ticket transfers, and Excel export
-  sit behind adapter interfaces (`packages/server/src/adapters/`, `narrative/`). Set
-  `ANTHROPIC_API_KEY` in `.env` to enable AI narratives.
-- **Schedule import** — on the Teams page, build a team's schedule three ways: **Import CSV** (download a
-  per-team template, fill it in a spreadsheet, upload — deterministic, no AI), **Import (paste)** (paste
-  the schedule text from the official site; parsed by the Claude API `claude-sonnet-4-6` in one fast/cheap
-  call), or **Add game** (manual). All auto-create the season and the team's default tickets (seats) per
-  game. Paste parsing requires `ANTHROPIC_API_KEY`; CSV and manual do not.
-- **Dynamics 365 CRM** — the New Request form pulls from Dynamics in three steps
-  (`packages/server/src/adapters/crm/`): **1)** search a company (account), **2)** select one or
-  more contacts from that account, **3)** pick an opportunity whose **Manual Rep Credit**
-  (`ais_manualrepcredit`, configurable via `DYNAMICS_OPP_REVENUE_FIELD`) becomes the request's
-  revenue. Selected contacts are linked to local contact records (join table `request_contacts`)
-  so the request feeds scoring. Uses sample data until the four `DYNAMICS_*` values are set, then
-  queries the live org (OAuth client-credentials + Web API).
+## Review the workflow
 
-### Wiring live Dynamics 365
-Register an Azure AD app, create a Dynamics **application user** for it with read access to
-`accounts` and `contacts`, then set in `.env`:
-`DYNAMICS_URL` (e.g. `https://yourorg.crm.dynamics.com`), `DYNAMICS_TENANT_ID`,
-`DYNAMICS_CLIENT_ID`, `DYNAMICS_CLIENT_SECRET`. Restart the app; the CRM badge in the request
-form flips from "Sample data" to "Live Dynamics".
+1. In coordinator inventory, select dates or enter an inclusive UTC date window; release immediately or schedule an explicit UTC instant. Release does not send announcements.
+2. Switch to a requester and express interest. The catalog shows available tickets, request count, distinct submitting people and requested ticket quantities. Interest never assigns tickets.
+3. Switch back, review rationale and advisory ranking, and choose quantities and a decision/override reason. Waitlists remain subject to coordinator decisions.
+4. Transfer tickets separately in the provider app, then record that manual step locally. This app cannot deliver tickets.
+5. After an event, record attended, confirmed no-show (with evidence/note), or unknown. Missing evidence and unanswered follow-ups stay unknown. Search contacts across seasons to review history.
+6. Under mock messages, preview availability and explicitly add it to the local mock outbox. Optional post-event follow-up is disabled by default. No email/SMS or photo upload is implemented.
 
-## Configuration (`.env`)
+See [requirements, assumptions and acceptance evidence](docs/APP_REVIEW_2026-10-23.md) and [local QA guide](docs/REVIEW_QA.md).
 
-Copy `.env.example` to `.env`. Notable keys: `JWT_SECRET` / `JWT_REFRESH_SECRET` (change for real
-use), `ANTHROPIC_API_KEY` (optional — enables AI narratives), `ANTHROPIC_MODEL`
-(default `claude-sonnet-4-6`).
+## Checks
+
+```bash
+npm test
+npm run typecheck
+npm run build
+git diff --check
+```
+
+Tests use isolated in-memory synthetic databases, including migration preservation tests. No lint script is configured. `npm run build` compiles artifacts only; it does not deploy. Optional browser checks are described in the QA guide.
+
+## Architecture and boundaries
+
+- `packages/shared`: typed DTOs, Zod validation, category defaults and advisory factors.
+- `packages/server`: API, non-destructive SQL migrations, inventory integrity, release clock and mock service seams.
+- `packages/client`: responsive coordinator/requester workflows using existing React Query and Tailwind components.
+- `scripts/review-demo.mjs`: isolated local fixture launcher.
+
+Sports retain seasons for fairness/reporting. Dated events ask only for a date and ticket quantity; their legacy internal storage group is hidden from that workflow. Requests and contact records are retired/deactivated rather than deleted so old seasons retain history.
+
+Legacy CRM/directory/narrative adapter code remains for a future separately authorized integration. Mock mode never falls back to live providers. No deployments, external schedules, real communications, real ticket operations, identity grants or subscriptions are part of this review build.

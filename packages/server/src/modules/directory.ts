@@ -1,6 +1,11 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import type { DirectoryStatus } from '@ais/shared';
+import { db } from '../db/client.js';
+import { contacts } from '../db/schema.js';
+import { requireRole } from '../middleware/requireRole.js';
+import { syncDirectorySnapshot } from './directory-service.js';
+import { MockDirectoryAdapter } from '../adapters/directory/mock.js';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { getDirectoryAdapter } from '../adapters/directory/index.js';
@@ -24,9 +29,14 @@ directoryRouter.get('/search', validate(searchQuery, 'query'), async (req: Reque
   try {
     const users = await adapter.searchUsers(q);
     logIntegration({ adapter: 'directory', operation: 'search', status: 'success', payload: { q, provider: adapter.provider }, response: { count: users.length }, durationMs: Date.now() - started });
-    res.json({ users, provider: adapter.provider });
+    const inactive = new Set(db.select().from(contacts).all().filter((c) => !c.isActive || !c.directoryActive).map((c) => c.directoryUserId));
+    res.json({ users: users.filter((u) => !inactive.has(u.id)), provider: adapter.provider });
   } catch (err) {
     logIntegration({ adapter: 'directory', operation: 'search', status: 'error', payload: { q, provider: adapter.provider }, error: err instanceof Error ? err.message : String(err), durationMs: Date.now() - started });
     res.status(502).json({ error: 'Directory search failed', detail: err instanceof Error ? err.message : String(err) });
   }
+});
+
+directoryRouter.post('/sync-mock', requireRole('admin'), async (_req, res) => {
+  res.json(syncDirectorySnapshot(await new MockDirectoryAdapter().searchUsers('')));
 });

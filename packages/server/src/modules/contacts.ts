@@ -1,8 +1,8 @@
 import { Router, type Request, type Response } from 'express';
-import { and, desc, eq, like } from 'drizzle-orm';
+import { and, desc, eq, like, or, inArray } from 'drizzle-orm';
 import { createContactSchema, updateContactSchema, contactQuery, idParam } from '@ais/shared';
 import { db } from '../db/client.js';
-import { contacts, attendanceRecords, ticketRequests, games } from '../db/schema.js';
+import { contacts, attendanceRecords, ticketRequests, games, requestContacts, assignments } from '../db/schema.js';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/requireRole.js';
@@ -17,7 +17,7 @@ contactsRouter.get('/', validate(contactQuery, 'query'), (req: Request, res: Res
   const filters = [];
   if (type) filters.push(eq(contacts.type, type));
   if (ownerId) filters.push(eq(contacts.accountOwnerUserId, ownerId));
-  if (q) filters.push(like(contacts.fullName, `%${q}%`));
+  if (q) filters.push(or(like(contacts.fullName, `%${q}%`), like(contacts.company, `%${q}%`), like(contacts.email, `%${q}%`), like(contacts.phone, `%${q}%`))!);
   const where = filters.length ? and(...filters) : undefined;
   const rows = db.select().from(contacts).where(where).all();
   res.json({ contacts: rows });
@@ -51,7 +51,10 @@ contactsRouter.get('/:id/history', validate(idParam, 'params'), (req: Request, r
     .where(eq(ticketRequests.beneficiaryContactId, id))
     .orderBy(desc(ticketRequests.createdAt))
     .all();
-  res.json({ contact, attendance, requests });
+  const linkedIds = db.select().from(requestContacts).where(eq(requestContacts.contactId, id)).all().map((r) => r.requestId);
+  const linked = linkedIds.length ? db.select().from(ticketRequests).where(inArray(ticketRequests.id, linkedIds)).all() : [];
+  const allocations = db.select({ assignment: assignments, gameDate: games.gameDate, seasonId: games.seasonId, title: games.title, opponent: games.opponent }).from(assignments).innerJoin(games, eq(games.id, assignments.gameId)).where(eq(assignments.beneficiaryContactId, id)).all();
+  res.json({ contact, attendance, assignments: allocations, requests: [...new Map([...requests, ...linked].map((r) => [r.id, r])).values()] });
 });
 
 contactsRouter.post('/', requireRole('admin', 'sales_rep'), validate(createContactSchema), (req: Request, res: Response) => {
@@ -91,7 +94,7 @@ contactsRouter.delete('/:id', requireRole('admin'), validate(idParam, 'params'),
   const { id } = req.params as unknown as { id: number };
   const existing = db.select().from(contacts).where(eq(contacts.id, id)).get();
   if (!existing) throw notFound('Contact not found');
-  db.delete(contacts).where(eq(contacts.id, id)).run();
+  db.update(contacts).set({ isActive: 0, updatedAt: Date.now() }).where(eq(contacts.id, id)).run();
   res.json({ ok: true });
 });
 

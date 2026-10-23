@@ -65,10 +65,10 @@ export type ReservationStatus = (typeof RESERVATION_STATUS)[number];
 // Statuses where a reservation actively holds its seat.
 export const ACTIVE_RESERVATION_STATUSES: ReservationStatus[] = ['offered', 'reserved'];
 
-export const TICKET_STATUS = ['accepted', 'declined', 'no_show', 'attended', 'cancelled'] as const;
+export const TICKET_STATUS = ['accepted', 'declined', 'no_show', 'attended', 'cancelled', 'unknown'] as const;
 export type TicketStatus = (typeof TICKET_STATUS)[number];
 // The outcomes an admin reconciles after a game, in the simplified attendance flow.
-export const ATTENDANCE_OUTCOMES = ['attended', 'no_show', 'cancelled'] as const;
+export const ATTENDANCE_OUTCOMES = ['attended', 'no_show', 'unknown', 'cancelled'] as const;
 export type AttendanceOutcome = (typeof ATTENDANCE_OUTCOMES)[number];
 
 export const TRANSFER_PLATFORM = ['ticketmaster', 'axs', 'seatgeek', 'mock'] as const;

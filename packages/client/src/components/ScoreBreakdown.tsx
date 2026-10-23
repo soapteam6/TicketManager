@@ -9,11 +9,11 @@ export function ScoreBreakdown({ breakdown }: { breakdown: FactorContribution[] 
     return <p className="text-sm text-slate-400">No breakdown available.</p>;
   }
 
-  const maxAbs = Math.max(1, ...breakdown.map((c) => Math.abs(c.sharePct)));
+  const maxAbs = Math.max(1, ...breakdown.filter((factor) => factor.weight !== 0).map((c) => Math.abs(c.sharePct)));
 
   return (
     <div className="space-y-3">
-      {breakdown.map((c) => {
+      {breakdown.filter((factor) => factor.weight !== 0).map((c) => {
         const pct = c.sharePct;
         const width = `${(Math.abs(pct) / maxAbs) * 100}%`;
         const positive = pct >= 0;

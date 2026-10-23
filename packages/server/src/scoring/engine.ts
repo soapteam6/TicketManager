@@ -69,10 +69,11 @@ export function rankGameRequests(
     const rb = byId.get(b.requestId)!;
     // Tiebreak: tier desc -> attendance rate desc -> earlier request -> id (stable).
     if (TIER_RANK[rb.tier] !== TIER_RANK[ra.tier]) return TIER_RANK[rb.tier] - TIER_RANK[ra.tier];
-    const attA = ra.awardedCount ? ra.attendedCount / ra.awardedCount : 0;
-    const attB = rb.awardedCount ? rb.attendedCount / rb.awardedCount : 0;
+    const knownA = ra.attendedCount + ra.noShowCount;
+    const attA = knownA ? ra.attendedCount / knownA : 0.5;
+    const knownB = rb.attendedCount + rb.noShowCount;
+    const attB = knownB ? rb.attendedCount / knownB : 0.5;
     if (attB !== attA) return attB - attA;
-    if (ra.createdAt !== rb.createdAt) return ra.createdAt - rb.createdAt;
     return a.requestId - b.requestId;
   });
 

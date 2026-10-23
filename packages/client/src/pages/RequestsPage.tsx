@@ -88,7 +88,7 @@ export function RequestsPage() {
           <RoleGate roles={['admin']}>
             {confirmDeleteId === r.id ? (
               <div className="flex items-center justify-end gap-2">
-                <span className="text-xs text-rose-700">Delete?</span>
+                <span className="text-xs text-rose-700">Retire request?</span>
                 <Button size="sm" variant="danger" loading={del.isPending} onClick={() => del.mutate(r.id)}>Confirm</Button>
                 <Button size="sm" variant="secondary" onClick={() => setConfirmDeleteId(null)}>Cancel</Button>
               </div>
@@ -104,7 +104,7 @@ export function RequestsPage() {
                     Waitlist
                   </Button>
                 )}
-                <Button size="sm" variant="secondary" onClick={() => setConfirmDeleteId(r.id)}>Delete</Button>
+                <Button size="sm" variant="secondary" onClick={() => setConfirmDeleteId(r.id)}>Retire</Button>
               </div>
             )}
           </RoleGate>

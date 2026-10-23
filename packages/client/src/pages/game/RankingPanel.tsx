@@ -33,8 +33,8 @@ export function RankingPanel({ gameId, onScored }: { gameId: number; onScored?: 
     <div className="card p-5">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-slate-800">Priority ranking</h3>
-          <p className="text-xs text-slate-500">Score all open requests against the active scoring config.</p>
+          <h3 className="text-sm font-semibold text-slate-800">Advisory priority ranking</h3>
+          <p className="text-xs text-slate-500">Suggestions only. A coordinator chooses every allocation and may override this ranking.</p>
         </div>
         <Button size="sm" loading={score.isPending} onClick={() => score.mutate()}>
           Score &amp; Rank
@@ -50,7 +50,7 @@ export function RankingPanel({ gameId, onScored }: { gameId: number; onScored?: 
               Seats available: <b className="text-slate-700">{result.seatsAvailable}</b>
             </span>
             <span className="rounded-md bg-slate-100 px-2 py-1">
-              Remaining after awards: <b className="text-slate-700">{result.seatsRemaining}</b>
+              Unallocated after suggestions: <b className="text-slate-700">{result.seatsRemaining}</b>
             </span>
             <span className="rounded-md bg-slate-100 px-2 py-1">
               Config #{result.configId}
@@ -82,7 +82,7 @@ export function RankingPanel({ gameId, onScored }: { gameId: number; onScored?: 
                       <div className="text-right">
                         <div className="text-sm font-semibold tabular-nums text-slate-800">{formatScore(r.finalScore)}</div>
                         <Badge status={r.recommendation === 'award' ? 'approved' : 'waitlisted'}>
-                          {r.recommendation === 'award' ? 'Award' : 'Waitlist'}
+                          {r.recommendation === 'award' ? 'Suggested fit' : 'Consider waitlist'}
                         </Badge>
                       </div>
                       <svg

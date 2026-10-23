@@ -2,7 +2,7 @@ import { eq, desc } from 'drizzle-orm';
 import type { RecordAttendanceInput } from '@ais/shared';
 import { db } from '../db/client.js';
 import { attendanceRecords, assignments, contacts, games } from '../db/schema.js';
-import { notFound, conflict } from '../lib/errors.js';
+import { notFound, conflict, badRequest } from '../lib/errors.js';
 
 // Rebuild a contact's history rollups from its attendance records — idempotent, feeds scoring.
 export function recomputeContactRollups(contactId: number): void {
@@ -56,6 +56,9 @@ export function recordAttendance(assignmentId: number, input: RecordAttendanceIn
     : undefined;
   const designation = input.designation ?? (beneficiary?.type === 'employee' ? 'employee' : 'customer');
 
+  if (input.ticketStatus === 'no_show' && !input.followUpNotes?.trim()) throw badRequest('Record evidence or a confirmation note for a confirmed no-show');
+  const game = db.select().from(games).where(eq(games.id, a.gameId)).get();
+  if (game && game.gameDate > Date.now() && ['attended', 'no_show'].includes(input.ticketStatus)) throw badRequest('Attendance can only be confirmed after the event');
   const now = Date.now();
   const existing = db.select().from(attendanceRecords).where(eq(attendanceRecords.assignmentId, assignmentId)).get();
 

@@ -42,14 +42,14 @@ export function NotifyAvailabilityModal({ onClose }: { onClose: () => void }) {
     <Modal
       open
       onClose={onClose}
-      title="Send availability update"
-      description="Let people know how many tickets are available."
+      title="Mock availability preview"
+      description="Add a local mock announcement. No real messages are delivered."
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>{send.isSuccess ? 'Close' : 'Cancel'}</Button>
           {!send.isSuccess && (
             <Button loading={send.isPending} disabled={!message.trim()} onClick={() => send.mutate()}>
-              Send to {AUDIENCE_LABELS[audience]}
+              Add preview for {AUDIENCE_LABELS[audience]}
             </Button>
           )}
         </>
@@ -96,7 +96,7 @@ export function NotifyAvailabilityModal({ onClose }: { onClose: () => void }) {
 
         {send.isSuccess && (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-            Sent to {AUDIENCE_LABELS[audience]}.
+            Saved locally for {AUDIENCE_LABELS[audience]}. Nothing was sent.
           </div>
         )}
         <ErrorNote error={send.error} />

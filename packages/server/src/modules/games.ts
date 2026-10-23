@@ -7,6 +7,8 @@ import { games, seasons, teams } from '../db/schema.js';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { expireDueReservations } from './reservations-service.js';
+import { demandForGame, isReleased } from './release-service.js';
 import { badRequest, notFound } from '../lib/errors.js';
 
 // Convert an incoming date string (YYYY-MM-DD or ISO) to unix-ms; guard invalid dates.
@@ -27,6 +29,7 @@ export const gamesRouter = Router();
 gamesRouter.use(requireAuth);
 
 gamesRouter.get('/', validate(gamesListQuery, 'query'), (req: Request, res: Response) => {
+  expireDueReservations();
   const { seasonId, teamId, status, seasonStatus } = req.query as unknown as { seasonId?: number; teamId?: number; status?: string; seasonStatus?: string };
   const conditions = [];
   if (seasonId) conditions.push(eq(games.seasonId, seasonId));
@@ -48,15 +51,24 @@ gamesRouter.get('/', validate(gamesListQuery, 'query'), (req: Request, res: Resp
     .innerJoin(seasons, eq(games.seasonId, seasons.id))
     .innerJoin(teams, eq(seasons.teamId, teams.id));
   const rows = (where ? base.where(where) : base).orderBy(asc(games.gameDate)).all();
-  res.json({ games: rows });
+  const visible = rows.filter((g) => req.user!.role === 'admin' || isReleased(g) && ['scheduled', 'transfer_pending'].includes(g.status));
+  res.json({ games: visible.map((g) => {
+    const demand = demandForGame(g.id);
+    if (req.user!.role === 'admin') return { ...g, ...demand, released: isReleased(g) };
+    return { id: g.id, title: g.title, kind: g.kind, opponent: g.opponent, gameDate: g.gameDate, teamName: g.teamName, availableSeats: g.availableSeats, totalSeats: g.totalSeats, status: g.status, ...demand };
+  }) });
 });
 
 gamesRouter.get('/:id', validate(idParam, 'params'), (req: Request, res: Response) => {
   const { id } = req.params as unknown as { id: number };
   const game = db.select().from(games).where(eq(games.id, id)).get();
-  if (!game) throw notFound('Game not found');
+  if (!game || req.user!.role !== 'admin' && (!isReleased(game) || !['scheduled', 'transfer_pending'].includes(game.status))) throw notFound('Game not found');
   const season = db.select().from(seasons).where(eq(seasons.id, game.seasonId)).get();
   const team = season ? db.select().from(teams).where(eq(teams.id, season.teamId)).get() : undefined;
+  if (req.user!.role !== 'admin') {
+    res.json({ game: { id: game.id, title: game.title, kind: game.kind, opponent: game.opponent, gameDate: game.gameDate, totalSeats: game.totalSeats, ...demandForGame(id) } });
+    return;
+  }
   res.json({ game: { ...game, seasonLabel: season?.label ?? null, teamName: team?.name ?? null } });
 });
 

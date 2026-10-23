@@ -2,10 +2,12 @@ import { and, asc, eq, inArray } from 'drizzle-orm';
 import { ACTIVE_ASSIGNMENT_STATUSES } from '@ais/shared';
 import { db } from '../db/client.js';
 import { waitlistEntries, ticketRequests, assignments, seats, games } from '../db/schema.js';
-import { notFound } from '../lib/errors.js';
+import { notFound, conflict } from '../lib/errors.js';
 
 // Add a request to the tail of a game's waitlist (idempotent for active entries).
 export function addToWaitlist(gameId: number, requestId: number, reason?: string): void {
+  const interest = db.select().from(ticketRequests).where(eq(ticketRequests.id, requestId)).get();
+  if (!interest || interest.gameId !== gameId || ['cancelled', 'declined'].includes(interest.status)) throw conflict('Select an active request for this event');
   const existing = db
     .select()
     .from(waitlistEntries)
@@ -41,6 +43,9 @@ export function listWaitlist(gameId?: number) {
 export function moveRequestToWaitlist(gameId: number, requestId: number): void {
   const req = db.select().from(ticketRequests).where(eq(ticketRequests.id, requestId)).get();
   if (!req) throw notFound('Request not found');
+  if (req.gameId !== gameId) throw conflict('Request belongs to another game');
+  const delivered = db.select().from(assignments).where(and(eq(assignments.requestId, requestId), eq(assignments.status, 'transferred'))).get();
+  if (delivered) throw conflict('Transferred allocations cannot be moved to a waitlist');
   const now = Date.now();
   db.transaction(() => {
     const held = db

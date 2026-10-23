@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { DEFAULT_SCORING_WEIGHTS, DEFAULT_SCORING_PARAMS } from '@ais/shared';
+import { FACTORS } from './factors.js';
 import { rankGameRequests, scoreRequest } from './engine.js';
 import type { ResolvedScoringConfig, ScoringGameInput, ScoringRequestInput, ScoringContext } from './types.js';
 
@@ -84,5 +85,23 @@ describe('rankGameRequests', () => {
     const freshScore = result.ranked.find((r) => r.requestId === 20)!.finalScore;
     const recentScore = result.ranked.find((r) => r.requestId === 21)!.finalScore;
     expect(freshScore).toBeGreaterThan(recentScore);
+  });
+});
+
+
+describe('review advisory policy', () => {
+  const ctx: ScoringContext = { game, config, pool: { total: 1, employeeCount: 0, customerCount: 1 }, now: NOW };
+  it('keeps unknown attendance neutral even after many allocations', () => {
+    const empty = FACTORS.reliability.extract(req({ requestId:1 }),ctx);
+    const unknown = FACTORS.reliability.extract(req({ requestId:2,awardedCount:20 }),ctx);
+    expect(empty.norm).toBe(0.5); expect(unknown.norm).toBe(empty.norm);
+    expect(FACTORS.attendanceRate.extract(req({requestId:3,awardedCount:20}),ctx).norm).toBe(0.5);
+  });
+  it('uses known attendance outcomes and permits transparent configurable category priorities', () => {
+    expect(FACTORS.reliability.extract(req({requestId:1,awardedCount:20,attendedCount:1,noShowCount:1}),ctx).norm).toBe(0.5);
+    const custom = { ...ctx, config:{...config,params:{...config.params,categoryProspectScore:1,categoryCustomerScore:0.5}} };
+    const prospect = FACTORS.strategicValue.extract(req({requestId:1,tier:'prospect'}),custom);
+    const customer = FACTORS.strategicValue.extract(req({requestId:2,tier:'gold'}),custom);
+    expect(prospect.norm).toBeGreaterThan(customer.norm);
   });
 });

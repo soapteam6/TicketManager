@@ -24,6 +24,8 @@ import { dashboardsRouter } from './modules/dashboards.js';
 import { integrationsRouter } from './modules/integrations.js';
 import { notificationsRouter } from './modules/notifications.js';
 import { exportRouter } from './modules/export.js';
+import { requireAuth, mockRoleBoundary } from './middleware/auth.js';
+import { reviewRouter } from './modules/review.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
 
 export function createApp() {
@@ -33,7 +35,10 @@ export function createApp() {
   app.use(express.json({ limit: '1mb' }));
   app.use(cookieParser());
 
-  app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'ais-ticket-concierge' }));
+  app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'ais-ticket-concierge', mode: env.LOCAL_MOCK_MODE ? 'local-mock' : 'auth-unconfigured' }));
+
+  app.use('/api', requireAuth, mockRoleBoundary);
+  app.use('/api', reviewRouter);
 
   app.use('/api/teams', teamsRouter);
   app.use('/api/events', eventsRouter);

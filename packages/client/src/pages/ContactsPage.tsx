@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CONTACT_TYPE, VALUE_TIER, FUTURE_PRIORITY } from '@ais/shared';
 import { api } from '@/lib/api';
@@ -16,6 +17,9 @@ import { RoleGate } from '@/auth/AuthContext';
 import { EmptyState } from '@/components/EmptyState';
 
 export function ContactsPage() {
+  const [params, setParams] = useSearchParams();
+  const qc = useQueryClient();
+  const sync = useMutation({ mutationFn: async () => (await api.post('/directory/sync-mock')).data, onSuccess: () => qc.invalidateQueries() });
   const [q, setQ] = useState('');
   const [type, setType] = useState('');
   const [editing, setEditing] = useState<Contact | 'new' | null>(null);
@@ -43,8 +47,10 @@ export function ContactsPage() {
       ),
     },
     { key: 'type', header: 'Type', render: (c) => <Badge tone="slate">{c.type}</Badge> },
+    { key: 'status', header: 'Eligibility', render: (c) => <span>{!c.isActive ? 'Inactive in app' : c.directoryActive === 0 ? 'Inactive in directory' : 'Active'}{c.directoryUserId && <span className="block text-xs text-slate-500">Directory source · app override independent</span>}</span> },
+    { key: 'phone', header: 'Transfer contact', render: (c) => <span>{c.phone || 'No phone'}<span className="block text-xs text-slate-500">{c.email}</span></span> },
     { key: 'tier', header: 'Tier', render: (c) => <Badge status={c.valueTier} /> },
-    { key: 'att', header: 'Attended', align: 'right', render: (c) => `${c.attendedCount}/${c.awardedCount}` },
+    { key: 'att', header: 'Attended', align: 'right', render: (c) => `${c.attendedCount} attended · ${c.noShowCount} confirmed no-shows` },
     { key: 'priority', header: 'Priority', render: (c) => <Badge status={c.futurePriorityFlag} /> },
     {
       key: 'actions',
@@ -65,25 +71,27 @@ export function ContactsPage() {
     <div>
       <PageHeader
         title="Contacts"
-        subtitle="Customers and employees who receive tickets."
+        subtitle="Search business, name, email or phone across all seasons. Inactive records retain their history."
         actions={
           <RoleGate roles={['admin', 'sales_rep']}>
-            <Button onClick={() => setEditing('new')}>New contact</Button>
+            <div className="flex flex-wrap gap-2"><Button variant="secondary" loading={sync.isPending} onClick={() => sync.mutate()}>Sync synthetic directory</Button><Button onClick={() => setEditing('new')}>New customer contact</Button></div>
           </RoleGate>
         }
       />
 
       <div className="mb-4 flex flex-wrap gap-3">
-        <Field className="w-72">
-          <TextInput placeholder="Search by name…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <Field label="Search contacts" className="w-72">
+          <TextInput type="search" placeholder="Business, name, email or phone…" value={q} onChange={(e) => setQ(e.target.value)} />
         </Field>
-        <Field className="w-44">
+        <Field label="Contact type" className="w-44">
           <Select value={type} onChange={(e) => setType(e.target.value)}>
             <EnumOptions values={CONTACT_TYPE} includeBlank blankLabel="All types" />
           </Select>
         </Field>
       </div>
 
+      <ErrorNote error={sync.error} />
+      {sync.isSuccess && <p role="status" className="mb-4 text-sm text-emerald-700">Synthetic directory refreshed. App overrides preserved; no directory was contacted.</p>}
       <QueryState isLoading={contacts.isLoading} error={contacts.error}>
         <DataTable columns={columns} rows={contacts.data} keyFn={(c) => c.id} emptyTitle="No contacts found" />
       </QueryState>
@@ -91,7 +99,7 @@ export function ContactsPage() {
       {editing && (
         <ContactModal contact={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />
       )}
-      {historyFor && <ContactHistoryDrawer contact={historyFor} onClose={() => setHistoryFor(null)} />}
+      {(historyFor ?? contacts.data?.find((c) => c.id === Number(params.get('contact')))) && <ContactHistoryDrawer contact={(historyFor ?? contacts.data?.find((c) => c.id === Number(params.get('contact'))))!} onClose={() => { setHistoryFor(null); setParams({}); }} />}
     </div>
   );
 }
@@ -108,12 +116,13 @@ function ContactModal({ contact, onClose }: { contact: Contact | null; onClose: 
   const [valueTier, setValueTier] = useState(contact?.valueTier ?? 'prospect');
   const [futurePriorityFlag, setFuturePriorityFlag] = useState(contact?.futurePriorityFlag ?? 'normal');
   const [notes, setNotes] = useState(contact?.notes ?? '');
+  const [isActive, setIsActive] = useState(contact?.isActive !== 0);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const del = useMutation({
     mutationFn: async () => (await api.delete(`/contacts/${contact!.id}`)).data,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['contacts'] });
+      qc.invalidateQueries();
       onClose();
     },
   });
@@ -129,7 +138,7 @@ function ContactModal({ contact, onClose }: { contact: Contact | null; onClose: 
         title: title || undefined,
         valueTier,
         notes: notes || undefined,
-        ...(isEdit ? { futurePriorityFlag } : {}),
+        ...(isEdit ? { futurePriorityFlag, isActive } : {}),
       };
       const res = isEdit
         ? await api.patch(`/contacts/${contact!.id}`, body)
@@ -137,7 +146,7 @@ function ContactModal({ contact, onClose }: { contact: Contact | null; onClose: 
       return res.data;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['contacts'] });
+      qc.invalidateQueries();
       onClose();
     },
   });
@@ -160,12 +169,12 @@ function ContactModal({ contact, onClose }: { contact: Contact | null; onClose: 
               <RoleGate roles={['admin']}>
                 {confirmDelete ? (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-rose-700">Delete this contact?</span>
+                    <span className="text-xs text-rose-700">Deactivate this contact? History stays intact.</span>
                     <Button variant="danger" size="sm" loading={del.isPending} onClick={() => del.mutate()}>Confirm</Button>
                     <Button variant="secondary" size="sm" onClick={() => setConfirmDelete(false)}>Cancel</Button>
                   </div>
                 ) : (
-                  <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>Delete</Button>
+                  <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>Deactivate</Button>
                 )}
               </RoleGate>
             )}
@@ -178,6 +187,8 @@ function ContactModal({ contact, onClose }: { contact: Contact | null; onClose: 
       }
     >
       <form id="contact-form" onSubmit={onSubmit} className="space-y-4">
+        {isEdit && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />Active in this app (independent of directory state)</label>}
+        {contact?.directoryUserId && <p className="text-xs text-slate-500">Directory source is {contact.directoryActive === 0 ? 'inactive' : 'active'}. Sync preserves your app override.</p>}
         <div className="grid grid-cols-2 gap-4">
           <Field label="Full name" required>
             <TextInput value={fullName} onChange={(e) => setFullName(e.target.value)} required />
@@ -197,7 +208,7 @@ function ContactModal({ contact, onClose }: { contact: Contact | null; onClose: 
             <TextInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           </Field>
           <Field label="Phone">
-            <TextInput value={phone} onChange={(e) => setPhone(e.target.value)} />
+            <TextInput type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
           </Field>
           <Field label="Value tier">
             <Select value={valueTier} onChange={(e) => setValueTier(e.target.value as typeof valueTier)}>
@@ -229,6 +240,7 @@ function ContactHistoryDrawer({ contact, onClose }: { contact: Contact; onClose:
       return {
         attendance: pickArray<{ record: AttendanceRecord; opponent?: string; gameDate?: number }>(data, 'attendance'),
         requests: pickArray<TicketRequest>(data, 'requests'),
+        assignments: pickArray<{ assignment: { id: number; status: string }; gameDate: number; seasonId: number; title: string | null; opponent: string }>(data, 'assignments'),
         contact: pickObject<Contact>(data, 'contact') ?? contact,
       };
     },
@@ -238,6 +250,8 @@ function ContactHistoryDrawer({ contact, onClose }: { contact: Contact; onClose:
     <Drawer open onClose={onClose} title={contact.fullName} description={contact.company ?? contact.type} size="lg">
       <QueryState isLoading={history.isLoading} error={history.error}>
         <div className="space-y-6">
+          <p className="text-sm text-slate-600">{contact.phone || 'No phone'} · {contact.email || 'No email'}. All seasons are included. Missing attendance records mean unknown.</p>
+          <section><h3 className="mb-2 font-semibold">Ticket allocations across seasons</h3>{history.data?.assignments.length ? <ul className="divide-y">{history.data.assignments.map((a) => <li key={a.assignment.id} className="py-2 text-sm">{a.title ?? a.opponent} · {formatDate(a.gameDate)} · Season #{a.seasonId} · {a.assignment.status}</li>)}</ul> : <p className="text-sm text-slate-500">No allocation history.</p>}</section>
           <section>
             <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Attendance</h4>
             {history.data && history.data.attendance.length > 0 ? (

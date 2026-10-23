@@ -25,7 +25,7 @@ function normalizeConfig(c: ScoringConfig | null) {
   if (!c) return null;
   const weights = (parseMaybeJson<Weights>(c.weights as string | Weights) ?? DEFAULT_SCORING_WEIGHTS) as Weights;
   const params = (parseMaybeJson<ScoringParams>(c.params as string | ScoringParams) ?? DEFAULT_SCORING_PARAMS) as ScoringParams;
-  return { ...c, weightsObj: weights, paramsObj: params };
+  return { ...c, weightsObj: { ...weights, attendanceRate: 0, leadTime: 0, premiumDemandBalance: 0, employeeCustomerBalance: 0 }, paramsObj: { ...DEFAULT_SCORING_PARAMS, ...params } };
 }
 
 export function ScoringConfigPage() {
@@ -51,7 +51,7 @@ export function ScoringConfigPage() {
     if (active.data) {
       setWeights(active.data.weightsObj);
       setParams(active.data.paramsObj);
-      setName(`${active.data.name} (copy)`);
+      setName(`${active.data.name ?? 'Advisory defaults'} (copy)`);
       setLoadedId(active.data.id);
     }
   }, [active.data]);
@@ -91,8 +91,8 @@ export function ScoringConfigPage() {
   return (
     <div>
       <PageHeader
-        title="Scoring Engine"
-        subtitle="Tune the factor weights and parameters that drive priority ranking."
+        title="Advisory allocation settings"
+        subtitle="Demo defaults, not approved business policy. Scores advise coordinators; every allocation is a human choice."
       />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
@@ -111,13 +111,14 @@ export function ScoringConfigPage() {
             </div>
 
             <div className="space-y-4">
-              {FACTOR_KEYS.map((k) => (
+              {FACTOR_KEYS.filter((k) => ['strategicValue', 'salesOpportunity', 'fairness', 'reliability'].includes(k)).map((k) => (
                 <div key={k}>
                   <div className="mb-1 flex items-center justify-between text-sm">
                     <span className="font-medium text-slate-700">{FACTOR_LABELS[k]}</span>
                     <span className="tabular-nums text-slate-500">{(weights[k] ?? 0).toFixed(2)}</span>
                   </div>
                   <input
+                    aria-label={FACTOR_LABELS[k]}
                     type="range"
                     min={0}
                     max={1}
@@ -135,28 +136,9 @@ export function ScoringConfigPage() {
             </p>
           </div>
 
-          {/* Params editor */}
-          <div className="card p-5">
-            <h3 className="mb-4 text-sm font-semibold text-slate-800">Parameters</h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="Sales opp cap (USD)">
-                <TextInput type="number" value={params.salesOppCapUsd} onChange={(e) => setParams((p) => ({ ...p, salesOppCapUsd: Number(e.target.value) }))} />
-              </Field>
-              <Field label="Fairness half-life (days)">
-                <TextInput type="number" value={params.fairnessHalfLifeDays} onChange={(e) => setParams((p) => ({ ...p, fairnessHalfLifeDays: Number(e.target.value) }))} />
-              </Field>
-              <Field label="Lead-time sweet spot (days)">
-                <TextInput type="number" value={params.leadTimeSweetSpotDays} onChange={(e) => setParams((p) => ({ ...p, leadTimeSweetSpotDays: Number(e.target.value) }))} />
-              </Field>
-              <Field label="Lead-time window (days)">
-                <TextInput type="number" value={params.leadTimeWindowDays} onChange={(e) => setParams((p) => ({ ...p, leadTimeWindowDays: Number(e.target.value) }))} />
-              </Field>
-              <Field label="Target employee share (0–1)">
-                <TextInput type="number" min="0" max="1" step="0.05" value={params.targetEmployeeShare} onChange={(e) => setParams((p) => ({ ...p, targetEmployeeShare: Number(e.target.value) }))} />
-              </Field>
-            </div>
-          </div>
+          <div className="card space-y-3 p-5"><h2 className="font-semibold">How these factors work</h2><p className="text-sm text-slate-600">Category distinguishes customers, prospects and employees. Rationale indicates that context was provided; opportunity value / MRR is for manual review. Fairness counts other allocations in the same season. Reliability uses confirmed attended / no-show outcomes only; unknown stays neutral. Lead time, premium demand and employee/customer balancing are disabled in the review defaults.</p><Button variant="secondary" onClick={() => { setWeights({ ...DEFAULT_SCORING_WEIGHTS }); setParams({ ...DEFAULT_SCORING_PARAMS }); setName('Review advisory defaults'); }}>Load review defaults</Button></div>
 
+          <div className="card p-5"><h2 className="mb-3 font-semibold">Category defaults (0–1)</h2><p className="mb-3 text-sm text-slate-600">Demonstration values only. Adjust customer, prospect and employee priority for local acceptance; these do not establish employment policy.</p><div className="grid gap-4 sm:grid-cols-3">{([['categoryCustomerScore', 'Customer'], ['categoryProspectScore', 'Prospect'], ['categoryEmployeeScore', 'Employee']] as const).map(([key, label]) => <Field key={key} label={label}><TextInput type="number" min={0} max={1} step={0.05} value={params[key]} onChange={(e) => setParams((p) => ({ ...p, [key]: Number(e.target.value) }))} /></Field>)}</div></div>
           {/* Create */}
           <div className="card p-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end">

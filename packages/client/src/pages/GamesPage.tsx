@@ -96,7 +96,7 @@ export function GamesPage() {
               Available seats only
             </label>
             <RoleGate roles={['admin']}>
-              <Button variant="secondary" onClick={() => setShowNotify(true)}>Send availability</Button>
+              <Button variant="secondary" onClick={() => setShowNotify(true)}>Preview availability</Button>
             </RoleGate>
           </>
         }
