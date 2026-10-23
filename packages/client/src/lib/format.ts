@@ -8,7 +8,7 @@ export function toDate(value: number | string | null | undefined): Date | null {
 export function formatDate(value: number | string | null | undefined): string {
   const d = toDate(value);
   if (!d) return '—';
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }) + ' UTC';
 }
 
 export function formatDateTime(value: number | string | null | undefined): string {
@@ -20,7 +20,8 @@ export function formatDateTime(value: number | string | null | undefined): strin
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
-  });
+    timeZone: 'UTC',
+  }) + ' UTC';
 }
 
 export function formatUsd(value: number | null | undefined): string {

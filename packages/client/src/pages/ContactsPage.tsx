@@ -5,7 +5,7 @@ import { CONTACT_TYPE, VALUE_TIER, FUTURE_PRIORITY } from '@ais/shared';
 import { api } from '@/lib/api';
 import type { AttendanceRecord, Contact, TicketRequest } from '@/lib/types';
 import { pickArray, pickObject } from '@/lib/unwrap';
-import { formatDate, formatUsd } from '@/lib/format';
+import { formatDateTime, formatUsd } from '@/lib/format';
 import { PageHeader } from '@/components/PageHeader';
 import { QueryState, ErrorNote } from '@/components/QueryState';
 import { DataTable, type Column } from '@/components/DataTable';
@@ -251,7 +251,7 @@ function ContactHistoryDrawer({ contact, onClose }: { contact: Contact; onClose:
       <QueryState isLoading={history.isLoading} error={history.error}>
         <div className="space-y-6">
           <p className="text-sm text-slate-600">{contact.phone || 'No phone'} · {contact.email || 'No email'}. All seasons are included. Missing attendance records mean unknown.</p>
-          <section><h3 className="mb-2 font-semibold">Ticket allocations across seasons</h3>{history.data?.assignments.length ? <ul className="divide-y">{history.data.assignments.map((a) => <li key={a.assignment.id} className="py-2 text-sm">{a.title ?? a.opponent} · {formatDate(a.gameDate)} · Season #{a.seasonId} · {a.assignment.status}</li>)}</ul> : <p className="text-sm text-slate-500">No allocation history.</p>}</section>
+          <section><h3 className="mb-2 font-semibold">Ticket allocations across seasons</h3>{history.data?.assignments.length ? <ul className="divide-y">{history.data.assignments.map((a) => <li key={a.assignment.id} className="py-2 text-sm">{a.title ?? a.opponent} · {formatDateTime(a.gameDate)} · Season #{a.seasonId} · {a.assignment.status}</li>)}</ul> : <p className="text-sm text-slate-500">No allocation history.</p>}</section>
           <section>
             <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Attendance</h4>
             {history.data && history.data.attendance.length > 0 ? (
@@ -260,7 +260,7 @@ function ContactHistoryDrawer({ contact, onClose }: { contact: Contact; onClose:
                   <div key={a.record.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
                     <div>
                       <div className="font-medium text-slate-800">vs {a.opponent ?? '—'}</div>
-                      <div className="text-xs text-slate-400">{formatDate(a.gameDate)}</div>
+                      <div className="text-xs text-slate-400">{formatDateTime(a.gameDate)}</div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-slate-500">{formatUsd(a.record.businessGenerated)}</span>

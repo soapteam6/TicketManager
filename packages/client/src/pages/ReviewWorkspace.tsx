@@ -3,6 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type RequestOptions, type FollowupTemplate, type CreateRequestInput, type ReviewInventoryItem as Game } from '@ais/shared';
 import { api } from '@/lib/api';
+import { formatDateTime } from '@/lib/format';
+import { utcDateTimeFromForm, calendarDateFromForm } from '@/lib/dateForms';
 import type { TicketRequest, Assignment } from '@/lib/types';
 import { useAuth } from '@/auth/AuthContext';
 import { Button } from '@/components/Button';
@@ -11,7 +13,7 @@ import { Modal } from '@/components/Modal';
 import { QueryState, ErrorNote } from '@/components/QueryState';
 import { RankingPanel } from '@/pages/game/RankingPanel';
 
-const date = (ms: number) => new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(ms) + ' UTC';
+const date = formatDateTime;
 const label = (g: Game) => g.title ?? `${g.teamName ?? 'Game'} · ${g.opponent}`;
 interface Job { path: string; body: unknown; method?: 'post' | 'put' | 'patch' }
 type ReviewRequest = Pick<TicketRequest, 'id' | 'gameId' | 'quantity' | 'status' | 'beneficiaryType' | 'requesterName' | 'requesterCompany' | 'notes' | 'createdAt'> & Partial<TicketRequest> & { beneficiaryNoShowCount?: number; beneficiaries?: { id:number; fullName:string; phone:string | null; email:string | null; noShowCount:number }[]; crmOpportunityName?: string | null };
@@ -94,14 +96,14 @@ function ReleasePanel({ selected, onDone }: { selected: number[]; onDone: () => 
   const [from, setFrom] = useState('');
   const [through, setThrough] = useState('');
   const [action, setAction] = useState('release');
-  const [at, setAt] = useState('');
-  return <form className="card space-y-3 p-4" onSubmit={(e) => { e.preventDefault(); job.mutate({ path: '/review/releases', body: { ...(scope === 'selected' ? { gameIds: selected } : { from: `${from}T00:00:00Z`, through: `${through}T23:59:59.999Z` }), action, ...(action === 'schedule' ? { releaseAt: `${at}:00Z` } : {}) } }, { onSuccess: onDone }); }}>
+  const [dateError, setDateError] = useState<unknown>(null);
+  return <form className="card space-y-3 p-4" onSubmit={(e) => { e.preventDefault(); try { const form = e.currentTarget; const selection = scope === 'selected' ? { gameIds: selected } : { from: `${calendarDateFromForm(form, 'from')}T00:00:00Z`, through: `${calendarDateFromForm(form, 'through')}T23:59:59.999Z` }; const schedule = action === 'schedule' ? { releaseAt: utcDateTimeFromForm(form, 'releaseAt') } : {}; setDateError(null); job.mutate({ path: '/review/releases', body: { ...selection, action, ...schedule } }, { onSuccess: onDone }); } catch (error) { setDateError(error); } }}>
     <div className="flex flex-wrap items-end gap-3"><Field label="Release scope"><Select value={scope} onChange={(e) => setScope(e.target.value)}><option value="selected">Selected inventory ({selected.length})</option><option value="window">Date window (all teams & events)</option></Select></Field>
-      {scope === 'window' && <><Field label="Event dates from (UTC)"><TextInput type="date" required value={from} onChange={(e) => setFrom(e.target.value)} /></Field><Field label="Through (UTC, inclusive)"><TextInput type="date" required value={through} min={from} onChange={(e) => setThrough(e.target.value)} /></Field></>}
+      {scope === 'window' && <><Field label="Event dates from (UTC)"><TextInput name="from" type="date" required value={from} onChange={(e) => setFrom(e.target.value)} /></Field><Field label="Through (UTC, inclusive)"><TextInput name="through" type="date" required value={through} min={from} onChange={(e) => setThrough(e.target.value)} /></Field></>}
       <Field label="Visibility action"><Select value={action} onChange={(e) => setAction(e.target.value)}><option value="release">Release now</option><option value="schedule">Schedule release</option><option value="private">Keep private / withdraw release</option></Select></Field>
-      {action === 'schedule' && <Field label="Release at (UTC)"><TextInput type="datetime-local" required value={at} onChange={(e) => setAt(e.target.value)} /></Field>}
+      {action === 'schedule' && <Field label="Release at (UTC)"><TextInput name="releaseAt" type="datetime-local" required defaultValue="" /></Field>}
       <Button type="submit" loading={job.isPending} disabled={scope === 'selected' && !selected.length}>Save release settings</Button>
-    </div><p className="text-xs text-slate-500">All entry times here are UTC, including the date picker. Scheduled eligibility begins at that exact instant and is checked by the server. Existing allocations stay intact. Announcements are a separate choice.</p><ErrorNote error={job.error} />
+    </div><p className="text-xs text-slate-500">All entry times here are UTC, including the date picker. Scheduled eligibility begins at that exact instant and is checked by the server. Existing allocations stay intact. Announcements are a separate choice.</p><ErrorNote error={dateError || job.error} />
   </form>;
 }
 function InterestForm({ game, onClose, onDone }: { game: Game; onClose: () => void; onDone: () => void }) {
@@ -161,9 +163,32 @@ function FollowThrough({ assignment: a, game, onDone }: { assignment: Assignment
   </article>;
 }
 function AddEvent({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
-  const [title, setTitle] = useState(''); const [at, setAt] = useState(''); const [tickets, setTickets] = useState(4); const [description, setDescription] = useState(''); const job = useReviewAction();
-  return <Modal open onClose={onClose} title="Add a dated event" description="A concert, performance or one-off event. No season setup required."><form className="space-y-4" onSubmit={(e) => { e.preventDefault(); job.mutate({ path: '/events', body: { title, description, date: `${at}:00Z`, tickets } }, { onSuccess: onDone }); }}><Field label="Event title"><TextInput required maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} /></Field><Field label="Date & time (UTC)"><TextInput type="datetime-local" required value={at} onChange={(e) => setAt(e.target.value)} /></Field><Field label="Ticket inventory"><TextInput type="number" min={0} max={1000} required value={tickets} onChange={(e) => setTickets(Number(e.target.value))} /></Field><Field label="Description (optional)"><TextArea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} /></Field><p className="text-sm text-slate-500">New inventory starts private. Release it separately when ready.</p><ErrorNote error={job.error} /><Button type="submit" loading={job.isPending}>Create private event</Button></form></Modal>;
+  const [title, setTitle] = useState('');
+  const [tickets, setTickets] = useState(4);
+  const [description, setDescription] = useState('');
+  const [dateError, setDateError] = useState<unknown>(null);
+  const job = useReviewAction();
+  function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    try {
+      const eventDate = utcDateTimeFromForm(e.currentTarget, 'eventDate');
+      setDateError(null);
+      job.mutate({ path: '/events', body: { title, description, date: eventDate, tickets } }, { onSuccess: onDone });
+    } catch (error) { setDateError(error); }
+  }
+  return <Modal open onClose={onClose} title="Add a dated event" description="A concert, performance or one-off event. No season setup required.">
+    <form className="space-y-4" onSubmit={submit}>
+      <Field label="Event title"><TextInput required maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
+      <Field label="Date & time (UTC)"><TextInput name="eventDate" type="datetime-local" required defaultValue="" /></Field>
+      <Field label="Ticket inventory"><TextInput type="number" min={0} max={1000} required value={tickets} onChange={(e) => setTickets(Number(e.target.value))} /></Field>
+      <Field label="Description (optional)"><TextArea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
+      <p className="text-sm text-slate-500">Enter the event time in UTC. New inventory starts private; release it separately when ready.</p>
+      <ErrorNote error={dateError || job.error} />
+      <Button type="submit" loading={job.isPending}>Create private event</Button>
+    </form>
+  </Modal>;
 }
+
 interface OutboxItem { id: number; kind: string; subject: string; body: string; audience: string; created_at: number }
 function Messages() {
   const preview = useQuery({ queryKey: ['review-availability'], queryFn: async () => (await api.get<{ message: string; availableSeats: number }>('/notifications/availability')).data });

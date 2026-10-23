@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { utcDateTimeFromForm } from '@/lib/dateForms';
 import type { Game } from '@/lib/types';
 import { pickArray } from '@/lib/unwrap';
 import { formatDateTime } from '@/lib/format';
@@ -72,15 +73,14 @@ function NewEventModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [date, setDate] = useState('');
+  const [dateError, setDateError] = useState<unknown>(null);
   const [tickets, setTickets] = useState('0');
 
   const create = useMutation({
-    mutationFn: async () =>
+    mutationFn: async (date: string) =>
       (await api.post('/events', { title, description: description || undefined, date, tickets: Number(tickets) || 0 })).data,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['events'] });
-      qc.invalidateQueries({ queryKey: ['games'] });
+      qc.invalidateQueries();
       onClose();
     },
   });
@@ -94,11 +94,11 @@ function NewEventModal({ onClose }: { onClose: () => void }) {
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button loading={create.isPending} disabled={!title || !date} onClick={() => create.mutate()}>Create event</Button>
+          <Button loading={create.isPending} type="submit" form="new-event-form" disabled={!title}>Create event</Button>
         </>
       }
     >
-      <div className="space-y-4">
+      <form id="new-event-form" className="space-y-4" onSubmit={(e: FormEvent<HTMLFormElement>) => { e.preventDefault(); try { const date = utcDateTimeFromForm(e.currentTarget, 'eventDate'); setDateError(null); create.mutate(date); } catch (error) { setDateError(error); } }}>
         <Field label="Title" required>
           <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Client Appreciation Night" required />
         </Field>
@@ -106,15 +106,16 @@ function NewEventModal({ onClose }: { onClose: () => void }) {
           <TextArea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Suite for key accounts, catered…" />
         </Field>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Date & time" required>
-            <TextInput type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} required />
+          <Field label="Date & time (UTC)" required>
+            <TextInput name="eventDate" type="datetime-local" defaultValue="" required />
           </Field>
           <Field label="Number of tickets" hint="Seats to create">
             <TextInput type="number" min="0" value={tickets} onChange={(e) => setTickets(e.target.value)} />
           </Field>
         </div>
-        <ErrorNote error={create.error} />
-      </div>
+        <p className="text-xs text-slate-500">All event entry and display times use UTC.</p>
+        <ErrorNote error={dateError || create.error} />
+      </form>
     </Modal>
   );
 }

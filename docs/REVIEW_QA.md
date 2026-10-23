@@ -47,6 +47,7 @@ Optional browser regression, with the existing Python Playwright package and sys
 # Start a fresh review fixture, then in another terminal:
 python3 scripts/review-browser-check.py
 python3 scripts/review-browser-setup-check.py
+python3 scripts/review-browser-date-check.py
 ```
 
 The browser script mutates only the running synthetic fixture, requires `http://localhost:5173/`, and writes internal screenshots beneath `/tmp/ticket-manager-review-browser/`. Restart before rerunning to avoid duplicate example events. It checks desktop/mobile journeys, no page errors, focus containment, Escape dismissal and responsive overflow.
@@ -68,3 +69,12 @@ The browser script mutates only the running synthetic fixture, requires `http://
 - Accept optional follow-up wording, who would receive it, photo optionality and retention expectations before any future real service.
 - Plan real authentication/authorization, directory and CRM connection, provider transfer and real email separately. None is enabled by this implementation.
 - Parent must have a chance to perform independent QA before the stakeholder handoff is marked `WAITING_FOR_HUMAN_TESTING`.
+
+
+## Date QA correction
+
+The earlier commit accepted `":00Z"` as a valid event date because JavaScript parsed it as January 1, 2000. A DOM-only fill could make the native control valid while its React state remained empty. Event/game/release forms now validate the native submitted field value; event and release API instants require a real ISO timestamp with seconds and an explicit `Z` or `±HH:MM` zone. Date-only legacy season/game inputs remain supported as midnight UTC, with real-calendar validation.
+
+Calendar checks reject impossible days and leap days rather than allowing parser rollover. All date/time displays use explicit UTC, including the events table and contact history. Stored instants are unchanged. Previously created malformed synthetic records are not guessed or rewritten; restart the in-memory fixture before retesting, or create a new correctly dated event.
+
+The date browser regression covers keyboard entry, blank native/submit guards, DOM-only fills without change events, both event forms, manual team/season game forms, scheduled release input, exact stored instants, and matching catalog/events/history displays in Pacific and Tokyo browser timezones. Parent should rerun the date creation/display checks on the new SHA before human handoff.

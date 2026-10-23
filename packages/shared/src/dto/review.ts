@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isoTimestampSchema } from '../dates.js';
 import type { GameKind, GameStatus } from '../enums.js';
 import type { AuthUser } from './auth.js';
 
@@ -16,11 +17,11 @@ export interface RequestContactOption {
 export interface RequestOptions { contacts: RequestContactOption[]; requesterUsers?: { id: number; fullName: string }[] }
 export const releaseInventorySchema = z.object({
   gameIds: z.array(z.number().int().positive()).min(1).max(500).optional(),
-  from: z.string().datetime({ offset: true }).optional(),
-  through: z.string().datetime({ offset: true }).optional(),
+  from: isoTimestampSchema.optional(),
+  through: isoTimestampSchema.optional(),
   seasonId: z.number().int().positive().optional(),
   action: z.enum(['release', 'schedule', 'private']),
-  releaseAt: z.string().datetime({ offset: true }).optional(),
+  releaseAt: isoTimestampSchema.optional(),
 }).superRefine((input, ctx) => {
   if (!input.gameIds && (!input.from || !input.through)) ctx.addIssue({ code: 'custom', message: 'Select inventory or specify both date-window boundaries' });
   if (input.gameIds && (input.from || input.through)) ctx.addIssue({ code: 'custom', message: 'Choose selected inventory or a date window' });

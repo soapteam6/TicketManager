@@ -15,3 +15,5 @@ export * from './dto/assignment.js';
 export * from './dto/attendance.js';
 
 export * from './dto/review.js';
+
+export * from './dates.js';

@@ -1,12 +1,13 @@
 import { z } from 'zod';
+import { calendarDateOrTimestampSchema, isoTimestampSchema } from '../dates.js';
 import { SEASON_STATUS, GAME_STATUS } from '../enums.js';
 
 // --- Seasons ---
 export const createSeasonSchema = z.object({
   teamId: z.coerce.number().int().positive(),
   label: z.string().min(1),
-  startDate: z.string().min(1),
-  endDate: z.string().min(1),
+  startDate: calendarDateOrTimestampSchema,
+  endDate: calendarDateOrTimestampSchema,
   status: z.enum(SEASON_STATUS).optional(),
 });
 export type CreateSeasonInput = z.infer<typeof createSeasonSchema>;
@@ -17,7 +18,7 @@ export type UpdateSeasonInput = z.infer<typeof updateSeasonSchema>;
 // --- Games ---
 export const createGameSchema = z.object({
   seasonId: z.coerce.number().int().positive(),
-  gameDate: z.string().min(1),
+  gameDate: calendarDateOrTimestampSchema,
   opponent: z.string().min(1),
   promotions: z.string().optional(),
   notes: z.string().optional(),
@@ -26,7 +27,7 @@ export const createGameSchema = z.object({
 export type CreateGameInput = z.infer<typeof createGameSchema>;
 
 export const updateGameSchema = z.object({
-  gameDate: z.string().min(1).optional(),
+  gameDate: calendarDateOrTimestampSchema.optional(),
   opponent: z.string().min(1).optional(),
   promotions: z.string().optional(),
   notes: z.string().optional(),
@@ -40,7 +41,7 @@ export const importGamesSchema = z.object({
   games: z
     .array(
       z.object({
-        gameDate: z.string().min(1),
+        gameDate: calendarDateOrTimestampSchema,
         opponent: z.string().min(1),
         promotions: z.string().optional(),
         premiumScore: z.coerce.number().min(0).max(1).optional(),
@@ -54,14 +55,14 @@ export type ImportGamesInput = z.infer<typeof importGamesSchema>;
 export const createEventSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
-  date: z.string().min(1),
+  date: isoTimestampSchema,
   tickets: z.coerce.number().int().min(0).optional(),
 });
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 
 // AI schedule import from a team's official website.
 export const extractedGameSchema = z.object({
-  gameDate: z.string().min(1),
+  gameDate: isoTimestampSchema,
   opponent: z.string().min(1),
   promotions: z.string().nullable().optional(),
 });

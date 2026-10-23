@@ -48,15 +48,24 @@ Exploratory: AI schedule retrieval, CRM embedding, automatic post-event messages
 
 | Check | Exact outcome |
 | --- | --- |
-| `npm test` | PASS: 4 files, 25 tests (baseline was 2 files, 8 tests) |
+| `npm test` | PASS: 5 files, 51 tests (baseline was 2 files, 8 tests) |
 | `npm run typecheck` | PASS: shared, server and client |
 | `npm run build` | PASS: shared TypeScript, server tsup, client Vite; no deploy |
 | `git diff --check` | PASS |
 | Lint | No lint script configured; no lint tool was installed |
 | `python3 scripts/review-browser-check.py` | PASS: 14 workflow/responsiveness/focus checks; zero browser page errors |
 | `python3 scripts/review-browser-setup-check.py` | PASS: 6 setup/import/directory/configuration checks |
+| `python3 scripts/review-browser-date-check.py` | PASS: 8 date submission/storage/display checks; zero page errors |
+| Pacific server timezone regressions | PASS: 40 date/API tests under `TZ=America/Los_Angeles` |
 | Native binding after environment workaround | PASS: 150,000-statement allocation/GC stress using an in-memory database |
 
 The initial browser setup run and combined launch encountered a native Node/SQLite cleanup abort. Rebuilding only the environment's installed binding with compatible verified headers resolved it for the repeated browser suites and stress check. Neither the dependency manifest nor lockfile was changed for that workaround. This is local evidence, not a general claim that upstream Node is fixed.
 
 Browser screenshots were inspected internally at desktop 1440×1000 and mobile 390×844. Keyboard focus containment and Escape were exercised, including nested import dialogs. Screen-reader, 200% zoom, stakeholder wording and actual business policy acceptance remain human checks. The parent has not yet independently tested this work.
+
+
+## Parent QA date correction
+
+Parent testing of the earlier implementation exposed a date validation defect: empty React date state could serialize to `":00Z"`, which JavaScript permissively parsed as January 1, 2000. Normal keyboard entry succeeded, while a DOM-only fill without a change event reproduced the stale-state path. Strict shared calendar/ISO validation now rejects the malformed payload before writes, and native form submission supplies the validated date value. Valid leap days, explicit offsets and milliseconds remain supported; date-only legacy season/game entry remains midnight UTC.
+
+Catalog, events, details and contact history now show explicit UTC consistently. No existing stored timestamps were rewritten. Browser regressions verify the exact `2026-12-20T18:00:00Z` instant and matching event/history dates in Pacific and Tokyo. Parent's final date creation/display recheck on the correction commit remains pending before stakeholder handoff.

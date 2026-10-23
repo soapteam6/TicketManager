@@ -207,3 +207,30 @@ describe('complete local flow and non-delivery guarantees', () => {
     expect(db.select().from(assignments).all()).toHaveLength(before);
   });
 });
+
+
+describe('date submission regression', () => {
+  it('rejects malformed event instants without creating inventory', async () => {
+    const before = db.select().from(games).all().length;
+    for (const date of [':00Z', '', '0', '2026-12-20T18:00', '2026-02-30T18:00:00Z', '2025-02-29T18:00:00Z', '2026-12-20T24:00:00Z']) {
+      await request(app).post('/api/events').send({title:'Synthetic invalid date regression',date,tickets:2}).expect(400);
+    }
+    expect(db.select().from(games).all()).toHaveLength(before);
+    const valid = await request(app).post('/api/events').send({title:'Synthetic valid date regression',date:'2026-12-20T18:00:00Z',tickets:2}).expect(201);
+    expect(valid.body.game.gameDate).toBe(1797789600000);
+    expect(valid.body.seatsCreated).toBe(2);
+    const offset = await request(app).post('/api/events').send({title:'Synthetic offset regression',date:'2026-12-20T18:00:00-08:00',tickets:2}).expect(201);
+    expect(offset.body.game.gameDate).toBe(Date.parse('2026-12-21T02:00:00Z'));
+  });
+  it('applies actual-calendar validation to release and game entry/import paths', async () => {
+    const game = fixture.inventory[0].game;
+    await request(app).post('/api/review/releases').send({gameIds:[game.id],action:'schedule',releaseAt:'2027-02-30T18:00:00Z'}).expect(400);
+    await request(app).patch(`/api/games/${game.id}`).send({gameDate:'2026-02-30'}).expect(400);
+    await request(app).post(`/api/teams/${fixture.team.id}/games`).send({gameDate:':00Z',opponent:'Invalid synthetic opponent',tickets:2}).expect(400);
+    await request(app).post(`/api/teams/${fixture.team.id}/schedule/import`).send({preview:false,games:[{gameDate:'2026-02-30T18:00:00Z',opponent:'Invalid synthetic schedule'}]}).expect(400);
+    await request(app).post(`/api/seasons/${fixture.season.id}/games/import`).send({games:[{gameDate:'2026-02-30',opponent:'Invalid legacy calendar date'}]}).expect(400);
+    expect(db.select().from(games).where(eq(games.id,game.id)).get()).toMatchObject({gameDate:game.gameDate,releaseStatus:'private',releaseAt:null});
+    const dateOnly = await request(app).post('/api/games').send({seasonId:fixture.season.id,gameDate:'2026-12-20',opponent:'Legacy synthetic midnight UTC'}).expect(201);
+    expect(dateOnly.body.game.gameDate).toBe(Date.parse('2026-12-20T00:00:00Z'));
+  });
+});

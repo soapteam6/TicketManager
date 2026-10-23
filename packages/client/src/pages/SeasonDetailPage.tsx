@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { calendarDateFromForm } from '@/lib/dateForms';
 import type { Game, Season } from '@/lib/types';
 import { pickArray, pickObject } from '@/lib/unwrap';
 import { formatDate } from '@/lib/format';
@@ -126,13 +127,13 @@ export function SeasonDetailPage() {
 
 function AddGameModal({ seasonId, onClose }: { seasonId: number; onClose: () => void }) {
   const qc = useQueryClient();
-  const [gameDate, setGameDate] = useState('');
+  const [dateError, setDateError] = useState<unknown>(null);
   const [opponent, setOpponent] = useState('');
   const [promotions, setPromotions] = useState('');
   const [premiumScore, setPremiumScore] = useState('0.5');
 
   const create = useMutation({
-    mutationFn: async () =>
+    mutationFn: async (gameDate: string) =>
       (
         await api.post('/games', {
           seasonId,
@@ -148,9 +149,9 @@ function AddGameModal({ seasonId, onClose }: { seasonId: number; onClose: () => 
     },
   });
 
-  function onSubmit(e: FormEvent) {
+  function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    create.mutate();
+    try { const date = calendarDateFromForm(e.currentTarget, 'gameDate'); setDateError(null); create.mutate(date); } catch (error) { setDateError(error); }
   }
 
   return (
@@ -167,8 +168,8 @@ function AddGameModal({ seasonId, onClose }: { seasonId: number; onClose: () => 
     >
       <form id="add-game" onSubmit={onSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Game date" required>
-            <TextInput type="date" value={gameDate} onChange={(e) => setGameDate(e.target.value)} required />
+          <Field label="Game date (UTC, midnight)" required>
+            <TextInput name="gameDate" type="date" defaultValue="" required />
           </Field>
           <Field label="Premium score" hint="0.0 – 1.0">
             <TextInput type="number" step="0.05" min="0" max="1" value={premiumScore} onChange={(e) => setPremiumScore(e.target.value)} />
@@ -180,7 +181,7 @@ function AddGameModal({ seasonId, onClose }: { seasonId: number; onClose: () => 
         <Field label="Promotions">
           <TextInput value={promotions} onChange={(e) => setPromotions(e.target.value)} placeholder="Fireworks Night" />
         </Field>
-        <ErrorNote error={create.error} />
+        <ErrorNote error={dateError || create.error} />
       </form>
     </Modal>
   );

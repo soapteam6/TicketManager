@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { utcDateTimeFromForm } from '@/lib/dateForms';
 import type { Season, Team } from '@/lib/types';
 import { pickArray, pickObject } from '@/lib/unwrap';
 import { formatDate } from '@/lib/format';
@@ -398,14 +399,14 @@ function CSVImportModal({ team, onClose, onImported }: { team: Team; onClose: ()
 
 // Manually add a single game to a team (season auto-created if needed).
 function AddGameModal({ team, onClose, onAdded }: { team: Team; onClose: () => void; onAdded: () => void }) {
-  const [gameDate, setGameDate] = useState('');
+  const [dateError, setDateError] = useState<unknown>(null);
   const [opponent, setOpponent] = useState('');
   const [promotions, setPromotions] = useState('');
   const [tickets, setTickets] = useState(String(team.defaultTicketsPerGame ?? 0));
 
   const add = useMutation({
-    mutationFn: async () =>
-      (await api.post(`/teams/${team.id}/games`, { gameDate: `${gameDate}:00Z`, opponent, promotions: promotions || undefined, tickets: Number(tickets) || 0 })).data,
+    mutationFn: async (gameDate: string) =>
+      (await api.post(`/teams/${team.id}/games`, { gameDate, opponent, promotions: promotions || undefined, tickets: Number(tickets) || 0 })).data,
     onSuccess: () => {
       onAdded();
       onClose();
@@ -420,14 +421,14 @@ function AddGameModal({ team, onClose, onAdded }: { team: Team; onClose: () => v
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button loading={add.isPending} disabled={!gameDate || !opponent} onClick={() => add.mutate()}>Add game</Button>
+          <Button loading={add.isPending} type="submit" form="new-team-game" disabled={!opponent}>Add game</Button>
         </>
       }
     >
-      <div className="space-y-4">
+      <form id="new-team-game" className="space-y-4" onSubmit={(e) => { e.preventDefault(); try { const date = utcDateTimeFromForm(e.currentTarget, 'gameDate'); setDateError(null); add.mutate(date); } catch (error) { setDateError(error); } }}>
         <div className="grid grid-cols-2 gap-4">
           <Field label="Date &amp; start time (UTC)" required>
-            <TextInput type="datetime-local" value={gameDate} onChange={(e) => setGameDate(e.target.value)} required />
+            <TextInput name="gameDate" type="datetime-local" defaultValue="" required />
           </Field>
           <Field label="Tickets available" hint="Seats to create">
             <TextInput type="number" min="0" value={tickets} onChange={(e) => setTickets(e.target.value)} />
@@ -439,8 +440,8 @@ function AddGameModal({ team, onClose, onAdded }: { team: Team; onClose: () => v
         <Field label="Promotions" hint="Optional">
           <TextInput value={promotions} onChange={(e) => setPromotions(e.target.value)} placeholder="e.g. Giveaway Night" />
         </Field>
-        <ErrorNote error={add.error} />
-      </div>
+        <ErrorNote error={dateError || add.error} />
+      </form>
     </Modal>
   );
 }

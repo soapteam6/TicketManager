@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { idParam, scheduleImportSchema, createEventSchema } from '@ais/shared';
+import { idParam, scheduleImportSchema, createEventSchema, isoTimestampSchema } from '@ais/shared';
 import { db } from '../db/client.js';
 import { teams, seasons, games, seats } from '../db/schema.js';
 import { validate } from '../middleware/validate.js';
@@ -150,7 +150,7 @@ function createGenericSeats(gameId: number, count: number): number {
 
 // Manually add a single home game to a team (auto-creates a season if needed).
 const addGameSchema = z.object({
-  gameDate: z.string().min(1),
+  gameDate: isoTimestampSchema,
   opponent: z.string().min(1),
   promotions: z.string().optional(),
   tickets: z.coerce.number().int().min(0).optional(),

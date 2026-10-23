@@ -20,7 +20,7 @@ Use the visible **Synthetic persona** picker:
 
 Selectable personas are a local demonstration, not production security. The server enforces these mock role boundaries and rejects normal API use outside explicit local mock mode. **Real authentication is not implemented**; real operation requires a separately reviewed identity and authorization integration. The legacy `setup`, database scripts and Windows launcher are not the review entry point.
 
-The fixture has a synthetic sports season, private/released games, a dated performance, active directory examples, synthetic customers with phone numbers, pre-release interest, and allocations from current/prior seasons. Dates are invented examples, not verified sports schedules. Sports setup supports manual entry, CSV import and a deterministic local CSV preview. New inventory starts private.
+The fixture has a synthetic sports season, private/released games, a dated performance, active directory examples, synthetic customers with phone numbers, pre-release interest, and allocations from current/prior seasons. Dates are invented examples, not verified sports schedules. Sports setup supports manual entry, CSV import and a deterministic local CSV preview. New inventory starts private. Event/game entry and display times are explicitly UTC; supported legacy date-only game entry means midnight UTC.
 
 ## Review the workflow
 
