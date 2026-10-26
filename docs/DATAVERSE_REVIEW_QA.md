@@ -10,7 +10,13 @@ the environment. They do not use Azure CLI or switch accounts.
 
 ## Open the app
 
-Run both servers in separate terminals:
+The hosted UI was published on 2026-10-26 into **AIS Ticket Manager** as
+`emikes@ais-now.com`.
+[Open the app](https://apps.powerapps.com/play/e/946e5045-3200-eb26-9160-3fe967a6b21c/app/1323f8ca-47e5-402e-9657-45f8651af4dc?tenantId=a22e51ee-6f67-49b3-b98c-0e3a97d49b8a).
+Local servers are only needed for local development. Published build/export
+hashes and source commit are recorded in `solutions/publication.json`.
+
+For local development, run both servers in separate terminals:
 
 ```powershell
 npm run dev -- --port 3000
@@ -25,8 +31,7 @@ Confirm PAC reports **emikes@ais-now.com**. Open the exact Local Play URL
 printed by **pac code run**, using its default host and port. The user confirmed
 this command pair works; do not substitute a manually assembled launch URL.
 The Allocation desk opens directly. Check the signed-in email in the
-workspace header. Keep both processes running. The existing hosted app was not
-republished.
+workspace header. Keep both processes running while using Local Play.
 
 If the Power Apps host says "This app isn't working", try appending
 `&PAOverrideFGRollout.EnableAuthenticatedGateway=false` to the Local Play URL.
@@ -197,7 +202,9 @@ membership and the native CRM Sales Rep members-only role. Twelve concurrent loa
 lock unchanged. No user was authenticated or impersonated other than
 `emikes@ais-now.com`, and the deployment did not assign individual user roles. Live individual grants
 and requester acceptance with approved testers remain pending. The hosted UI
-has not been republished; see the solution notes before exporting for deployment.
+has now been published and both solution exports are verified against its
+production build. Hosted-browser and physical-iPad acceptance are not implied by
+the artifact and API checks.
 
 ```powershell
 # Read-only description of provisioning:

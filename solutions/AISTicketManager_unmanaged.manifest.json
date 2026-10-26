@@ -1,6 +1,6 @@
 {
   "file": "AISTicketManager_unmanaged.zip",
-  "bytes": 566847,
+  "bytes": 283531,
   "rootComponents": [
     {
       "type": "1",
@@ -120,9 +120,8 @@
     "solution.xml",
     "PluginAssemblies/TicketReview-92E64C8F-51D1-F111-A05B-6045BD0695F8/TicketReview.dll",
     "CanvasApps/cr9cd_aisticketconcierge_af330_CodeAppPackages/index.html",
-    "CanvasApps/cr9cd_aisticketconcierge_af330_CodeAppPackages/assets/ais-logo-BoPNiIQd.webp",
-    "CanvasApps/cr9cd_aisticketconcierge_af330_CodeAppPackages/assets/index-Cpb3i6mg.css",
-    "CanvasApps/cr9cd_aisticketconcierge_af330_CodeAppPackages/assets/index-D9BiU8LM.js",
+    "CanvasApps/cr9cd_aisticketconcierge_af330_CodeAppPackages/assets/index-CWJSClWd.js",
+    "CanvasApps/cr9cd_aisticketconcierge_af330_CodeAppPackages/assets/index-D1azEhC7.css",
     "CanvasApps/cr9cd_aisticketconcierge_af330_CodeAppPackages/vite.svg",
     "customapis/cr9cd_TicketReview/customapirequestparameters/Payload/customapirequestparameter.xml",
     "customapis/cr9cd_TicketReview/customapiresponseproperties/Result/customapiresponseproperty.xml",

@@ -58,21 +58,37 @@ The legacy Ticket Manager User role is included to keep its definition with the
 project. Its privileges and assignments were preserved; it is not an app-admin
 role and is not offered by the application's three-role assignment controls.
 
-**The exported app contains its existing published bundle.** The current
-Allocation desk and User access UI are built and tested locally, and have not
-been published to the hosted app. After explicitly deciding to publish, the
-installed PAC 2.9.3 command is:
+**The approved Allocation desk and User access UI were published on 2026-10-26**
+to the existing AIS Development app in this solution, using only
+`emikes@ais-now.com`. This includes the Groups role-management screen.
+[Open the hosted app](https://apps.powerapps.com/play/e/946e5045-3200-eb26-9160-3fe967a6b21c/app/1323f8ca-47e5-402e-9657-45f8651af4dc?tenantId=a22e51ee-6f67-49b3-b98c-0e3a97d49b8a).
+Local servers are not needed for the hosted app. The production build and all
+64 frontend tests passed before publication; live read-only checks verified the
+backend, admins, group binding and solution membership afterward.
+
+Both managed and unmanaged solution exports contain the current app build.
+Every app file is compared byte for byte with `dist/`; file hashes, verification
+time and deployed source commit are recorded in [publication.json](publication.json).
+For subsequent approved publications, the installed PAC 2.9.3 commands are:
 
 ```powershell
 npm run build
 pac code push --environment https://org5c824bd0.crm.dynamics.com --solutionName AISTicketManager
 python scripts/package-ticket-solution.py --export
+python scripts/verify-ticket-publication.py
 ```
 
 Verify the active PAC account is `emikes@ais-now.com`, announce that publication
 before running it, and export again afterward so the ZIPs contain the new bundle.
 The installed CLI uses `--solutionName`; newer documentation may describe
 different flags. Do not run a publish command merely to refresh the local app.
+
+The first export verification found the binary WebP logo rewritten as UTF-8
+replacement bytes by the Dataverse solution export. The unchanged logo now uses
+Vite's explicit `?inline` import, preserving its original bytes as a data URL in
+the JavaScript bundle. See [Vite's asset import documentation](https://vite.dev/guide/assets#explicit-inline-handling).
+This fix was rebuilt, tested and republished before the final export comparison.
+Future binary assets should also be checked with the publication verifier.
 
 ## Roles and deployment boundaries
 
@@ -177,7 +193,7 @@ table exports. Post-consolidation live checks verified the retired QA solution i
 absent and all four Ticket Manager role definitions remain in the main solution.
 
 Live individual role assignment/removal with approved testers, requester sign-in acceptance,
-hosted UI publication and a clean-environment import/bootstrap remain manual
+hosted-browser acceptance and a clean-environment import/bootstrap remain manual
 acceptance/deployment work. The offline tests exercise role replacement, stale
 edits, fixed-admin protection, preservation of unrelated and inherited roles,
 business-unit copies and paginated queries; they do not replace those live checks.

@@ -5,7 +5,13 @@
 environment setup and live API checks were run on 2026-10-26, authenticated as
 **emikes@ais-now.com**. No other user was authenticated or impersonated.
 
-Run **both** local servers on this computer:
+**The hosted Allocation desk UI was published on 2026-10-26** to AIS Development
+in the AIS Ticket Manager solution, authenticated as `emikes@ais-now.com`.
+[Open the hosted app](https://apps.powerapps.com/play/e/946e5045-3200-eb26-9160-3fe967a6b21c/app/1323f8ca-47e5-402e-9657-45f8651af4dc?tenantId=a22e51ee-6f67-49b3-b98c-0e3a97d49b8a).
+Hosted testing does not need local servers. Both solution exports are checked
+against the production build; see [publication evidence](../solutions/publication.json).
+
+For local development, run **both** local servers on this computer:
 
 ```powershell
 # Terminal 1: Vite application server
@@ -25,7 +31,7 @@ browser's local network access prompt if shown.
 If the host still reports an app-load error, the URL-only workaround
 `&PAOverrideFGRollout.EnableAuthenticatedGateway=false` is described in
 [Microsoft issue #504](https://github.com/microsoft/PowerAppsCodeApps/issues/504).
-The hosted app has not been republished. See
+See
 [Dataverse QA setup and acceptance checks](DATAVERSE_REVIEW_QA.md) for the
 applied environment changes, test evidence, roles, and remaining checks.
 
@@ -97,8 +103,9 @@ container was backed up and retired after all 29 component entries were verified
 as covered. Future setup runs target the main solution.
 Managed/unmanaged exports passed inspection with zero missing dependencies.
 See [solution artifacts, commands and deployment boundaries](../solutions/README.md).
-The exports contain the existing hosted bundle; the latest UI is available locally
-and has not been republished.
+The exports contain the current published Allocation desk and User access UI,
+including group role administration. The hosted package is verified against the
+production build; requester sign-in acceptance remains pending.
 
 ## Isolated synthetic regression testing
 
