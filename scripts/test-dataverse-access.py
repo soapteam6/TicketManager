@@ -47,6 +47,16 @@ def main():
     assert any(c["componenttype"] == 300 and c["objectid"] == APP_ID for c in members), "Code app missing"
     assert len([c for c in members if c["componenttype"] == 1 and c["rootcomponentbehavior"] == 0]) >= 16, "Full table definitions missing"
     assert {20, 91, 10026}.issubset({c["componenttype"] for c in members}), "Backend or roles missing"
+    search_path = Path(__file__).resolve().parent.parent / "solutions/schedule-search.json"
+    if search_path.exists():
+        search = json.loads(search_path.read_text(encoding="utf-8"))
+        assert snapshot["scheduleSearchAvailable"] is True, "Schedule search is not enabled"
+        for kind, component_id in [(29, search["workflowId"]), (372, search["connectorId"])]:
+            assert any(c["componenttype"] == kind and c["objectid"] == component_id for c in members), "Schedule flow or connector missing from solution"
+        metadata = d.call("GET", "EntityDefinitions(LogicalName='cr9cd_schedulesearch')", params={"$select": "MetadataId"})
+        assert any(c["componenttype"] == 1 and c["objectid"] == metadata["MetadataId"] and c["rootcomponentbehavior"] == 0 for c in members), "Search table missing from solution"
+        refs = d.call("GET", "connectionreferences", params={"$select": "connectionreferenceid", "$filter": "connectionreferencelogicalname eq 'cr9cd_ticketscheduledataverse' or connectionreferencelogicalname eq 'cr9cd_ticketscheduleclaude'"})["value"]
+        assert len(refs) == 2 and all(any(c["componenttype"] == 10083 and c["objectid"] == r["connectionreferenceid"] for c in members) for r in refs), "Search connection references missing"
     legacy = d.call("GET", "roles", params={"$select": "roleid,_parentrootroleid_value", "$filter": "name eq 'Ticket Manager User'"})["value"]
     legacy = [r for r in legacy if r.get("_parentrootroleid_value", r["roleid"]) == r["roleid"]]
     for role in roles + legacy:

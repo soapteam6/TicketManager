@@ -1,0 +1,14 @@
+{
+  "properties": {
+    "displayName": "Ticket Manager Claude",
+    "description": "Server-side Anthropic connection for schedule web search. Credentials are stored in the Power Platform connection, outside the app and flow definition.",
+    "iconBrandColor": "#215e69",
+    "capabilities": [],
+    "connectionParameters": {
+      "api_key": {
+        "type": "securestring",
+        "uiDefinition": { "displayName": "Anthropic API key", "description": "Server-side API key", "tooltip": "Anthropic API key", "constraints": { "required": "true", "clearText": false, "tabIndex": 2 } }
+      }
+    }
+  }
+}

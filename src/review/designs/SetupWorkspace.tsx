@@ -5,6 +5,7 @@ import type { SchedulePreview } from '../types';
 import { Button, Field, FormError, Select, TextArea, TextInput } from '../ui';
 import { EmptyRows, Glyph, Status } from './parts';
 import { rowSelection } from './rowSelection';
+import { ScheduleFinder } from './ScheduleFinder';
 
 const example = 'date,time,title,tickets,kind\n2027-01-10,03:00,Example home game,4,game\n2027-01-15,02:00,Example performance,2,event';
 type Section = 'teams' | 'seasons' | 'import';
@@ -21,6 +22,7 @@ export function SetupWorkspace() {
   const [preview, setPreview] = useState<SchedulePreview | null>(null);
   const [previewError, setPreviewError] = useState('');
   const [importSeason, setImportSeason] = useState('');
+  const [importMode, setImportMode] = useState<'find' | 'csv'>('find');
   const team = snapshot.teams.find(t => t.id === teamId);
   const season = snapshot.seasons.find(s => s.id === seasonId);
   const selectedSeason = importSeason || snapshot.seasons[0]?.id || '';
@@ -61,7 +63,8 @@ export function SetupWorkspace() {
           }
         }}><FormError /><Field label="Team" required><Select name="seasonTeam" required value={seasonDraft.teamId || snapshot.teams[0]?.id || ''} onChange={e => setSeasonDraft({ ...seasonDraft, teamId: e.target.value })}>{!snapshot.teams.length && <option value="">Create a team first</option>}{snapshot.teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></Field><Field label="Season label" required><TextInput name="seasonLabel" required maxLength={200} placeholder="2027–28 season" value={seasonDraft.label} onChange={e => setSeasonDraft({ ...seasonDraft, label: e.target.value })} /></Field><Field label="Start date" required><TextInput name="seasonStart" type="date" required value={seasonDraft.start} onChange={e => setSeasonDraft({ ...seasonDraft, start: e.target.value })} /></Field><Field label="End date" required><TextInput name="seasonEnd" type="date" required min={seasonDraft.start || undefined} value={seasonDraft.end} onChange={e => setSeasonDraft({ ...seasonDraft, end: e.target.value })} /></Field><p className="work-help">Season dates are calendar dates. No timezone conversion is applied.</p><Button type="submit" disabled={busy || !snapshot.teams.length}>Save season</Button></form></> : season ? <><div className="work-inspector-heading"><strong>Season details</strong><button className="work-icon-button" aria-label="Close season details" onClick={() => setSeasonId('')}><Glyph name="close" size={16} /></button></div><h3>{season.label}</h3><p className="work-help">{snapshot.teams.find(t => t.id === season.teamId)?.name}</p><dl className="work-facts"><div><dt>Starts</dt><dd>{season.startDate}</dd></div><div><dt>Ends</dt><dd>{season.endDate}</dd></div><div><dt>Inventory</dt><dd>{snapshot.catalog.filter(g => g.seasonId === season.id).length} events</dd></div></dl><Button variant="secondary" onClick={() => { setImportSeason(season.id); changeSection('import'); }}>Import into this season</Button></> : null}</aside>}
       </div>}
-      {section === 'import' && <div className="work-import-section">
+      {section === 'import' && <div className="work-import-container"><div className="work-subtoolbar"><h3>Schedule import</h3><div className="work-access-sections" role="group" aria-label="Schedule source"><button aria-pressed={importMode === 'find'} onClick={() => setImportMode('find')}>Find schedule</button><button aria-pressed={importMode === 'csv'} onClick={() => setImportMode('csv')}>CSV import</button></div></div>
+      {importMode === 'find' ? <ScheduleFinder key={selectedSeason} seasonId={selectedSeason} onSeason={setImportSeason} /> : <div className="work-import-section">
         <form className="work-import-editor" onSubmit={e => { e.preventDefault(); setPreviewError(''); try { setPreview(provider.previewSchedule(persona, csv)); } catch (err) { setPreviewError(err instanceof Error ? err.message : 'Unable to preview this CSV.'); } }}>
           <div className="work-subtoolbar"><h3>Import source</h3><button type="button" className="work-text-button" onClick={() => { setCsv(example); setPreview(null); setPreviewError(''); }}>Load example</button></div>
           <Field label="Sports season" required><Select name="importSeason" value={selectedSeason} onChange={e => { setImportSeason(e.target.value); setPreview(null); }} required>{!snapshot.seasons.length && <option value="">Create a season first</option>}{snapshot.seasons.map(s => <option key={s.id} value={s.id}>{snapshot.teams.find(t => t.id === s.teamId)?.name} · {s.label}</option>)}</Select></Field>
@@ -77,6 +80,7 @@ export function SetupWorkspace() {
           </>}</div>
           <div className="work-import-commit"><div><strong>{preview ? `${preview.rows.length} events · ${preview.rows.reduce((sum, row) => sum + row.tickets, 0)} tickets` : 'No inventory will be created until you import.'}</strong><p>Imported events are private. No messages are sent.</p></div><Button disabled={busy || !selectedSeason || !preview || !preview.rows.length || preview.errors.length > 0} onClick={async () => { if (await run({ type: 'importSchedule', csv, seasonId: selectedSeason })) { setPreview(null); setCsv(''); } }}>Import private inventory</Button></div>
         </section>
+      </div>}
       </div>}
     </div>
   </section>;

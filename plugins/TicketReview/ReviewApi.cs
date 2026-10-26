@@ -37,7 +37,11 @@ namespace Ais.TicketReview
                 var actor = Actor(service, context.InitiatingUserId);
                 var input = Parse((string)context.InputParameters["Payload"]);
                 var operation = Str(input, "operation");
-                Check(operation == "snapshot" || operation == "command" || operation == "seed", "Unsupported operation.");
+                Check(operation == "snapshot" || operation == "command" || operation == "seed" || operation == "scheduleSearchStart" || operation == "scheduleSearchGet", "Unsupported operation.");
+                if (operation == "scheduleSearchStart" || operation == "scheduleSearchGet") {
+                    context.OutputParameters["Result"] = ScheduleSearch(service, actor, input).ToString(Formatting.None);
+                    return;
+                }
                 if (operation != "snapshot" && Str(input["command"], "type") != "interest") RequireAdmin(actor);
 
                 // Loading must never compete for a write lock. In particular, React
@@ -413,6 +417,7 @@ namespace Ais.TicketReview
                 snapshot["accessGroups"] = AccessGroups(service);
             }
             if (admin) {
+                snapshot["scheduleSearchAvailable"] = ScheduleSearchAvailable(service);
                 foreach (var k in new[] {"contacts", "allocations", "attendanceHistory", "outbox", "followup", "scoring"}) snapshot[k] = s[k].DeepClone();
                 snapshot["requesters"] = new JArray(Read(service, "systemuser", new ConditionExpression("isdisabled", ConditionOperator.Equal, false), new ConditionExpression("accessmode", ConditionOperator.Equal, 0))
                     .Where(u => u.GetAttributeValue<Guid>("azureactivedirectoryobjectid") != Guid.Empty)

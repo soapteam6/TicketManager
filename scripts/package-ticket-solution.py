@@ -28,6 +28,9 @@ def plan(d):
     names = {source["logicalName"] for db in config["databaseReferences"].values()
              for source in db["dataSources"].values() if source["logicalName"].startswith("cr9cd_")}
     names.add("cr9cd_reviewworkspace")
+    search_tables = d.call("GET", "EntityDefinitions", params={"$select": "LogicalName", "$filter": "LogicalName eq 'cr9cd_schedulesearch'"})["value"]
+    if search_tables:
+        names.add("cr9cd_schedulesearch")
     components = []
     for name in sorted(names):
         table = d.call("GET", f"EntityDefinitions(LogicalName='{name}')", params={"$select": "MetadataId,LogicalName"})
@@ -55,6 +58,18 @@ def plan(d):
         if len(rows) != 1:
             raise RuntimeError(f"Expected one {label}; found {len(rows)}.")
         components.append({"name": label, "id": rows[0][select.split(',')[0]], "type": kind})
+    search_config = ROOT / "solutions/schedule-search.json"
+    if search_config.exists():
+        search = json.loads(search_config.read_text(encoding="utf-8"))
+        components.extend([
+            {"name": "Schedule search background flow", "id": search["workflowId"], "type": 29},
+            {"name": "Ticket Manager Claude connector", "id": search["connectorId"], "type": 372},
+        ])
+        for name in ["cr9cd_ticketscheduledataverse", "cr9cd_ticketscheduleclaude"]:
+            rows = find(d, "connectionreferences", "connectionreferenceid", f"connectionreferencelogicalname eq '{name}'")
+            if len(rows) != 1:
+                raise RuntimeError(f"Expected one schedule-search connection reference: {name}")
+            components.append({"name": name, "id": rows[0]["connectionreferenceid"], "type": 10083})
     return components, roles
 
 

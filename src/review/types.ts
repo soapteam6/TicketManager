@@ -214,6 +214,20 @@ export interface ReviewSnapshot {
   requesters?: { id: string; name: string; email?: string }[];
   accessUsers?: AccessUser[];
   accessGroups?: AccessGroup[];
+  scheduleSearchAvailable?: boolean;
+}
+export interface ScheduleSearchRequest {
+  query: string;
+  seasonId: string;
+  ticketsPerEvent: number;
+  homeOnly: boolean;
+}
+export interface ScheduleSearchJob {
+  id: string;
+  status: 'queued' | 'searching' | 'complete' | 'failed';
+  request: ScheduleSearchRequest & { from?: string; through?: string; seasonLabel?: string };
+  rawResult?: unknown;
+  error?: string;
 }
 export interface ScheduleRow {
   gameDate: string;
@@ -305,6 +319,8 @@ export interface ReviewProvider {
   snapshot(persona: PersonaKey): ReviewSnapshot;
   execute(persona: PersonaKey, command: ReviewCommand): Promise<CommandResult>;
   previewSchedule(persona: PersonaKey, csv: string): SchedulePreview;
+  startScheduleSearch?(persona: PersonaKey, request: ScheduleSearchRequest, jobId: string): Promise<ScheduleSearchJob>;
+  getScheduleSearch?(persona: PersonaKey, jobId: string): Promise<ScheduleSearchJob>;
   availability(persona: PersonaKey): string;
   rank(persona: PersonaKey, gameId: GameId): GameRankingResult;
 }

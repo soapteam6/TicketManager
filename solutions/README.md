@@ -6,11 +6,12 @@ same app ID; adding it to this solution does not create another app or move data
 
 [Open the solution](https://make.powerapps.com/environments/946e5045-3200-eb26-9160-3fe967a6b21c/solutions/1c411462-63d1-f111-a05b-6045bd069cda/overview).
 
-It contains all 16 custom tables declared by the project (including the review
+It contains all 17 custom tables declared by the project (including the review
 workspace), the three active app security roles plus the legacy Ticket Manager
 User role definition, the signed `TicketReview`
 plug-in assembly, the `cr9cd_TicketReview` Custom API and its Payload/Result
-contract, and the existing AIS Ticket Concierge code app. Dependencies were
+contract, the existing AIS Ticket Concierge code app, and the schedule-search
+flow, custom Claude connector and two connection references. Dependencies were
 included by Dataverse. Both managed and unmanaged exports reported **zero missing
 dependencies** and passed local content inspection. The unmanaged export was
 also successfully unpacked with PAC. Import into a separate environment has not
@@ -162,13 +163,61 @@ AIS Development; provisioning another environment requires a separately reviewed
 target and credentials. The current API reads only records scoped to
 `ais-ticket-review-v1`. Unscoped legacy records have not been migrated.
 
+## Schedule search
+
+Coordinators use **Setup & import → Schedule import → Find schedule** to enter
+a team/year and review source-linked games before importing them as private
+inventory. CSV import remains available. Search jobs are separate from the
+inventory/workspace transaction, so web research does not block ticket work.
+Each job is readable through the API only by its initiating coordinator.
+
+The solution includes `cr9cd_schedulesearch`, **Ticket Manager - Find schedule**,
+the **Ticket Manager Claude** custom connector and the
+`cr9cd_ticketscheduledataverse` / `cr9cd_ticketscheduleclaude` connection
+references. [schedule-search.json](schedule-search.json) records the non-secret
+environment bindings. Definition sources are in `flows/schedule-search/` and
+`scripts/schedule_search_flow.py`; provisioning is pinned to AIS Development.
+
+The active flow uses Claude Sonnet 4.6 with native web search and web fetch.
+Each request permits five search and five fetch tool uses; pause-turn
+continuation is capped at three requests / eight minutes. The backend limits
+each coordinator to two recently pending jobs. Search errors and incomplete
+responses create no inventory. Only an explicit reviewed import writes games.
+
+The Anthropic credential was reused in memory from the existing AIS configuration
+and placed in Microsoft's encrypted connection store. It was not written to this
+repository, the app or flow definition. Existing Claude flows were not changed.
+Exports include connector metadata and connection references, **not credentials
+or live connections**. Another environment needs its own deliberate connection
+binding and activation. Current setup refuses to overwrite an active flow.
+
+```powershell
+# Read-only setup plan; announce environment changes before applying:
+python scripts/setup-schedule-search.py
+# Initial setup only, not an update command for the already active flow:
+python scripts/setup-schedule-search.py --apply --enable
+
+# Read an existing completed job without another paid web search/import:
+python scripts/test-schedule-search.py --job-id fe492d17-557b-4577-aa5d-bd45e5af6fab
+node scripts/verify-schedule-result.mjs
+```
+
+The live test found 9 games, with 8 ready for review and 1 excluded due to an
+unconfirmed time; 18 native tool source links were available. It imported zero
+inventory and left the workspace unchanged. The parser checks source provenance
+and per-date timezone conversion; these checks do not establish that every
+published game was found. [schedule-search-test.json](schedule-search-test.json)
+records the result. Raw tool responses stay in ignored local artifacts.
+
 ## Verification
 
-On 2026-10-26: production build and changed-source lint passed; **64 frontend
-tests** and **24 offline C# security tests** passed. Synthetic browser checks
+On 2026-10-26: production build and changed-source lint passed; **76 frontend
+tests** and **32 offline C# security tests** passed. Synthetic browser checks
 passed at desktop, iPad landscape and iPad portrait sizes, including granting
 and reversing a role, ordinary coordinator privacy, row selection, closable
-right-side details and bounded page scrolling. Group checks covered connecting
+right-side details and bounded page scrolling. Schedule checks cover source
+validation, DST, TBD exclusion, preview, selected import and CSV fallback.
+Group checks covered connecting
 a group, assigning its role, admin-only management, inherited access, stale
 edits, preservation of other roles and members-only scope.
 

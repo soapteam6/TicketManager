@@ -10,6 +10,21 @@
 .work-access-sections button[aria-pressed=true] { color:var(--work-accent); background:var(--work-selection); font-weight:600; }
 .work-access-sections button+button { border-left:1px solid var(--work-border); }
 .work-group-id { overflow-wrap:anywhere; }
+.work-import-container { display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
+.work-import-container>.work-import-section { flex:1; }
+.work-search-home { display:flex; align-items:center; gap:9px; font-size:12px; }
+.work-import-error-message { color:#963d46; font-size:12px; line-height:1.6; }
+.work-schedule-sources { padding:12px 18px; display:flex; flex-wrap:wrap; gap:8px 16px; border-bottom:1px solid var(--work-border); font-size:11px; }
+.work-schedule-source-disclosure { border-bottom:1px solid var(--work-border); }
+.work-schedule-source-disclosure summary { cursor:pointer; padding:10px 18px; font-size:11px; color:var(--work-accent); }
+.work-schedule-source-disclosure .work-schedule-sources { max-height:140px; overflow:auto; border-bottom:0; }
+.work-schedule-sources a,.work-source-link { color:var(--work-accent); text-decoration:underline; text-underline-offset:2px; }
+.work-source-link { display:inline-block; margin-top:6px; font-size:10px; }
+.work-found-schedule td:first-child { width:36px; }
+.work-found-schedule td:nth-child(2) { min-width:180px; }
+.work-found-schedule td:nth-child(3) { min-width:190px; }
+.work-found-schedule td:nth-child(4) { width:95px; }
+.work-found-schedule td:nth-child(5) { min-width:135px; }
 .work-shell :is(button,a,input,select,textarea):focus-visible { outline:2px solid var(--work-accent); outline-offset:3px; }
 .work-shell button.bg-brand-600 { background:var(--work-accent); }
 .work-shell button.bg-brand-600:hover { filter:brightness(.93); }
@@ -282,7 +297,7 @@
 .work-import-section { display:grid; grid-template-columns:350px minmax(0,1fr); min-width:0; min-height:0; overflow:hidden; }
 .work-import-editor { padding:0 20px 22px; min-width:0; min-height:0; overflow:auto; overscroll-behavior:contain; display:flex; flex-direction:column; gap:15px; border-right:1px solid var(--work-border); background:#fcfefe; }
 .work-import-editor>.work-subtoolbar { padding-left:0; padding-right:0; }
-.work-import-editor>label:nth-of-type(2) { flex:1; display:flex; flex-direction:column; min-height:180px; }
+.work-import-section:not(.work-schedule-finder)>.work-import-editor>label:nth-of-type(2) { flex:1; display:flex; flex-direction:column; min-height:180px; }
 .work-import-editor textarea { flex:1; min-height:140px; resize:vertical; font:11px/1.7 Consolas,monospace; white-space:pre; }
 .work-import-editor>.work-help { margin:0; flex-shrink:0; }
 .work-import-preview { display:flex; flex-direction:column; min-height:0; min-width:0; overflow:hidden; }

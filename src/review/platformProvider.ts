@@ -3,7 +3,7 @@ import { ReviewError } from './provider';
 import { rankReviewState } from './ranking';
 import { previewScheduleCsv } from './schedule';
 import { createSnapshotLoader } from './workspaceLoading';
-import type { CommandResult, PersonaKey, ReviewCommand, ReviewProvider, ReviewSnapshot, ReviewState } from './types';
+import type { CommandResult, PersonaKey, ReviewCommand, ReviewProvider, ReviewSnapshot, ReviewState, ScheduleSearchJob, ScheduleSearchRequest } from './types';
 
 export interface PlatformResponse {
   revision: number;
@@ -13,6 +13,7 @@ export interface PlatformResponse {
   result: CommandResult;
 }
 export type PlatformTransport = (payload: Record<string, unknown>) => Promise<PlatformResponse>;
+export type ScheduleSearchTransport = (payload: Record<string, unknown>) => Promise<ScheduleSearchJob>;
 
 // Authenticated projections and every mutation come from the server. A persona key
 // is kept in the UI interface for demo compatibility; it is never sent to Dataverse.
@@ -23,10 +24,12 @@ export class DataverseReviewProvider implements ReviewProvider {
   private current: PlatformResponse;
   private transport: PlatformTransport;
   private loadSnapshot: () => Promise<PlatformResponse>;
-  constructor(transport: PlatformTransport, initial: PlatformResponse) {
+  private searchTransport?: ScheduleSearchTransport;
+  constructor(transport: PlatformTransport, initial: PlatformResponse, searchTransport?: ScheduleSearchTransport) {
     this.transport = transport;
     this.loadSnapshot = createSnapshotLoader(transport);
     this.current = initial;
+    this.searchTransport = searchTransport;
   }
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   revision = () => this.version;
@@ -57,6 +60,16 @@ export class DataverseReviewProvider implements ReviewProvider {
     if (this.current.snapshot.persona.role !== 'coordinator') throw new ReviewError('forbidden', 'Coordinator permission is required.');
   }
   previewSchedule(_key: PersonaKey, csv: string) { this.coordinator(); return previewScheduleCsv(csv); }
+  async startScheduleSearch(_key: PersonaKey, request: ScheduleSearchRequest, jobId: string) {
+    this.coordinator();
+    if (!this.searchTransport) throw new Error('Schedule search is unavailable.');
+    return this.searchTransport({ operation: 'scheduleSearchStart', request, jobId });
+  }
+  async getScheduleSearch(_key: PersonaKey, jobId: string) {
+    this.coordinator();
+    if (!this.searchTransport) throw new Error('Schedule search is unavailable.');
+    return this.searchTransport({ operation: 'scheduleSearchGet', jobId });
+  }
   availability(): string {
     this.coordinator();
     const now = Date.parse(this.current.serverNow);

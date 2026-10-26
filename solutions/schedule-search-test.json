@@ -1,0 +1,16 @@
+{
+  "authenticatedAs": "emikes@ais-now.com",
+  "jobId": "fe492d17-557b-4577-aa5d-bd45e5af6fab",
+  "query": "Las Vegas Aviators home games in September 2026",
+  "status": "complete",
+  "team": "Las Vegas Aviators",
+  "season": "2026",
+  "timezone": "America/Los_Angeles",
+  "gamesFound": 9,
+  "gamesReadyForReview": 8,
+  "gamesWithUnconfirmedTimes": 1,
+  "toolReturnedSources": 18,
+  "warnings": 5,
+  "workspaceUnchanged": true,
+  "inventoryImported": 0
+}

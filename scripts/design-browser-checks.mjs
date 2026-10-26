@@ -177,6 +177,15 @@ try {
       await page.wait(`document.querySelector('[aria-label="Season details"] h3')?.textContent==='QA 2027 season'`);
       await click('Import into this season');
       await page.evaluate(`document.querySelector('button[aria-label="Schedule import"]').click()`);
+      await set('input[name="scheduleQuery"]', 'Demo schedule 2027');
+      await click('Find schedule', 'document.querySelector(".work-schedule-finder form")');
+      await page.wait(`document.querySelectorAll('.work-found-schedule tbody tr').length===2`);
+      assert(await page.evaluate(`document.querySelectorAll('.work-found-schedule tbody input[type="checkbox"]:checked').length===1`), 'TBD game was selected for import');
+      assert(await page.evaluate(`document.querySelector('.work-schedule-sources').textContent.includes('Synthetic schedule source')`));
+      await screenshot('schedule-search');
+      await click('Import selected games');
+      await page.wait(`document.querySelector('.work-found-schedule tbody tr').textContent.includes('Already in inventory')`);
+      await click('CSV import');
       await click('Load example');
       await click('Validate & preview');
       await page.wait(`document.querySelectorAll('.work-import-preview tbody tr').length===2`);
@@ -253,6 +262,15 @@ try {
         await page.wait(`!document.querySelector('[aria-label="Team details"]') && !document.querySelector('tbody tr[aria-selected="true"]')`);
         assert(await page.evaluate(`document.documentElement.scrollHeight <= window.innerHeight+1 && document.documentElement.scrollWidth <= window.innerWidth`), `iPad ${orientation}: setup overflows the page`);
         await screenshot(`ipad-${orientation}-setup`);
+        await page.evaluate(`document.querySelector('button[aria-label="Schedule import"]').click()`);
+        await click('Find schedule', 'document.querySelector(".work-access-sections")');
+        await page.wait(`document.querySelector('input[name="scheduleQuery"]')`);
+        await set('input[name="scheduleQuery"]', 'Demo schedule 2027');
+        await click('Find schedule', 'document.querySelector(".work-schedule-finder form")');
+        await page.wait(`document.querySelectorAll('.work-found-schedule tbody tr').length===2`);
+        assert(await page.evaluate(`document.documentElement.scrollHeight <= innerHeight+1 && document.documentElement.scrollWidth <= innerWidth`), `iPad ${orientation}: schedule search overflows the page`);
+        assert(await page.evaluate(`(() => {const editor=document.querySelector('.work-schedule-finder form').getBoundingClientRect();const preview=document.querySelector('[aria-label="Found schedule"]').getBoundingClientRect();return preview.left>=editor.right-1 && Math.abs(preview.top-editor.top)<2;})()`), `iPad ${orientation}: schedule preview moved below the form`);
+        await screenshot(`ipad-${orientation}-schedule-search`);
         await nav('User access');
         await page.wait(`document.querySelector('.work-table tbody tr')`);
         await page.evaluate(`document.querySelector('.work-table tbody tr').cells[0].click()`);
@@ -273,7 +291,7 @@ try {
     assert(await page.evaluate(`!document.querySelector('.work-feedback, .work-table-footer, .work-app-footer, .design-switcher')`), 'Routine feedback or removed layout chrome is still rendered');
     assert.deepEqual(errors, [], `${design}: page errors`);
     assert.deepEqual(external, [], `${design}: external requests`);
-    results.push({ design, status: 'PASS', checks: ['no automatic initial selection', 'detail pane dismissal', 'no routine save banners', 'search', 'whole-row and keyboard selection', 'private inventory creation', 'interest', 'requester email', 'allocation', 'right-side allocation details', 'visible rejection reason', 'contact history', ...(design === 'desk' ? ['team and season creation', 'schedule preview and import', 'independent detail scrolling'] : []), 'admin-only user access', 'role grant and reversal', 'group role assignment', 'connecting a directory group', 'requester navigation', 'iPad landscape', 'iPad portrait', 'bounded page scroll'], pageErrors: 0, externalRequests: 0 });
+    results.push({ design, status: 'PASS', checks: ['no automatic initial selection', 'detail pane dismissal', 'no routine save banners', 'search', 'whole-row and keyboard selection', 'private inventory creation', 'interest', 'requester email', 'allocation', 'right-side allocation details', 'visible rejection reason', 'contact history', ...(design === 'desk' ? ['team and season creation', 'web schedule preview and selected import', 'TBD game excluded', 'CSV fallback', 'iPad schedule search', 'independent detail scrolling'] : []), 'admin-only user access', 'role grant and reversal', 'group role assignment', 'connecting a directory group', 'requester navigation', 'iPad landscape', 'iPad portrait', 'bounded page scroll'], pageErrors: 0, externalRequests: 0 });
     page.close();
     await browser.call('Target.closeTarget', { targetId });
   }

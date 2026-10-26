@@ -72,8 +72,8 @@ preserve records. Messages remain saved previews and transfers remain manual.
 Live verification passed: native record persistence, invalid-date rollback,
 idempotent replay, demand without reservation, competing allocations with exactly
 one winner, future-attendance rejection, cancellation without auto-promotion,
-and directory synchronization preserving app eligibility. Local checks: **64
-frontend tests and 24 offline C# security tests pass**, typecheck and
+and directory synchronization preserving app eligibility. Local checks: **76
+frontend tests and 32 offline C# security tests pass**, typecheck and
 changed-source lint pass, and platform build passes.
 Browser click-through and requester testing with separately authorized accounts
 remain pending; these results are API verification, not browser acceptance.
@@ -100,7 +100,7 @@ remain separate. Requester sign-in with approved testers remains an acceptance
 task.
 
 The single **AIS Ticket Manager** authoring solution contains the existing app,
-16 custom table definitions, the three app roles plus the legacy Ticket Manager
+17 custom table definitions, the three app roles plus the legacy Ticket Manager
 User role definition, signed plug-in and Custom API. The old unmanaged QA
 container was backed up and retired after all 29 component entries were verified
 as covered. Future setup runs target the main solution.
@@ -109,6 +109,41 @@ See [solution artifacts, commands and deployment boundaries](../solutions/README
 The exports contain the current published Allocation desk and User access UI,
 including group role administration. The hosted package is verified against the
 production build; requester sign-in acceptance remains pending.
+
+## Find a schedule without copying and pasting
+
+As a coordinator, open **Setup & import → Schedule import → Find schedule**.
+Choose the destination sports season, enter a team and year in **Find schedule
+for**, set the number of tickets the company owns per game, then select
+**Find schedule**. Home games only is selected initially. A background Claude
+flow searches and reads public schedule sources; other ticket work can continue.
+Returning to the same season in this browser tab resumes the job.
+
+Results appear as an editable preview with source links. Inspect the dates,
+opponents and warnings; select the rows to keep, then **Import selected games**.
+Search itself creates no inventory. Imported games start private. Unconfirmed
+times, unverified sources, out-of-season dates and existing inventory duplicates
+cannot be imported as ready rows. Confirmed times are checked against the source
+timezone, including daylight saving. The preview date controls use UTC, as do
+the other event screens. **CSV import** remains available beside Find schedule.
+
+The new **Ticket Manager - Find schedule** Power Automate flow, its custom
+Claude connector, two connection references and search-job table are included
+in **AIS Ticket Manager**. The API key lives in an encrypted server connection;
+it is absent from the browser, source and flow definition. Only the search
+phrase, season bounds and home-game choice go to Claude; contacts, requests,
+roles and ticket inventory are not sent.
+
+Live verification as `emikes@ais-now.com` searched Las Vegas Aviators home games
+in September 2026: **9 games found, 8 ready for review, 1 time TBD excluded**,
+with 18 tool-returned source links. No inventory was imported and the workspace
+was unchanged. These checks validate the flow and parser; reviewers still need
+to check schedule completeness and source accuracy before importing. See
+[test evidence](../solutions/schedule-search-test.json).
+
+Local regression coverage now includes **76 frontend tests and 32 backend
+security tests**, plus the desktop and iPad preview/import checks. Requester
+sign-in and human acceptance in the hosted app remain pending.
 
 ## Isolated synthetic regression testing
 

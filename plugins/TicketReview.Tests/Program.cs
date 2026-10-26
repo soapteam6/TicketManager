@@ -158,6 +158,7 @@ internal static class Program
             Denied(() => Call("ConnectGroup", s, Actor(s, s.Caller), new JObject { ["directoryId"] = Guid.NewGuid().ToString(), ["role"] = "System Administrator" }), "supported Ticket Manager");
             Assert(s.Writes == 0, "Unexpected team creation");
         });
+        passed += SearchTests.Run();
         Console.WriteLine(passed + " security tests passed; no network access.");
     }
     private static JObject GroupCommand(Entity team, string role, params string[] expected) => new JObject {

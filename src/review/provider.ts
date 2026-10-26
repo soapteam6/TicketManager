@@ -9,6 +9,8 @@ import type {
   AccessUser,
   AccessGroup,
   AppRole,
+  ScheduleSearchJob,
+  ScheduleSearchRequest,
   CommandResult,
   Contact,
   DirectorySource,
@@ -87,6 +89,7 @@ export class MockReviewProvider implements ReviewProvider {
   }));
   private accessGroups: AccessGroup[] = [{ id: '80000000-0000-4000-8000-000000000001', directoryId: '80000000-0000-4000-8000-000000000002', name: 'Demo sales group', type: 'security', membership: 'members', roles: [] }];
   private groupMembers = new Map<string, string[]>([['80000000-0000-4000-8000-000000000001', [PERSONAS.rep.id]]]);
+  private scheduleJobs = new Map<string, { owner: string; job: ScheduleSearchJob }>();
   private updateEffectiveAccess() {
     for (const user of this.accessUsers) {
       user.inheritedRoles = [...new Set(this.accessGroups.filter(g => this.groupMembers.get(g.id)?.includes(user.id)).flatMap(g => g.roles))];
@@ -217,6 +220,7 @@ export class MockReviewProvider implements ReviewProvider {
       options,
       teams: admin ? state.teams : [],
       seasons: admin ? state.seasons : [],
+      scheduleSearchAvailable: admin,
       ...(actor.isAppAdmin ? { accessUsers: this.accessUsers, accessGroups: this.accessGroups } : {}),
       ...(admin
         ? {
@@ -233,6 +237,40 @@ export class MockReviewProvider implements ReviewProvider {
   previewSchedule(key: PersonaKey, csv: string): SchedulePreview {
     coordinator(this.actor(key));
     return previewScheduleCsv(csv);
+  }
+  async startScheduleSearch(key: PersonaKey, request: ScheduleSearchRequest, jobId: string): Promise<ScheduleSearchJob> {
+    const actor = coordinator(this.actor(key));
+    const season = this.state.seasons.find(s => s.id === request.seasonId);
+    if (!season) invalid('Choose a season.');
+    text(request.query, 'a schedule query', 300); integer(request.ticketsPerEvent, 0, 1000, 'Tickets');
+    const existing = this.scheduleJobs.get(jobId);
+    if (existing) {
+      if (existing.owner !== actor.id) throw new ReviewError('forbidden', 'Search not found.');
+      return structuredClone(existing.job);
+    }
+    const job: ScheduleSearchJob = { id: jobId, status: 'queued', request: { ...request, from: season.startDate, through: season.endDate, seasonLabel: season.label } };
+    this.scheduleJobs.set(jobId, { owner: actor.id, job });
+    return structuredClone(job);
+  }
+  async getScheduleSearch(key: PersonaKey, jobId: string): Promise<ScheduleSearchJob> {
+    const actor = coordinator(this.actor(key));
+    const record = this.scheduleJobs.get(jobId);
+    if (!record || record.owner !== actor.id) throw new ReviewError('forbidden', 'Search not found.');
+    const job = record.job;
+    if (job.status === 'queued') {
+      const date = new Date(`${job.request.from}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + 10);
+      const day = date.toISOString().slice(0, 10), sourceUrl = 'https://schedule.example.invalid/official';
+      job.status = 'complete';
+      job.rawResult = { stop_reason: 'end_turn', content: [
+        { type: 'server_tool_use', name: 'web_search' },
+        { type: 'web_search_tool_result', content: [{ type: 'web_search_result', url: sourceUrl, title: 'Synthetic schedule source' }] },
+        { type: 'text', text: JSON.stringify({ team: 'Demo schedule search', season: job.request.seasonLabel, timezone: 'UTC', warnings: ['Synthetic preview only. No web search or external service was called.'], games: [
+          { title: 'Discovered demo opponent', localDate: day, localTime: '12:00', startAt: date.toISOString(), home: true, venue: 'Demo stadium', sourceUrl },
+          { title: 'Demo time TBD', localDate: day, localTime: null, startAt: null, home: true, sourceUrl },
+        ] }) }
+      ] };
+    }
+    return structuredClone(job);
   }
   availability(key: PersonaKey): string {
     coordinator(this.actor(key));

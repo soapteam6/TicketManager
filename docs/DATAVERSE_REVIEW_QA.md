@@ -93,6 +93,37 @@ interpret the complete contract. Cross-org CRM/opportunity search, Entra/Office
 not exercised by this route. Opportunity is free-text context; directory sync
 reads this environment's Dataverse users.
 
+## Web schedule search
+
+**Setup & import → Schedule import → Find schedule** calls the review API to
+create a job in the new organization-owned `cr9cd_schedulesearch` table.
+The **Ticket Manager - Find schedule** cloud flow researches public schedules
+with Claude web search/fetch, then saves its result to that job. The API enforces
+coordinator permission, authenticated requester ownership, scoped season input
+and idempotent job IDs. Polling and job creation bypass the ticket-workspace
+lock/revision; the flow writes only job status/results, never inventory.
+
+The screen previews editable games and source links. Native web-tool results
+must support each source URL. UTC conversion is checked against each source's
+local date, time and IANA timezone. TBD or mismatched times are excluded. Games
+stay unimported until the coordinator selects **Import selected games**; normal
+transactional CSV validation then creates private inventory. CSV input remains
+available as a fallback.
+
+All new components belong to `AISTicketManager`: the 17th custom table, the flow,
+custom Claude connector and two connection references. The key is encrypted in
+the server connection and absent from the client/repository/flow definition.
+Only public search text, season date bounds and home-only selection go to the
+model. The original Claude flows and individual role associations were untouched.
+
+A live search as `emikes@ais-now.com` completed queued → searching → complete:
+Las Vegas Aviators home games in September 2026, 9 rows, 8 ready, 1 time TBD,
+18 tool-returned sources, zero inventory imports and unchanged workspace.
+[Evidence](../solutions/schedule-search-test.json) and
+[setup/export commands](../solutions/README.md#schedule-search) are recorded.
+Synthetic desktop and both iPad orientations pass the new preview/import flow.
+Human hosted-app acceptance and clean-environment import remain pending.
+
 ## Identity and transactions
 
 The API resolves `InitiatingUserId` and direct/team Dataverse security roles.

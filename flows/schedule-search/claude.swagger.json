@@ -1,0 +1,34 @@
+{
+  "swagger": "2.0",
+  "info": { "title": "Ticket Manager Claude", "description": "Server-side Claude messages for public schedule discovery.", "version": "1.0" },
+  "host": "api.anthropic.com",
+  "basePath": "/v1",
+  "schemes": ["https"],
+  "consumes": ["application/json"],
+  "produces": ["application/json"],
+  "securityDefinitions": { "api_key": { "type": "apiKey", "in": "header", "name": "x-api-key" } },
+  "security": [{ "api_key": [] }],
+  "paths": {
+    "/messages": {
+      "post": {
+        "operationId": "Messages",
+        "summary": "Search public schedules with Claude",
+        "parameters": [
+          { "in": "header", "name": "anthropic-version", "type": "string", "required": true, "default": "2023-06-01", "x-ms-visibility": "internal" },
+          { "in": "body", "name": "body", "required": true, "schema": {
+            "type": "object", "required": ["model", "max_tokens", "messages"],
+            "properties": {
+              "model": { "type": "string" }, "max_tokens": { "type": "integer" }, "system": { "type": "string" },
+              "messages": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+              "tools": { "type": "array", "items": { "type": "object", "additionalProperties": true } }
+            }
+          } }
+        ],
+        "responses": { "200": { "description": "Claude response including native web-tool results and final schedule JSON.", "schema": { "type": "object", "additionalProperties": true, "properties": {
+          "content": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+          "stop_reason": { "type": "string" }, "usage": { "type": "object", "additionalProperties": true }
+        } } } }
+      }
+    }
+  }
+}

@@ -6,16 +6,18 @@ import { Button } from './ui';
 import { reviewErrorMessage } from './errorMessage';
 import { createSnapshotLoader, workspaceLoadMessage } from './workspaceLoading';
 import logoUrl from '../assets/ais-logo.webp?inline';
+import type { ScheduleSearchJob } from './types';
 
-const transport: PlatformTransport = async (payload) => {
+const callApi = async (payload: Record<string, unknown>): Promise<unknown> => {
   const response = await MicrosoftDataverseService.PerformUnboundActionWithOrganization(
     'https://org5c824bd0.crm.dynamics.com', 'cr9cd_TicketReview', { Payload: JSON.stringify(payload) },
   );
   if (!response.success || typeof response.data?.Result !== 'string') {
     throw new Error(response.error ? reviewErrorMessage(response.error) : 'Dataverse review API is unavailable. Verify the AIS Development QA setup and your Ticket Manager role.');
   }
-  return JSON.parse(response.data.Result) as PlatformResponse;
+  return JSON.parse(response.data.Result) as unknown;
 };
+const transport: PlatformTransport = async payload => await callApi(payload) as PlatformResponse;
 const loadSnapshot = createSnapshotLoader(transport);
 
 export function PlatformReview() {
@@ -25,7 +27,7 @@ export function PlatformReview() {
   useEffect(() => {
     let active = true;
     loadSnapshot().then(initial => {
-      if (active) { setProvider(new DataverseReviewProvider(transport, initial)); setError(''); }
+      if (active) { setProvider(new DataverseReviewProvider(transport, initial, async payload => await callApi(payload) as ScheduleSearchJob)); setError(''); }
     }).catch(err => { if (active) setError(workspaceLoadMessage(err)); });
     return () => { active = false; };
   }, [attempt]);
