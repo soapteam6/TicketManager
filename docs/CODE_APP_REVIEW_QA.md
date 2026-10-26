@@ -45,6 +45,9 @@ Lists start without an automatically selected record. Close buttons clear the se
 
 The repeated Ticket management/page breadcrumb has been removed, reclaiming its
 vertical space for the active workspace.
+The top bar also omits the environment label and connection-status dot. The
+workspace opens only after its authenticated Dataverse snapshot loads; startup
+connection or access failures show the loading error/retry screen instead.
 
 B keeps the workspace within the viewport. Lists, details, and editor panes
 scroll independently. Inventory, allocation, contact, team and season rows can
