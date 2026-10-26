@@ -43,6 +43,9 @@ redirect to the main workspace. The isolated synthetic preview uses this same UI
 
 Lists start without an automatically selected record. Close buttons clear the selection and return the space to the list. Routine successful saves do not display banners; errors remain explicit.
 
+The repeated Ticket management/page breadcrumb has been removed, reclaiming its
+vertical space for the active workspace.
+
 B keeps the workspace within the viewport. Lists, details, and editor panes
 scroll independently. Inventory, allocation, contact, team and season rows can
 be selected by clicking the row or using Tab and Enter/Space. Nested action
