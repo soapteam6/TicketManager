@@ -232,6 +232,30 @@ records the result. Raw tool responses stay in ignored local artifacts.
 
 ## Verification
 
+### Prepared credential migration (not activated)
+
+The existing Claude action already masks inputs/outputs and contains no literal
+API key. A migration is prepared for `cr9cd_TicketManagerAnthropicApiKey` in this
+solution, with a masked runtime key lookup and masked HTTPS call to Anthropic.
+It has not replaced the live encrypted-connection credential yet.
+
+A true **Secret** environment variable requires an Azure Key Vault reference.
+No configured reference was found and the current emikes PAC login cannot obtain
+Azure access silently. No Azure CLI or interactive sign-in was attempted.
+The alternative is a **Text** current value with masked flow history and excluded
+exports; authorized Dataverse administrators can still read that value. The
+storage choice is awaiting user input. Never put the literal key in a default.
+
+`scripts/configure-claude-environment.py --storage text|secret` shows the selected
+plan; `--apply` must follow an announcement of the exact environment changes.
+Secret mode creates only the definition until its Key Vault reference is supplied.
+After a current value is configured, `scripts/update-schedule-search.py
+--credential-source textEnvironmentVariable|secretEnvironmentVariable --apply`
+switches the existing flow while retaining its ID and Dataverse connection.
+Six offline checks in `scripts/test-schedule-flow-security.py` cover masked key
+reads/calls, key exclusion from messages/results and rejection of unknown modes.
+The exporter rejects API-key material in memory before writing a ZIP.
+
 On 2026-10-26: production build and changed-source lint passed; **81 frontend
 tests** and **36 offline C# security tests** passed. Synthetic browser checks
 passed at desktop, iPad landscape and iPad portrait sizes, including granting

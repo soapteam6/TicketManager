@@ -8,6 +8,7 @@ fixture writes, table publication, or code-app publication occur here.
 import argparse
 import base64
 import json
+import io
 from pathlib import Path
 import re
 import zipfile
@@ -71,6 +72,8 @@ def plan(d):
             if len(rows) != 1:
                 raise RuntimeError(f"Expected one schedule-search connection reference: {name}")
             components.append({"name": name, "id": rows[0]["connectionreferenceid"], "type": 10083})
+        if search.get("credentialDefinitionId"):
+            components.append({"name": search["credentialEnvironmentVariable"], "id": search["credentialDefinitionId"], "type": 380})
     return components, roles
 
 
@@ -86,8 +89,21 @@ def inspect_schedule_search(archive, roots):
     if len(flows) != 1:
         raise RuntimeError("Export is missing the schedule-search flow.")
     flow = json.loads(archive.read(flows[0]))
-    if flow["properties"]["definition"] != definition(search["jobEntitySet"], search["connectorApi"]):
+    if flow["properties"]["definition"] != definition(search["jobEntitySet"], search["connectorApi"], search.get("credentialSource", "connection")):
         raise RuntimeError("Exported schedule-search flow differs from its source definition.")
+    if search.get("credentialSource", "connection") != "connection":
+        work = flow["properties"]["definition"]["actions"]["Find_schedule"]["actions"]
+        for action in [work["Get_Claude_key"], work["Research"]["actions"]["Claude_messages"]]:
+            if set(action.get("runtimeConfiguration", {}).get("secureData", {}).get("properties", [])) != {"inputs", "outputs"}:
+                raise RuntimeError("A key-bearing action is missing secure inputs/outputs.")
+        if "claude" in flow["properties"]["connectionReferences"]:
+            raise RuntimeError("The migrated flow still depends on its old credential connection.")
+        env_files = [n for n in archive.namelist() if search["credentialEnvironmentVariable"] in n and n.endswith("environmentvariabledefinition.xml")]
+        if len(env_files) != 1:
+            raise RuntimeError("The solution-owned Claude environment variable is missing from the export.")
+        env = ET.fromstring(archive.read(env_files[0]))
+        if env.findtext("defaultvalue") or any("environmentvariablevalue" in n.lower() and search["credentialEnvironmentVariable"].lower() in n.lower() for n in archive.namelist() if n not in env_files):
+            raise RuntimeError("Credential defaults/current values must not be packaged.")
     connectors = [r for r in roots if r.attrib.get("type") == "372" and r.attrib.get("id", "").strip("{}").lower() == search["connectorId"]]
     if len(connectors) != 1:
         raise RuntimeError("Export is missing the custom Claude connector.")
@@ -182,12 +198,13 @@ def main():
         unchanged = 0
         for component in components:
             current = included.get((component["type"], component["id"]))
-            if current and current["rootcomponentbehavior"] == 0:
+            behavior = 1 if component["type"] == 380 else 0
+            if current and current["rootcomponentbehavior"] == behavior:
                 unchanged += 1
                 continue
             d.call("POST", "AddSolutionComponent", {
                 "ComponentId": component["id"], "ComponentType": component["type"], "SolutionUniqueName": SOLUTION,
-                "AddRequiredComponents": True, "DoNotIncludeSubcomponents": False,
+                "AddRequiredComponents": True, "DoNotIncludeSubcomponents": component["type"] == 380,
             })
             print("Included " + component["name"])
         print(f"{unchanged} existing full components retained without a membership update.")
@@ -205,7 +222,13 @@ def main():
                             "ExportGeneralSettings": False, "ExportMarketingSettings": False, "ExportOutlookSynchronizationSettings": False,
                             "ExportRelationshipRoles": False, "ExportIsvConfig": False, "ExportSales": False, "ExportExternalApplications": False})
             path = folder / (SOLUTION + ("_managed" if managed else "_unmanaged") + ".zip")
-            path.write_bytes(base64.b64decode(result["ExportSolutionFile"]))
+            blob = base64.b64decode(result["ExportSolutionFile"])
+            # Reject a credential-containing package in memory before a ZIP can
+            # land on disk. In particular, never package an ENV current key value.
+            with zipfile.ZipFile(io.BytesIO(blob)) as archive:
+                if any(re.search(rb"sk-ant-[A-Za-z0-9_-]{20,}", archive.read(n)) for n in archive.namelist() if not n.endswith("/")):
+                    raise RuntimeError("API-key material detected in the export; package contents withheld and no ZIP written.")
+            path.write_bytes(blob)
             inspect_zip(path)
 
 

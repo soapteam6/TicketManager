@@ -7,9 +7,12 @@ FLOW_NAME = "Ticket Manager - AI Import"
 FLOW_UNIQUE_NAME = "cr9cd_TicketScheduleSearch"
 TABLE = "cr9cd_schedulesearch"
 MODEL = "claude-sonnet-4-6"
+KEY_SCHEMA = "cr9cd_TicketManagerAnthropicApiKey"
 
 
-def definition(entity_set, connector_api):
+def definition(entity_set, connector_api, credential_mode="connection"):
+    if credential_mode not in ["connection", "secretEnvironmentVariable", "textEnvironmentVariable"]:
+        raise ValueError("Unsupported Claude credential source.")
     dv = {"apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "dataverse", "operationId": "UpdateOnlyRecord"}
 
     def update(fields, after=None):
@@ -37,6 +40,27 @@ def definition(entity_set, connector_api):
             ]
         }}
     }}
+    key_action = None
+    if credential_mode != "connection":
+        secure = {"secureData": {"properties": ["inputs", "outputs"]}}
+        if credential_mode == "secretEnvironmentVariable":
+            key_action = {"type": "OpenApiConnection", "runAfter": {"Mark_searching": ["Succeeded"]}, "runtimeConfiguration": secure,
+                "inputs": {"host": {"apiId": dv["apiId"], "connectionName": "dataverse", "operationId": "PerformUnboundAction"},
+                    "parameters": {"actionName": "RetrieveEnvironmentVariableSecretValue", "item/EnvironmentVariableName": KEY_SCHEMA}}}
+            key = "@body('Get_Claude_key')?['EnvironmentVariableSecretValue']"
+        else:
+            key_action = {"type": "OpenApiConnection", "runAfter": {"Mark_searching": ["Succeeded"]}, "runtimeConfiguration": secure,
+                "inputs": {"host": {"apiId": dv["apiId"], "connectionName": "dataverse", "operationId": "ListRecords"},
+                    "parameters": {"entityName": "environmentvariabledefinitions", "$filter": f"schemaname eq '{KEY_SCHEMA}'",
+                        "$select": "environmentvariabledefinitionid,defaultvalue", "$top": 1,
+                        "$expand": "environmentvariabledefinition_environmentvariablevalue($select=value)"}}}
+            key = "@coalesce(first(body('Get_Claude_key')?['value'])?['environmentvariabledefinition_environmentvariablevalue']?[0]?['value'], first(body('Get_Claude_key')?['value'])?['defaultvalue'])"
+        # The key exists only in masked action output and the masked HTTP header.
+        # No variable/Compose output or exported parameter contains the value.
+        claude = {"type": "Http", "runAfter": {}, "runtimeConfiguration": secure, "inputs": {
+            "method": "POST", "uri": "https://api.anthropic.com/v1/messages", "retryPolicy": {"type": "none"},
+            "headers": {"x-api-key": key, "anthropic-version": "2023-06-01", "Content-Type": "application/json"},
+            "body": claude["inputs"]["parameters"]["body"]}}
     # Drop large fetched documents/PDFs from the client result, retaining their
     # actual tool-returned URL and metadata. Continuation messages retain the full
     # original content required by Anthropic's server-tool protocol.
@@ -56,6 +80,9 @@ def definition(entity_set, connector_api):
             "Save_result": update({"cr9cd_status": "complete", "cr9cd_result": "@string(setProperty(setProperty(json('{}'), 'content', variables('content')), 'stop_reason', variables('stopReason')))", "cr9cd_error": ""})
         }, "else": {"actions": {"Save_incomplete": update({"cr9cd_status": "failed", "cr9cd_error": "The schedule search did not finish. Try a narrower team/date query."})}}}
     }}
+    if key_action:
+        work["actions"]["Get_Claude_key"] = key_action
+        work["actions"]["Research"]["runAfter"] = {"Get_Claude_key": ["Succeeded"]}
     actions["Find_schedule"] = work
     actions["Save_failure"] = update({"cr9cd_status": "failed", "cr9cd_error": "Schedule search could not complete. Try again or use a narrower team/date query."}, {"Find_schedule": ["Failed", "TimedOut", "Skipped"], "Messages": ["Succeeded", "Failed", "TimedOut", "Skipped"], "Collected_content": ["Succeeded", "Failed", "TimedOut", "Skipped"], "Stop_reason": ["Succeeded", "Failed", "TimedOut", "Skipped"]})
     return {"$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#", "contentVersion": "1.0.0.0",
