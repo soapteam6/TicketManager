@@ -53,7 +53,7 @@ export function DesignWorkspace({ onRefresh, onPersona }: {
   </button>)}</nav>;
   return <div className="work-shell work-shell--desk">
     <header className="work-app-header"><div className="work-brand"><img src={logoUrl} alt="AIS" /><span className="work-brand-divider" /><div><strong>Allocation desk</strong><span>Ticket management</span></div></div>
-      <div className="work-header-tools"><span className="work-environment"><i />{live ? 'AIS Development' : 'Synthetic preview'}</span><button className={`work-refresh ${refreshState === 'refreshing' ? 'is-refreshing' : refreshState === 'updated' ? 'is-updated' : ''}`} disabled={busy || refreshState === 'refreshing'} aria-busy={refreshState === 'refreshing'} onClick={async () => {
+      <div className="work-header-tools"><button className={`work-refresh ${refreshState === 'refreshing' ? 'is-refreshing' : refreshState === 'updated' ? 'is-updated' : ''}`} disabled={busy || refreshState === 'refreshing'} aria-busy={refreshState === 'refreshing'} onClick={async () => {
         setRefreshState('refreshing');
         setRefreshState(await onRefresh() ? 'updated' : 'idle');
       }}><Glyph name={refreshState === 'updated' ? 'check' : 'refresh'} size={16} /><span aria-live="polite" aria-atomic="true">{refreshState === 'refreshing' ? 'Refreshing…' : refreshState === 'updated' ? 'Updated' : live ? 'Refresh data' : 'Reset demo'}</span></button><div className="work-user"><strong>{personName(snapshot.persona.name)}</strong><span>{snapshot.persona.email}</span></div></div>
