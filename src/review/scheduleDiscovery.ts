@@ -19,6 +19,8 @@ export interface ScheduleDiscovery {
   team: string;
   season: string;
   timezone: string;
+  seasonStart: string;
+  seasonEnd: string;
   warnings: string[];
   sources: ScheduleSource[];
   games: DiscoveredGame[];
@@ -106,7 +108,10 @@ export function parseScheduleDiscovery(raw: unknown, request: ScheduleSearchRequ
       sourceUrl, sourceVerified, timeIssue: timing.issue, tickets: request.ticketsPerEvent,
       selected: !!title && sourceVerified && !!timing.startAt && (!request.homeOnly || home === true) };
   });
-  return { team: text(parsed.team), season: text(parsed.season), timezone, games, sources: [...sources.values()], warnings: Array.isArray(parsed.warnings) ? parsed.warnings.map(w => text(w)).filter(Boolean).slice(0, 20) : [] };
+  return { team: text(parsed.team), season: text(parsed.season), timezone,
+    seasonStart: isCalendarDate(text(parsed.seasonStart, 10)) ? text(parsed.seasonStart, 10) : '',
+    seasonEnd: isCalendarDate(text(parsed.seasonEnd, 10)) ? text(parsed.seasonEnd, 10) : '',
+    games, sources: [...sources.values()], warnings: Array.isArray(parsed.warnings) ? parsed.warnings.map(w => text(w)).filter(Boolean).slice(0, 20) : [] };
 }
 export function discoveredGameIssues(game: DiscoveredGame, catalog: InventoryView[], homeOnly: boolean): string[] {
   const issues: string[] = [];

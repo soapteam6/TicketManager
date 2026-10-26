@@ -241,14 +241,14 @@ export class MockReviewProvider implements ReviewProvider {
   async startScheduleSearch(key: PersonaKey, request: ScheduleSearchRequest, jobId: string): Promise<ScheduleSearchJob> {
     const actor = coordinator(this.actor(key));
     const season = this.state.seasons.find(s => s.id === request.seasonId);
-    if (!season) invalid('Choose a season.');
-    text(request.query, 'a schedule query', 300); integer(request.ticketsPerEvent, 0, 1000, 'Tickets');
+    if (request.seasonId && !season) invalid('Choose a season.');
+    text(request.query, 'an import request', 2000); integer(request.ticketsPerEvent, 0, 1000, 'Tickets');
     const existing = this.scheduleJobs.get(jobId);
     if (existing) {
       if (existing.owner !== actor.id) throw new ReviewError('forbidden', 'Search not found.');
       return structuredClone(existing.job);
     }
-    const job: ScheduleSearchJob = { id: jobId, status: 'queued', request: { ...request, from: season.startDate, through: season.endDate, seasonLabel: season.label } };
+    const job: ScheduleSearchJob = { id: jobId, status: 'queued', request: { ...request, from: season?.startDate, through: season?.endDate, seasonLabel: season?.label } };
     this.scheduleJobs.set(jobId, { owner: actor.id, job });
     return structuredClone(job);
   }
@@ -258,13 +258,13 @@ export class MockReviewProvider implements ReviewProvider {
     if (!record || record.owner !== actor.id) throw new ReviewError('forbidden', 'Search not found.');
     const job = record.job;
     if (job.status === 'queued') {
-      const date = new Date(`${job.request.from}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + 10);
+      const date = new Date(`${job.request.from || '2027-09-01'}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + 10);
       const day = date.toISOString().slice(0, 10), sourceUrl = 'https://schedule.example.invalid/official';
       job.status = 'complete';
       job.rawResult = { stop_reason: 'end_turn', content: [
         { type: 'server_tool_use', name: 'web_search' },
         { type: 'web_search_tool_result', content: [{ type: 'web_search_result', url: sourceUrl, title: 'Synthetic schedule source' }] },
-        { type: 'text', text: JSON.stringify({ team: 'Demo schedule search', season: job.request.seasonLabel, timezone: 'UTC', warnings: ['Synthetic preview only. No web search or external service was called.'], games: [
+          { type: 'text', text: JSON.stringify({ team: 'Demo schedule search', season: job.request.seasonLabel || '2027–28', seasonStart: job.request.from || '2027-09-01', seasonEnd: job.request.through || '2028-04-30', timezone: 'UTC', warnings: ['Synthetic preview only. No web search or external service was called.'], games: [
           { title: 'Discovered demo opponent', localDate: day, localTime: '12:00', startAt: date.toISOString(), home: true, venue: 'Demo stadium', sourceUrl },
           { title: 'Demo time TBD', localDate: day, localTime: null, startAt: null, home: true, sourceUrl },
         ] }) }
@@ -402,14 +402,30 @@ export class MockReviewProvider implements ReviewProvider {
         break;
       }
       case 'importSchedule': {
-        if (!next.seasons.some((s) => s.id === command.seasonId))
+        let targetSeason = command.seasonId;
+        if (command.newSeason) {
+          if (targetSeason) invalid('Choose an existing season or a new season, not both.');
+          const d = command.newSeason;
+          text(d.label, 'a season label', 200);
+          if (!isCalendarDate(d.startDate) || !isCalendarDate(d.endDate) || d.startDate > d.endDate) invalid('Enter valid season dates.');
+          let targetTeam = d.teamId;
+          if (!targetTeam) {
+            text(d.teamName, 'a team name', 200); integer(d.defaultTickets, 0, 1000, 'Default tickets');
+            targetTeam = next.teams.find(t => t.name.toLowerCase() === d.teamName.trim().toLowerCase())?.id ?? '';
+            if (!targetTeam) { targetTeam = this.id(); next.teams.push({ id: targetTeam, name: d.teamName.trim(), defaultTickets: d.defaultTickets }); }
+          }
+          if (!next.teams.some(t => t.id === targetTeam)) invalid('Choose a team.');
+          if (next.seasons.some(s => s.teamId === targetTeam && s.label.toLowerCase() === d.label.trim().toLowerCase())) invalid('A season with that label already exists for this team. Select it from the list.');
+          targetSeason = this.id(); next.seasons.push({ id: targetSeason, teamId: targetTeam, label: d.label.trim(), startDate: d.startDate, endDate: d.endDate });
+        }
+        if (!next.seasons.some((s) => s.id === targetSeason))
           invalid('Choose a season for sports imports');
         const preview = previewScheduleCsv(command.csv);
         if (preview.errors.length) invalid(preview.errors.join(' '));
         for (const row of preview.rows)
           this.addInventory(next, {
             ...row,
-            seasonId: row.kind === 'game' ? command.seasonId : undefined,
+            seasonId: row.kind === 'game' ? targetSeason : undefined,
           });
         result = {
           message: `Imported ${preview.rows.length} private inventory items. Nothing published or announced.`,

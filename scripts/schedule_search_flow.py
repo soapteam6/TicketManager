@@ -3,7 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 FLOW_ID = "c5df18a1-df8f-4f17-bac4-e04d99d6be79"
-FLOW_NAME = "Ticket Manager - Find schedule"
+FLOW_NAME = "Ticket Manager - AI Import"
 FLOW_UNIQUE_NAME = "cr9cd_TicketScheduleSearch"
 TABLE = "cr9cd_schedulesearch"
 MODEL = "claude-sonnet-4-6"
@@ -20,6 +20,7 @@ def definition(entity_set, connector_api):
         return {"type": "InitializeVariable", "runAfter": after or {}, "inputs": {"variables": [{"name": name, "type": kind, "value": value}]}}
 
     prompt = "@string(setProperty(setProperty(setProperty(setProperty(json('{}'), 'query', json(triggerBody()?['cr9cd_input'])?['query']), 'from', json(triggerBody()?['cr9cd_input'])?['from']), 'through', json(triggerBody()?['cr9cd_input'])?['through']), 'homeOnly', json(triggerBody()?['cr9cd_input'])?['homeOnly']))"
+    prompt = "@string(setProperty(" + prompt[len("@string("):-1] + ", 'today', formatDateTime(utcNow(), 'yyyy-MM-dd')))"
     actions = {
         "Messages": initialize("messages", "array", [{"role": "user", "content": prompt}]),
         "Collected_content": initialize("content", "array", [], {"Messages": ["Succeeded"]}),

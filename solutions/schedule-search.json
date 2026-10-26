@@ -1,6 +1,6 @@
 {
   "workflowId": "c5df18a1-df8f-4f17-bac4-e04d99d6be79",
-  "name": "Ticket Manager - Find schedule",
+  "name": "Ticket Manager - AI Import",
   "connectorId": "b811dfc7-70d1-f111-a05b-6045bd069cda",
   "connectorApi": "/providers/Microsoft.PowerApps/apis/shared_new-5fticket-20manager-20claude-5fc74f477b4ef26772",
   "claudeConnectionId": "b65497886cbd4ec6bfdf0aa6b2cb58db",

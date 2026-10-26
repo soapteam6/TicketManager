@@ -165,13 +165,21 @@ target and credentials. The current API reads only records scoped to
 
 ## Schedule search
 
-Coordinators use **Setup & import → Schedule import → Find schedule** to enter
-a team/year and review source-linked games before importing them as private
+Coordinators use **Setup & import → AI Import** to describe the schedule they
+need and review source-linked games before importing them as private
 inventory. CSV import remains available. Search jobs are separate from the
 inventory/workspace transaction, so web research does not block ticket work.
 Each job is readable through the API only by its initiating coordinator.
 
-The solution includes `cr9cd_schedulesearch`, **Ticket Manager - Find schedule**,
+The first screen is one plain-language request box. Existing teams and seasons
+are optional at search time. The model receives today's date to resolve phrases
+like “VGK next season,” and proposes the team, season and calendar bounds for
+review. If no published schedule is available, it returns an explained empty
+result. Company-owned ticket quantity is entered in the review screen. A missing
+team and season can be created with the selected games in a single inventory
+transaction; no setup records are created by search itself.
+
+The solution includes `cr9cd_schedulesearch`, **Ticket Manager - AI Import**,
 the **Ticket Manager Claude** custom connector and the
 `cr9cd_ticketscheduledataverse` / `cr9cd_ticketscheduleclaude` connection
 references. [schedule-search.json](schedule-search.json) records the non-secret
@@ -206,6 +214,10 @@ python scripts/setup-schedule-search.py
 # Initial setup only, not an update command for the already active flow:
 python scripts/setup-schedule-search.py --apply --enable
 
+# Definition-only update of the existing flow (retains ID/connections):
+# Announce the change first; refuses while recent search jobs are pending.
+python scripts/update-schedule-search.py --apply
+
 # Read an existing completed job without another paid web search/import:
 python scripts/test-schedule-search.py --job-id fe492d17-557b-4577-aa5d-bd45e5af6fab
 node scripts/verify-schedule-result.mjs
@@ -220,8 +232,8 @@ records the result. Raw tool responses stay in ignored local artifacts.
 
 ## Verification
 
-On 2026-10-26: production build and changed-source lint passed; **76 frontend
-tests** and **32 offline C# security tests** passed. Synthetic browser checks
+On 2026-10-26: production build and changed-source lint passed; **78 frontend
+tests** and **36 offline C# security tests** passed. Synthetic browser checks
 passed at desktop, iPad landscape and iPad portrait sizes, including granting
 and reversing a role, ordinary coordinator privacy, row selection, closable
 right-side details and bounded page scrolling. Schedule checks cover source

@@ -66,7 +66,7 @@ internal static class SearchTests
             ["invalid query, quantity and search IDs fail before writing"] = () => {
                 var service = new Fake();
                 Denied(() => Call(service, Actor(), Input(Guid.Empty)), "unique search ID");
-                Denied(() => Call(service, Actor(), Input(Guid.NewGuid(), "two\nlines")), "single line");
+                Denied(() => Call(service, Actor(), Input(Guid.NewGuid(), "bad\u0001control")), "control characters");
                 var input = Input(Guid.NewGuid()); ((JObject)input["request"])["ticketsPerEvent"] = 1001;
                 Denied(() => Call(service, Actor(), input), "0 to 1000"); Assert(service.Writes == 0, "Invalid input wrote data");
             },
@@ -77,6 +77,35 @@ internal static class SearchTests
                 job["createdon"] = DateTime.UtcNow.AddMinutes(-11);
                 Assert((string)Call(service, Actor(), input)["status"] == "failed", "Expired search not reported");
                 Assert(service.Writes == 1 && job.GetAttributeValue<string>("cr9cd_status") == "queued", "Polling changed native state");
+            },
+            ["plain language and relative seasons do not require an existing season"] = () => {
+                var service = new Fake(); var input = Input(Guid.NewGuid(), "I got VGK tickets for next season.\nFind their home schedule.");
+                input["request"]["seasonId"] = "";
+                var result = Call(service, Actor(), input);
+                Assert((string)result["request"]["seasonId"] == "" && result["request"]["from"].Type == JTokenType.Null, "Unrelated season imposed on freeform request");
+                Assert(service.Writes == 1, "Freeform request was not queued");
+            },
+            ["long requests retain their text without overflowing the job title"] = () => {
+                var service = new Fake(); var input = Input(Guid.NewGuid(), new String('a', 900));
+                var result = Call(service, Actor(), input);
+                Assert(((string)result["request"]["query"]).Length == 900 && service.Jobs.Single().GetAttributeValue<string>("cr9cd_name").Length == 300, "Request was lost or title overflowed");
+            },
+            ["AI destination creation stages a team, season and private games without native writes"] = () => {
+                var service = new Fake();
+                var state = new JObject { ["teams"] = new JArray(), ["seasons"] = new JArray(), ["games"] = new JArray(), ["seats"] = new JArray() };
+                var command = new JObject { ["type"] = "importSchedule", ["seasonId"] = "", ["csv"] = "date,time,title,tickets,kind\n2027-10-10,02:00,Example opponent,2,game",
+                    ["newSeason"] = new JObject { ["teamId"] = "", ["teamName"] = "Example team", ["label"] = "2027–28", ["startDate"] = "2027-09-01", ["endDate"] = "2028-06-30", ["defaultTickets"] = 2 } };
+                typeof(ReviewApi).GetMethod("Apply", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, new object[] { service, state, Actor(), command, DateTimeOffset.UtcNow });
+                Assert(((JArray)state["teams"]).Count == 1 && ((JArray)state["seasons"]).Count == 1 && ((JArray)state["games"]).Count == 1 && ((JArray)state["seats"]).Count == 2, "Incomplete draft destination");
+                Assert((string)state["games"][0]["release"] == "private" && service.Writes == 0, "Planning wrote native data or released inventory");
+            },
+            ["requesters cannot create an AI import destination"] = () => {
+                var service = new Fake(); var state = new JObject();
+                try {
+                    typeof(ReviewApi).GetMethod("Apply", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, new object[] { service, state, Actor("requester"), new JObject { ["type"] = "importSchedule", ["newSeason"] = new JObject() }, DateTimeOffset.UtcNow });
+                    throw new Exception("Requester imported a destination");
+                } catch (TargetInvocationException ex) { Assert(ex.InnerException is InvalidPluginExecutionException && ex.InnerException.Message.Contains("Coordinator"), "Wrong rejection"); }
+                Assert(!state.HasValues && service.Writes == 0, "Requester changed state");
             },
             ["the per-user pending search limit rejects another job"] = () => {
                 var service = new Fake(); Call(service, Actor(), Input(Guid.NewGuid())); Call(service, Actor(), Input(Guid.NewGuid()));

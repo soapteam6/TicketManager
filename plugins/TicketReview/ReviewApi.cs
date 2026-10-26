@@ -210,7 +210,19 @@ namespace Ais.TicketReview
                     Add(s, "seasons", season); result["id"] = season["id"]; break;
                 case "createInventory": result["id"] = AddInventory(s, c); break;
                 case "importSchedule":
-                    Find(s, "seasons", Str(c, "seasonId"));
+                    var importSeasonId = Str(c, "seasonId");
+                    if (c["newSeason"] is JObject draft) {
+                        Check(String.IsNullOrEmpty(importSeasonId), "Choose an existing season or a new season, not both.");
+                        var importTeamId = Str(draft, "teamId");
+                        if (String.IsNullOrEmpty(importTeamId)) {
+                            var importName = Text(draft, "teamName", 200);
+                            var matchingTeam = Rows(s, "teams").FirstOrDefault(t => String.Equals(Str(t, "name"), importName, StringComparison.OrdinalIgnoreCase));
+                            importTeamId = matchingTeam != null ? Str(matchingTeam, "id") : Str(Apply(service, s, actor, new JObject { ["type"] = "createTeam", ["name"] = importName, ["defaultTickets"] = draft["defaultTickets"] }, now), "id");
+                        }
+                        Check(!Rows(s, "seasons").Any(x => Str(x, "teamId") == importTeamId && String.Equals(Str(x, "label"), Str(draft, "label").Trim(), StringComparison.OrdinalIgnoreCase)), "A season with that label already exists for this team. Select it from the list.");
+                        importSeasonId = Str(Apply(service, s, actor, new JObject { ["type"] = "createSeason", ["teamId"] = importTeamId, ["label"] = draft["label"], ["startDate"] = draft["startDate"], ["endDate"] = draft["endDate"] }, now), "id");
+                    }
+                    Find(s, "seasons", importSeasonId);
                     var lines = Str(c, "csv").Split('\n').Select(x => x.TrimEnd('\r')).Where(x => !String.IsNullOrWhiteSpace(x) && !x.StartsWith("#")).ToList();
                     if (lines.Count > 0 && lines[0].StartsWith("date,", StringComparison.OrdinalIgnoreCase)) lines.RemoveAt(0);
                     Check(lines.Count > 0 && lines.Count <= 100, "Import 1 to 100 rows per transaction.");
@@ -218,7 +230,7 @@ namespace Ais.TicketReview
                         var cells = Csv(line); Check(cells.Count == 5, "Each CSV row must contain exactly five columns.");
                         Check(Regex.IsMatch(cells[0], @"^\d{4}-\d{2}-\d{2}$") && Regex.IsMatch(cells[1], @"^\d{2}:\d{2}$"), "Use YYYY-MM-DD and HH:mm UTC.");
                         Check(Int32.TryParse(cells[3], out var tickets), "Ticket quantity must be an integer.");
-                        AddInventory(s, new JObject { ["gameDate"] = cells[0] + "T" + cells[1] + ":00Z", ["title"] = cells[2], ["tickets"] = tickets, ["kind"] = cells[4], ["seasonId"] = c["seasonId"] });
+                        AddInventory(s, new JObject { ["gameDate"] = cells[0] + "T" + cells[1] + ":00Z", ["title"] = cells[2], ["tickets"] = tickets, ["kind"] = cells[4], ["seasonId"] = importSeasonId });
                     } break;
                 case "release":
                     var action = Str(c, "action"); Check(new[] {"private", "released", "scheduled"}.Contains(action), "Choose a visibility action.");

@@ -31,16 +31,20 @@ namespace Ais.TicketReview
                 Check(ScheduleSearchAvailable(service), "Schedule search is not configured yet. Use CSV import for now.");
                 var request = input["request"] as JObject;
                 Check(request != null, "Enter a schedule to find.");
-                var text = Text(request, "query", 300);
-                Check(!text.Any(Char.IsControl), "Use a single line to describe the schedule.");
-                Check(Guid.TryParse(Str(request, "seasonId"), out var seasonId), "Select the target season.");
-                var seasonEntity = service.Retrieve("cr9cd_season", seasonId, new ColumnSet("cr9cd_review_scope", "cr9cd_review_data"));
-                Check(seasonEntity.GetAttributeValue<string>("cr9cd_review_scope") == Scope, "Select a season from this workspace.");
-                var season = Parse(seasonEntity.GetAttributeValue<string>("cr9cd_review_data"));
+                var text = Text(request, "query", 2000);
+                Check(!text.Any(ch => Char.IsControl(ch) && ch != '\r' && ch != '\n' && ch != '\t'), "Remove unsupported control characters from the request.");
+                var seasonId = Guid.Empty;
+                var season = new JObject();
+                if (!String.IsNullOrEmpty(Str(request, "seasonId"))) {
+                    Check(Guid.TryParse(Str(request, "seasonId"), out seasonId) && seasonId != Guid.Empty, "Select a valid season.");
+                    var seasonEntity = service.Retrieve("cr9cd_season", seasonId, new ColumnSet("cr9cd_review_scope", "cr9cd_review_data"));
+                    Check(seasonEntity.GetAttributeValue<string>("cr9cd_review_scope") == Scope, "Select a season from this workspace.");
+                    season = Parse(seasonEntity.GetAttributeValue<string>("cr9cd_review_data"));
+                }
                 var tickets = Number(request, "ticketsPerEvent", 0, 1000);
                 Check(request["homeOnly"]?.Type == JTokenType.Boolean, "Choose home games or all games.");
                 var payload = new JObject {
-                    ["query"] = text, ["seasonId"] = seasonId.ToString(), ["seasonLabel"] = season["label"],
+                    ["query"] = text, ["seasonId"] = seasonId == Guid.Empty ? "" : seasonId.ToString(), ["seasonLabel"] = season["label"],
                     ["from"] = season["startDate"], ["through"] = season["endDate"],
                     ["ticketsPerEvent"] = tickets, ["homeOnly"] = request["homeOnly"].DeepClone()
                 };
@@ -54,7 +58,7 @@ namespace Ais.TicketReview
                     active.Criteria.AddCondition("createdon", ConditionOperator.OnOrAfter, DateTime.UtcNow.AddMinutes(-10));
                     Check(service.RetrieveMultiple(active).Entities.Count < 2, "Wait for one of your current schedule searches to finish.");
                     existing = new Entity(SearchTable, id) {
-                        ["cr9cd_name"] = text, ["cr9cd_requestedby"] = Str(actor, "id"),
+                        ["cr9cd_name"] = text.Substring(0, Math.Min(300, text.Length)).Replace('\r', ' ').Replace('\n', ' '), ["cr9cd_requestedby"] = Str(actor, "id"),
                         ["cr9cd_status"] = "queued", ["cr9cd_input"] = payload.ToString(Formatting.None)
                     };
                     service.Create(existing);

@@ -269,7 +269,7 @@ export type ReviewCommand =
       tickets: number;
       seasonId?: string;
     }
-  | { type: 'importSchedule'; csv: string; seasonId: string }
+  | { type: 'importSchedule'; csv: string; seasonId: string; newSeason?: { teamId: string; teamName: string; label: string; startDate: string; endDate: string; defaultTickets: number } }
   | ReleaseCommand
   | {
       type: 'interest';

@@ -53,7 +53,7 @@ B keeps the workspace within the viewport. Lists, details, and editor panes
 scroll independently. Inventory, allocation, contact, team and season rows can
 be selected by clicking the row or using Tab and Enter/Space. Nested action
 buttons and checkboxes retain their own actions. Allocation and contact details
-open on the right. Setup has separate Teams, Seasons and Schedule import
+open on the right. Setup has separate Teams, Seasons and AI Import
 sections; import uses a source editor and a validation table before commit.
 
 Desktop and iPad are the target sizes. Browser checks against isolated synthetic
@@ -75,8 +75,8 @@ preserve records. Messages remain saved previews and transfers remain manual.
 Live verification passed: native record persistence, invalid-date rollback,
 idempotent replay, demand without reservation, competing allocations with exactly
 one winner, future-attendance rejection, cancellation without auto-promotion,
-and directory synchronization preserving app eligibility. Local checks: **76
-frontend tests and 32 offline C# security tests pass**, typecheck and
+and directory synchronization preserving app eligibility. Local checks: **78
+frontend tests and 36 offline C# security tests pass**, typecheck and
 changed-source lint pass, and platform build passes.
 Browser click-through and requester testing with separately authorized accounts
 remain pending; these results are API verification, not browser acceptance.
@@ -113,14 +113,24 @@ The exports contain the current published Allocation desk and User access UI,
 including group role administration. The hosted package is verified against the
 production build; requester sign-in acceptance remains pending.
 
-## Find a schedule without copying and pasting
+## AI Import
 
-As a coordinator, open **Setup & import → Schedule import → Find schedule**.
-Choose the destination sports season, enter a team and year in **Find schedule
-for**, set the number of tickets the company owns per game, then select
-**Find schedule**. Home games only is selected initially. A background Claude
-flow searches and reads public schedule sources; other ticket work can continue.
-Returning to the same season in this browser tab resumes the job.
+As a coordinator, open **Setup & import → AI Import** and describe what you
+need, for example: “I got VGK tickets for next season. Find their home schedule
+so I can give the tickets out to people.” Select **Prepare import**. No team,
+season or ticket quantity is required before asking. The AI resolves team
+abbreviations and relative season wording using today's date and public sources.
+An unpublished schedule produces an explained empty result rather than invented
+games. Other ticket work can continue while the search runs.
+
+After results arrive, review the resolved team/season and choose an existing
+season or the proposed new destination. Enter the number of tickets the company
+owns per game; the AI never assumes venue capacity is company inventory. New
+team/season names and dates can be corrected here. **Create season & import**
+saves the new destination and selected private games in one transaction. An
+invalid row rolls back the complete command. Existing-season imports use
+**Import selected games**. Nothing is allocated, released or sent to people by
+the AI, even if the request describes that future intent.
 
 Results appear as an editable preview with source links. Inspect the dates,
 opponents and warnings; select the rows to keep, then **Import selected games**.
@@ -130,7 +140,7 @@ cannot be imported as ready rows. Confirmed times are checked against the source
 timezone, including daylight saving. The preview date controls use UTC, as do
 the other event screens. **CSV import** remains available beside Find schedule.
 
-The new **Ticket Manager - Find schedule** Power Automate flow, its custom
+The new **Ticket Manager - AI Import** Power Automate flow, its custom
 Claude connector, two connection references and search-job table are included
 in **AIS Ticket Manager**. The API key lives in an encrypted server connection;
 it is absent from the browser, source and flow definition. Only the search
@@ -144,7 +154,7 @@ was unchanged. These checks validate the flow and parser; reviewers still need
 to check schedule completeness and source accuracy before importing. See
 [test evidence](../solutions/schedule-search-test.json).
 
-Local regression coverage now includes **76 frontend tests and 32 backend
+Local regression coverage now includes **78 frontend tests and 36 backend
 security tests**, plus the desktop and iPad preview/import checks. Requester
 sign-in and human acceptance in the hosted app remain pending.
 

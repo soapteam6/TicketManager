@@ -5,6 +5,7 @@ service. It never imports inventory. Without --create, pass --job-id for polling
 """
 import argparse
 import json
+import re
 from pathlib import Path
 import time
 import uuid
@@ -17,7 +18,11 @@ def main():
     parser.add_argument("--create", action="store_true")
     parser.add_argument("--job-id")
     parser.add_argument("--query", default="Las Vegas Aviators home games in September 2026")
+    parser.add_argument("--freeform", action="store_true", help="Resolve the requested season without imposing an existing one.")
+    parser.add_argument("--artifact-stem", default="schedule-search-live")
     args = parser.parse_args()
+    if not re.fullmatch(r"[a-z0-9-]+", args.artifact_stem):
+        parser.error("Artifact stem must contain only lowercase letters, numbers and hyphens.")
     if not args.create and not args.job_id:
         parser.error("Use --create after announcing the live search, or --job-id for a read-only status check.")
     d = Dataverse()
@@ -31,7 +36,7 @@ def main():
     if args.create:
         seasons = snapshot["snapshot"]["seasons"]
         season = next((s for s in seasons if s["startDate"] <= "2026-09-01" and s["endDate"] >= "2026-09-30"), seasons[0])
-        result = api({"operation": "scheduleSearchStart", "jobId": job_id, "request": {"query": args.query, "seasonId": season["id"], "ticketsPerEvent": 4, "homeOnly": True}})
+        result = api({"operation": "scheduleSearchStart", "jobId": job_id, "request": {"query": args.query, "seasonId": "" if args.freeform else season["id"], "ticketsPerEvent": 0 if args.freeform else 4, "homeOnly": True}})
         print("Created search job " + job_id + "; status " + result["status"], flush=True)
     else:
         result = api({"operation": "scheduleSearchGet", "jobId": job_id})
@@ -45,13 +50,13 @@ def main():
             break
         time.sleep(3)
         result = api({"operation": "scheduleSearchGet", "jobId": job_id})
-    artifact = Path(__file__).resolve().parent.parent / "design-artifacts.local/schedule-search-live.json"
+    artifact = Path(__file__).resolve().parent.parent / f"design-artifacts.local/{args.artifact_stem}.json"
     artifact.parent.mkdir(exist_ok=True)
     artifact.write_text(json.dumps(result, indent=2), encoding="utf-8")
     after = d.call("GET", "cr9cd_reviewworkspaces(f18b973a-2936-44e5-aa55-271d7424aef3)", params={"$select": "cr9cd_data,cr9cd_revision,cr9cd_lock"})
     check = {"jobId": job_id, "status": result["status"], "workspaceUnchanged": before == after,
              "inventoryImported": 0, "artifact": str(artifact)}
-    artifact.with_name("schedule-search-live-check.json").write_text(json.dumps(check, indent=2), encoding="utf-8")
+    artifact.with_name(args.artifact_stem + "-check.json").write_text(json.dumps(check, indent=2), encoding="utf-8")
     print(json.dumps(check, indent=2))
     if result["status"] != "complete":
         raise RuntimeError(result.get("error") or "Search did not finish within the check window.")

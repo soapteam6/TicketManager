@@ -24,6 +24,28 @@ const create = (state?: ReviewState) =>
 const snapshot = (p: MockReviewProvider) => p.snapshot('coordinator');
 
 describe('Code App review provider boundary', () => {
+  it('prepares a freeform AI import without creating teams, seasons or inventory', async () => {
+    const p = create(), before = snapshot(p);
+    const job = await p.startScheduleSearch('coordinator', { query: 'I got VGK tickets for next season', seasonId: '', ticketsPerEvent: 0, homeOnly: true }, 'ai-query');
+    const result = await p.getScheduleSearch('coordinator', job.id);
+    expect(result.status).toBe('complete');
+    expect(result.request.from).toBeUndefined();
+    expect(snapshot(p)).toEqual(before);
+  });
+  it('creates an AI import destination and selected games together, rolling back invalid rows', async () => {
+    const p = create(), before = snapshot(p);
+    const command: Extract<ReviewCommand, { type: 'importSchedule' }> = {
+      type: 'importSchedule', seasonId: '', csv: 'date,time,title,tickets,kind\n2027-10-10,02:00,AI home game,2,game',
+      newSeason: { teamId: '', teamName: 'AI example team', label: '2027–28', startDate: '2027-09-01', endDate: '2028-06-30', defaultTickets: 2 },
+    };
+    await expect(p.execute('coordinator', { ...command, csv: command.csv + '\ninvalid,row' })).rejects.toThrow();
+    expect(snapshot(p)).toEqual(before);
+    await p.execute('coordinator', command);
+    const after = snapshot(p), team = after.teams.find(t => t.name === 'AI example team')!, season = after.seasons.find(s => s.teamId === team.id)!;
+    expect(after.catalog.find(g => g.title === 'AI home game')).toMatchObject({ seasonId: season.id, release: 'private', totalTickets: 2 });
+    expect(after.teams.length).toBe(before.teams.length + 1);
+    expect(after.seasons.length).toBe(before.seasons.length + 1);
+  });
   it('fails closed in platform mode and does not fabricate generated schema support', async () => {
     const p = new UnavailablePlatformProvider();
     expect(p.mode).toBe('platform-unavailable');

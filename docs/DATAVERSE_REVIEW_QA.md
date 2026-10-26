@@ -95,9 +95,9 @@ reads this environment's Dataverse users.
 
 ## Web schedule search
 
-**Setup & import → Schedule import → Find schedule** calls the review API to
+**Setup & import → AI Import** calls the review API to
 create a job in the new organization-owned `cr9cd_schedulesearch` table.
-The **Ticket Manager - Find schedule** cloud flow researches public schedules
+The **Ticket Manager - AI Import** cloud flow researches public schedules
 with Claude web search/fetch, then saves its result to that job. The API enforces
 coordinator permission, authenticated requester ownership, scoped season input
 and idempotent job IDs. Polling and job creation bypass the ticket-workspace
