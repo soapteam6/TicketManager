@@ -39,9 +39,29 @@ describe('schedule discovery result validation', () => {
     expect(game.startAt).toBe(''); expect(game.selected).toBe(false);
     expect(discoveredGameIssues(game, [], true)).toContain('Start time not confirmed');
   });
-  it('flags a daylight-saving mismatch', () => {
+  it('calculates UTC from source local time instead of the AI conversion', () => {
     const game = parseScheduleDiscovery(response({ startAt: '2027-07-05T03:00:00Z' }), request).games[0];
-    expect(game.startAt).toBe(''); expect(game.timeIssue).toContain('timezone');
+    expect(game.startAt).toBe('2027-07-05T02:00:00.000Z'); expect(game.timeIssue).toBe('');
+    expect(parseScheduleDiscovery(response({ startAt: '2027-07-05T02:00:00-07:00' }), request).warnings.join(' ')).toContain('source local');
+  });
+  it('never guesses a repeated or skipped local time during a DST change', () => {
+    for (const [localDate, localTime, startAt] of [['2027-11-07', '01:30', '2027-11-07T08:30:00Z'], ['2027-03-14', '02:30', '2027-03-14T10:30:00Z']]) {
+      const game = parseScheduleDiscovery(response({ localDate, localTime, startAt }), request).games[0];
+      expect(game.startAt).toBe(''); expect(game.selected).toBe(false);
+    }
+  });
+  it('withholds a current-season substitution for a next-season request', () => {
+    const raw = response();
+    const block = raw.content.find(c => c.type === 'text')!;
+    const parsed = JSON.parse(String(block.text)); parsed.seasonStart = '2026-09-01'; parsed.season = '2026-27'; block.text = JSON.stringify(parsed);
+    const found = parseScheduleDiscovery(raw, { ...request, query: 'VGK next season', today: '2026-10-26' });
+    expect(found.games).toEqual([]); expect(found.warnings.join(' ')).toContain('withheld');
+  });
+  it('keeps an unpublished future-season explanation when calendar bounds are unknown', () => {
+    const raw = response(); const block = raw.content.find(c => c.type === 'text')!;
+    block.text = JSON.stringify({ team: 'Example team', season: '2027-28', seasonStart: null, seasonEnd: null, games: [], warnings: ['The 2027-28 schedule is not published.'] });
+    const found = parseScheduleDiscovery(raw, { ...request, query: 'next season', today: '2026-10-26' });
+    expect(found.games).toEqual([]); expect(found.warnings).toEqual(['The 2027-28 schedule is not published.']);
   });
   it('handles winter offset separately from summer', () => {
     const game = parseScheduleDiscovery(response({ localDate: '2027-01-09', localTime: '19:00', startAt: '2027-01-10T03:00:00Z' }), request).games[0];

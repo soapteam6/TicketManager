@@ -232,7 +232,7 @@ records the result. Raw tool responses stay in ignored local artifacts.
 
 ## Verification
 
-On 2026-10-26: production build and changed-source lint passed; **78 frontend
+On 2026-10-26: production build and changed-source lint passed; **81 frontend
 tests** and **36 offline C# security tests** passed. Synthetic browser checks
 passed at desktop, iPad landscape and iPad portrait sizes, including granting
 and reversing a role, ordinary coordinator privacy, row selection, closable

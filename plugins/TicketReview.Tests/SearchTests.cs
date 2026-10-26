@@ -14,7 +14,7 @@ internal static class SearchTests
     private static JObject Input(Guid id, string query = "Las Vegas schedule 2027") => new JObject {
         ["operation"] = "scheduleSearchStart", ["jobId"] = id.ToString(), ["request"] = new JObject {
             ["query"] = query, ["seasonId"] = Season.ToString(), ["ticketsPerEvent"] = 4, ["homeOnly"] = true,
-            ["requestedBy"] = Guid.NewGuid().ToString()
+            ["requestedBy"] = Guid.NewGuid().ToString(), ["today"] = "1900-01-01"
         }
     };
     private static JObject Call(Fake service, JObject actor, JObject input)
@@ -43,6 +43,7 @@ internal static class SearchTests
                 Assert((string)result["status"] == "queued" && service.Writes == 1, "Job was not queued");
                 Assert(service.Jobs.Single().GetAttributeValue<string>("cr9cd_requestedby") == User.ToString(), "Client chose another owner");
                 Assert(!((JObject)result["request"]).ContainsKey("requestedBy"), "Private caller metadata included in model request");
+                Assert((string)result["request"]["today"] == DateTime.UtcNow.ToString("yyyy-MM-dd"), "Client controlled the relative-season clock");
             },
             ["a repeated search ID does not create another job"] = () => {
                 var service = new Fake(); var input = Input(Guid.NewGuid());

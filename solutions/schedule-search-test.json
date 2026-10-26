@@ -6,6 +6,7 @@
   "team": "Las Vegas Aviators",
   "season": "2026",
   "timezone": "America/Los_Angeles",
+  "existingSeasonRequired": true,
   "gamesFound": 9,
   "gamesReadyForReview": 8,
   "gamesWithUnconfirmedTimes": 1,

@@ -1,5 +1,5 @@
 import { isCalendarDate, parseIsoTimestamp } from './dates';
-import type { InventoryView, ScheduleSearchRequest } from './types';
+import type { InventoryView, ScheduleSearchJob } from './types';
 
 export interface ScheduleSource { url: string; title: string }
 export interface DiscoveredGame {
@@ -53,23 +53,38 @@ export function publicSourceUrl(value: unknown): string {
     url.hash = ''; return url.href.replace(/\/$/, '');
   } catch { return ''; }
 }
-function verifiedStart(row: Record<string, unknown>, timezone: string): { startAt: string; issue: string } {
+function verifiedStart(row: Record<string, unknown>, timezone: string): { startAt: string; issue: string; corrected?: boolean } {
   const raw = text(row.startAt, 80);
   const ms = parseIsoTimestamp(raw);
   if (ms === null) return { startAt: '', issue: 'Start time not confirmed' };
   const date = text(row.localDate, 10), time = text(row.localTime, 5);
   if (!isCalendarDate(date) || !/^\d{2}:\d{2}$/.test(time) || !timezone) return { startAt: '', issue: 'Source date/timezone not confirmed' };
   try {
-    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(ms));
-    const part = (key: string) => parts.find(p => p.type === key)?.value;
-    if (`${part('year')}-${part('month')}-${part('day')}` !== date || `${part('hour')}:${part('minute')}` !== time) return { startAt: '', issue: 'UTC time does not match the source timezone' };
-    return { startAt: new Date(ms).toISOString(), issue: '' };
+    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+    const local = (instant: number) => {
+      const parts = formatter.formatToParts(new Date(instant));
+      const part = (key: string) => parts.find(p => p.type === key)?.value;
+      return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}:00Z`;
+    };
+    const target = `${date}T${time}:00Z`, naive = Date.parse(target);
+    const candidates = new Set<number>();
+    // Probe both sides of a possible DST transition. A repeated local time is
+    // ambiguous and a skipped local time has no candidate; neither is guessed.
+    for (const hours of [-36, 0, 36]) {
+      const probe = naive + hours * 3600000;
+      const offset = Date.parse(local(probe)) - probe;
+      const candidate = naive - offset;
+      if (local(candidate) === target) candidates.add(candidate);
+    }
+    if (candidates.size !== 1) return { startAt: '', issue: 'Source time is ambiguous or invalid during a timezone change' };
+    const instant = [...candidates][0];
+    return { startAt: new Date(instant).toISOString(), issue: '', corrected: instant !== ms };
   } catch { return { startAt: '', issue: 'Source timezone is not recognized' }; }
 }
 
 // Only actual Anthropic server-tool results count as verified sources. A URL in
 // the model's final JSON cannot verify itself. No page content becomes executable UI.
-export function parseScheduleDiscovery(raw: unknown, request: ScheduleSearchRequest): ScheduleDiscovery {
+export function parseScheduleDiscovery(raw: unknown, request: ScheduleSearchJob['request']): ScheduleDiscovery {
   const result = object(raw);
   if (!result || !Array.isArray(result.content)) throw new Error('The search returned no usable result. Try a more specific team and year.');
   if (result.stop_reason !== 'end_turn') throw new Error('The schedule search did not finish. Try a narrower date range.');
@@ -97,21 +112,28 @@ export function parseScheduleDiscovery(raw: unknown, request: ScheduleSearchRequ
   if (!parsed || !Array.isArray(parsed.games)) throw new Error('The search did not return a schedule table. Try naming the team and season year.');
   if (parsed.games.length > 400) throw new Error('The search returned too many events. Use a narrower date range.');
   const timezone = text(parsed.timezone, 100);
+  const warnings = Array.isArray(parsed.warnings) ? parsed.warnings.map(w => text(w)).filter(Boolean).slice(0, 20) : [];
+  const seasonStart = isCalendarDate(text(parsed.seasonStart, 10)) ? text(parsed.seasonStart, 10) : '';
+  const seasonEnd = isCalendarDate(text(parsed.seasonEnd, 10)) ? text(parsed.seasonEnd, 10) : '';
+  const today = isCalendarDate(request.today || '') ? request.today! : new Date().toISOString().slice(0, 10);
+  const wrongRelativeSeason = parsed.games.length > 0 && /\bnext\s+season\b/i.test(request.query) && (!seasonStart || seasonStart <= today);
+  if (wrongRelativeSeason) warnings.unshift(`The returned ${text(parsed.season) || 'schedule'} was not confirmed as the next season after ${today}. Its games were withheld. Specify the intended season year and try again.`);
+  let corrected = false;
   const games = parsed.games.map((value, index): DiscoveredGame => {
     const row = object(value) ?? {};
     const sourceUrl = publicSourceUrl(row.sourceUrl);
     const sourceVerified = sources.has(sourceUrl);
     const timing = verifiedStart(row, text(row.timezone, 100) || timezone);
+    corrected ||= !!timing.corrected;
     const title = text(row.title, 200).replace(/[\r\n]+/g, ' ');
     const home = typeof row.home === 'boolean' ? row.home : null;
     return { id: String(index), title, startAt: timing.startAt, localDate: text(row.localDate, 10), venue: text(row.venue, 200), home,
       sourceUrl, sourceVerified, timeIssue: timing.issue, tickets: request.ticketsPerEvent,
       selected: !!title && sourceVerified && !!timing.startAt && (!request.homeOnly || home === true) };
   });
+  if (corrected) warnings.push('UTC times were calculated from source local dates, times and timezones rather than the AI’s conversion.');
   return { team: text(parsed.team), season: text(parsed.season), timezone,
-    seasonStart: isCalendarDate(text(parsed.seasonStart, 10)) ? text(parsed.seasonStart, 10) : '',
-    seasonEnd: isCalendarDate(text(parsed.seasonEnd, 10)) ? text(parsed.seasonEnd, 10) : '',
-    games, sources: [...sources.values()], warnings: Array.isArray(parsed.warnings) ? parsed.warnings.map(w => text(w)).filter(Boolean).slice(0, 20) : [] };
+    seasonStart, seasonEnd, games: wrongRelativeSeason ? [] : games, sources: [...sources.values()], warnings: wrongRelativeSeason ? warnings.slice(0, 1) : warnings };
 }
 export function discoveredGameIssues(game: DiscoveredGame, catalog: InventoryView[], homeOnly: boolean): string[] {
   const issues: string[] = [];

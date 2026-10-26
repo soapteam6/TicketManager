@@ -35,7 +35,7 @@ def main():
     job_id = args.job_id or str(uuid.uuid4())
     if args.create:
         seasons = snapshot["snapshot"]["seasons"]
-        season = next((s for s in seasons if s["startDate"] <= "2026-09-01" and s["endDate"] >= "2026-09-30"), seasons[0])
+        season = {} if args.freeform else next((s for s in seasons if s["startDate"] <= "2026-09-01" and s["endDate"] >= "2026-09-30"), seasons[0])
         result = api({"operation": "scheduleSearchStart", "jobId": job_id, "request": {"query": args.query, "seasonId": "" if args.freeform else season["id"], "ticketsPerEvent": 0 if args.freeform else 4, "homeOnly": True}})
         print("Created search job " + job_id + "; status " + result["status"], flush=True)
     else:

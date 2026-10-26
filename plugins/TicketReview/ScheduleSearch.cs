@@ -48,6 +48,9 @@ namespace Ais.TicketReview
                     ["from"] = season["startDate"], ["through"] = season["endDate"],
                     ["ticketsPerEvent"] = tickets, ["homeOnly"] = request["homeOnly"].DeepClone()
                 };
+                var original = existing == null ? null : Parse(existing.GetAttributeValue<string>("cr9cd_input"));
+                if (existing == null) payload["today"] = DateTime.UtcNow.ToString("yyyy-MM-dd");
+                else if (original["today"] != null) payload["today"] = original["today"];
                 if (existing != null) {
                     Check(existing.GetAttributeValue<string>("cr9cd_requestedby") == Str(actor, "id"), "Search not found.");
                     Check(JToken.DeepEquals(Parse(existing.GetAttributeValue<string>("cr9cd_input")), payload), "This search ID was already used for another query.");

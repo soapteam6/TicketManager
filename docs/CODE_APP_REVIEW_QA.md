@@ -75,7 +75,7 @@ preserve records. Messages remain saved previews and transfers remain manual.
 Live verification passed: native record persistence, invalid-date rollback,
 idempotent replay, demand without reservation, competing allocations with exactly
 one winner, future-attendance rejection, cancellation without auto-promotion,
-and directory synchronization preserving app eligibility. Local checks: **78
+and directory synchronization preserving app eligibility. Local checks: **81
 frontend tests and 36 offline C# security tests pass**, typecheck and
 changed-source lint pass, and platform build passes.
 Browser click-through and requester testing with separately authorized accounts
@@ -137,8 +137,11 @@ opponents and warnings; select the rows to keep, then **Import selected games**.
 Search itself creates no inventory. Imported games start private. Unconfirmed
 times, unverified sources, out-of-season dates and existing inventory duplicates
 cannot be imported as ready rows. Confirmed times are checked against the source
-timezone, including daylight saving. The preview date controls use UTC, as do
-the other event screens. **CSV import** remains available beside Find schedule.
+timezone, including daylight saving. UTC is calculated from the source local
+date/time and IANA timezone; ambiguous or skipped DST times are excluded. A
+current-season substitution for a next-season request is withheld. The preview
+date controls use UTC, as do
+the other event screens. **CSV import** remains available beside AI Import.
 
 The new **Ticket Manager - AI Import** Power Automate flow, its custom
 Claude connector, two connection references and search-job table are included
@@ -154,7 +157,14 @@ was unchanged. These checks validate the flow and parser; reviewers still need
 to check schedule completeness and source accuracy before importing. See
 [test evidence](../solutions/schedule-search-test.json).
 
-Local regression coverage now includes **78 frontend tests and 36 backend
+The plain-language VGK next-season test resolved **Vegas Golden Knights,
+2027–28** using the server-pinned date 2026-10-26, and returned an unpublished
+schedule explanation with zero games. No existing season was selected, no
+inventory was imported and workspace revision 18 was unchanged. An earlier
+current-season substitution was rejected; UTC conversion is now calculated in
+the client from source local fields. See [AI Import evidence](../solutions/ai-import-test.json).
+
+Local regression coverage now includes **81 frontend tests and 36 backend
 security tests**, plus the desktop and iPad preview/import checks. Requester
 sign-in and human acceptance in the hosted app remain pending.
 

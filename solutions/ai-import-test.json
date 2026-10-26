@@ -1,0 +1,20 @@
+{
+  "authenticatedAs": "emikes@ais-now.com",
+  "jobId": "b74523f7-09c5-4d97-807d-feb2f989d899",
+  "query": "I got VGK tickets for next season. Need their home schedule so I can give tickets out to people.",
+  "status": "complete",
+  "team": "Vegas Golden Knights",
+  "season": "2027-28",
+  "timezone": "America/Los_Angeles",
+  "existingSeasonRequired": false,
+  "gamesFound": 0,
+  "gamesReadyForReview": 0,
+  "gamesWithUnconfirmedTimes": 0,
+  "toolReturnedSources": 19,
+  "warnings": 1,
+  "workspaceUnchanged": true,
+  "inventoryImported": 0,
+  "notes": [
+    "Today is 2026-10-26. The current NHL season in progress is 2026-27. 'Next season' resolves to 2027-28, which has not yet been scheduled. The NHL typically releases the following season's schedule in late June or July after the Stanley Cup Final — expect the 2027-28 schedule around July 2027. No games can be returned until that schedule is published."
+  ]
+}

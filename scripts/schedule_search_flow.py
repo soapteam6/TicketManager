@@ -20,7 +20,7 @@ def definition(entity_set, connector_api):
         return {"type": "InitializeVariable", "runAfter": after or {}, "inputs": {"variables": [{"name": name, "type": kind, "value": value}]}}
 
     prompt = "@string(setProperty(setProperty(setProperty(setProperty(json('{}'), 'query', json(triggerBody()?['cr9cd_input'])?['query']), 'from', json(triggerBody()?['cr9cd_input'])?['from']), 'through', json(triggerBody()?['cr9cd_input'])?['through']), 'homeOnly', json(triggerBody()?['cr9cd_input'])?['homeOnly']))"
-    prompt = "@string(setProperty(" + prompt[len("@string("):-1] + ", 'today', formatDateTime(utcNow(), 'yyyy-MM-dd')))"
+    prompt = "@string(setProperty(" + prompt[len("@string("):-1] + ", 'today', coalesce(json(triggerBody()?['cr9cd_input'])?['today'], formatDateTime(utcNow(), 'yyyy-MM-dd'))))"
     actions = {
         "Messages": initialize("messages", "array", [{"role": "user", "content": prompt}]),
         "Collected_content": initialize("content", "array", [], {"Messages": ["Succeeded"]}),

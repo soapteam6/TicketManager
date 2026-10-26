@@ -225,7 +225,7 @@ export interface ScheduleSearchRequest {
 export interface ScheduleSearchJob {
   id: string;
   status: 'queued' | 'searching' | 'complete' | 'failed';
-  request: ScheduleSearchRequest & { from?: string; through?: string; seasonLabel?: string };
+  request: ScheduleSearchRequest & { from?: string; through?: string; seasonLabel?: string; today?: string };
   rawResult?: unknown;
   error?: string;
 }

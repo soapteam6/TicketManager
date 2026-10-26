@@ -111,11 +111,11 @@ export function ScheduleFinder({ initialSeasonId = '' }: { initialSeasonId?: str
             <td><TextInput type="number" min={0} max={1000} disabled={imported || busy} aria-label={`Tickets for ${game.title}`} value={game.tickets} onChange={e => update(game.id, { tickets: Number(e.target.value) })} /></td><td>{errors.length ? errors.map(issue => <small key={issue}>{issue}</small>) : 'Ready'}</td></tr>;
         })}</tbody></table>{!discovery.games.length && <EmptyRows>No published games were found for this request. Check the notes above or add a team and season year to your request.</EmptyRows>}
       </div>
-      <div className="work-import-commit"><div><strong>{ready.length} games · {ready.reduce((n, g) => n + g.tickets, 0)} tickets</strong><p>{!ticketsValid ? 'Enter the number of tickets you own per game.' : seasonId ? 'Imported games start private.' : 'The team, season and private games will be saved together.'}</p></div><Button disabled={busy || searching || imported || !ticketsValid || !targetValid || !ready.length || ready.length > 100} onClick={async () => {
+      {discovery.games.length > 0 && <div className="work-import-commit"><div><strong>{ready.length} games · {ready.reduce((n, g) => n + g.tickets, 0)} tickets</strong><p>{!ticketsValid ? 'Enter the number of tickets you own per game.' : seasonId ? 'Imported games start private.' : 'The team, season and private games will be saved together.'}</p></div><Button disabled={busy || searching || imported || !ticketsValid || !targetValid || !ready.length || ready.length > 100} onClick={async () => {
         if (await run({ type: 'importSchedule', csv: discoveredGamesCsv(ready), seasonId, ...(!seasonId && { newSeason: { ...draft, defaultTickets: Number(tickets) } }) })) {
           setImported(true); setDiscovery(current => current && ({ ...current, games: current.games.map(g => ({ ...g, selected: false })) }));
         }
-      }}>{seasonId ? 'Import selected games' : 'Create season & import'}</Button></div>
+      }}>{seasonId ? 'Import selected games' : 'Create season & import'}</Button></div>}
     </section>}
   </div>;
 }
