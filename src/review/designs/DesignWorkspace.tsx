@@ -61,7 +61,6 @@ export function DesignWorkspace({ onRefresh, onPersona }: {
     <div className="work-top-navigation">{nav}<span>{admin ? 'Coordinator workspace' : 'Requester access'}</span></div>
     <div className="work-app-body">
       <main className="work-main">
-        <div className="work-page-location"><span>Ticket management</span><Glyph name="chevron" size={12} /><strong>{areas.find(a => a.id === effectiveArea)?.label}</strong></div>
         {!live && <label className="work-demo-persona">Preview role<select aria-label="Synthetic persona" value={persona} onChange={e => onPersona(e.target.value as PersonaKey)}>{Object.values(PERSONAS).map(p => <option key={p.key} value={p.key}>{p.name}</option>)}</select></label>}
         {effectiveArea === 'inventory' && <InventoryGrid onRequests={id => { setGameId(id); setArea('requests'); }} />}
         {effectiveArea === 'requests' && <RequestQueue desk gameId={gameId} onGameChange={setGameId} />}
