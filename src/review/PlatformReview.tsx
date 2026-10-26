@@ -5,7 +5,7 @@ import { ReviewApp } from './ReviewApp';
 import { Button } from './ui';
 import { reviewErrorMessage } from './errorMessage';
 import { createSnapshotLoader, workspaceLoadMessage } from './workspaceLoading';
-import logoUrl from '../assets/ais-logo.webp';
+import logoUrl from '../assets/ais-logo.webp?inline';
 
 const transport: PlatformTransport = async (payload) => {
   const response = await MicrosoftDataverseService.PerformUnboundActionWithOrganization(

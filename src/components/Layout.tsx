@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import clsx from 'clsx';
-import logoUrl from '../assets/ais-logo.webp';
+import logoUrl from '../assets/ais-logo.webp?inline';
 import { useAuth } from '../auth/AuthContext';
 import { Spinner } from './Spinner';
 import { Button } from './Button';

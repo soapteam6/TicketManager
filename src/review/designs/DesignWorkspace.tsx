@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import logoUrl from '../../assets/ais-logo.webp';
+import logoUrl from '../../assets/ais-logo.webp?inline';
 import { useReview } from '../context';
 import { PERSONAS } from '../fixtures';
 import { personName } from '../personName';
