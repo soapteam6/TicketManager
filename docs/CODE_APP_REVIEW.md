@@ -1,5 +1,13 @@
 # Ticket Manager review — Code App adaptation
 
+**2026-10-26 live QA update:** the later user-authorized AIS Development setup
+replaces the unavailable `/review` provider with a transactional Dataverse API.
+See [Dataverse QA](DATAVERSE_REVIEW_QA.md) for the applied schema contract,
+identity, persistence, live API evidence and pending browser/requester acceptance.
+The original synthetic implementation report below describes the earlier
+boundary and is retained as historical context. Its no-integration/no-deployment
+statements do not describe the subsequently authorized QA backend setup.
+
 Base: `code-app` at `76e250279c401df3f36f9dae078afc257b7a838e`. Working branch: `dot/20261026-ticket-manager-review-code-app`. The standalone review branch remains preserved at `2776812ad06aee75b784fb3499a1422787bf8dd4`.
 
 Requirements source: all 398 lines of the Oct 23 Ticket Manager App Review transcript, previously read from the user-supplied Library file. Its product agreements are requirements, not authorization for real data, identity access or communications.

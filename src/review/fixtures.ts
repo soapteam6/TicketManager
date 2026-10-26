@@ -15,6 +15,7 @@ export const PERSONAS: Record<'coordinator' | 'rep' | 'employee', Persona> = {
     name: 'Demo Coordinator',
     email: 'coordinator@example.invalid',
     role: 'coordinator',
+    isAppAdmin: true,
   },
   rep: {
     key: 'rep',

@@ -1,13 +1,14 @@
-import { DEFAULT_SCORING_PARAMS } from '../domain/constants';
+import { rankReviewState } from './ranking';
 import { FACTOR_KEYS } from '../domain/enums';
-import { rankGameRequests } from '../scoring/engine';
 import type { GameRankingResult } from '../domain/scoring-types';
-import type { ScoringRequestInput } from '../scoring/types';
 import { createFixtures, DIRECTORY, GUID, PERSONAS } from './fixtures';
 import { isCalendarDate, parseIsoTimestamp } from './dates';
 import { previewScheduleCsv } from './schedule';
 import type {
   Allocation,
+  AccessUser,
+  AccessGroup,
+  AppRole,
   CommandResult,
   Contact,
   DirectorySource,
@@ -50,8 +51,7 @@ function persona(key: PersonaKey): Persona {
     throw new ReviewError('forbidden', 'Unknown synthetic persona');
   return PERSONAS[key];
 }
-function coordinator(key: PersonaKey) {
-  const actor = persona(key);
+function coordinator(actor: Persona) {
   if (actor.role !== 'coordinator')
     throw new ReviewError(
       'forbidden',
@@ -81,6 +81,24 @@ const defaultDirectory: DirectorySource = {
 // imports generated service modules or SDK context. Its atomic writes do not claim to provide
 // a Dataverse transaction or authorize a production user.
 export class MockReviewProvider implements ReviewProvider {
+  private accessUsers: AccessUser[] = Object.values(PERSONAS).map(p => ({
+    id: p.id, name: p.name, email: p.email, isAppAdmin: !!p.isAppAdmin,
+    directRoles: p.isAppAdmin ? [] : [p.key], inheritedRoles: [], effectiveRole: p.key,
+  }));
+  private accessGroups: AccessGroup[] = [{ id: '80000000-0000-4000-8000-000000000001', directoryId: '80000000-0000-4000-8000-000000000002', name: 'Demo sales group', type: 'security', membership: 'members', roles: [] }];
+  private groupMembers = new Map<string, string[]>([['80000000-0000-4000-8000-000000000001', [PERSONAS.rep.id]]]);
+  private updateEffectiveAccess() {
+    for (const user of this.accessUsers) {
+      user.inheritedRoles = [...new Set(this.accessGroups.filter(g => this.groupMembers.get(g.id)?.includes(user.id)).flatMap(g => g.roles))];
+      user.effectiveRole = user.isAppAdmin ? 'coordinator' : ['coordinator', 'rep', 'employee'].find(r => [...user.directRoles, ...user.inheritedRoles].includes(r as AppRole)) as AppRole | undefined ?? 'none';
+    }
+  }
+  private actor(key: PersonaKey): Persona {
+    const base = persona(key);
+    const user = this.accessUsers.find(u => u.id === base.id)!;
+    if (user.effectiveRole === 'none') throw new ReviewError('forbidden', 'A Ticket Manager role is required. Ask an app admin to grant access.');
+    return { ...base, key: user.effectiveRole, role: user.effectiveRole === 'coordinator' ? 'coordinator' : 'requester' };
+  }
   readonly mode = 'mock' as const;
   private state: ReviewState;
   private version = 0;
@@ -112,7 +130,7 @@ export class MockReviewProvider implements ReviewProvider {
     return GUID(9, ++this.sequence);
   }
   snapshot(key: PersonaKey): ReviewSnapshot {
-    const actor = persona(key),
+    const actor = this.actor(key),
       admin = actor.role === 'coordinator',
       now = this.clock(),
       state = this.state;
@@ -164,6 +182,10 @@ export class MockReviewProvider implements ReviewProvider {
           ? {
               contactIds: [...r.contactIds],
               requesterId: r.requesterId,
+              requesterName: Object.values(PERSONAS).find((p) => p.id === r.requesterId)?.name,
+              requesterEmail: Object.values(PERSONAS).find((p) => p.id === r.requesterId)?.email,
+              recordedById: r.recordedBy,
+              recordedByName: Object.values(PERSONAS).find((p) => p.id === r.recordedBy)?.name,
               confirmedNoShows: state.allocations.filter(
                 (a) =>
                   r.contactIds.includes(a.contactId) && a.outcome === 'no_show',
@@ -176,7 +198,7 @@ export class MockReviewProvider implements ReviewProvider {
         (c) =>
           eligible(c) &&
           (admin ||
-            (c.type === 'customer' && key === 'rep') ||
+            (c.type === 'customer' && actor.key === 'rep') ||
             c.directoryId === actor.directoryId),
       )
       .map((c) => ({
@@ -195,6 +217,7 @@ export class MockReviewProvider implements ReviewProvider {
       options,
       teams: admin ? state.teams : [],
       seasons: admin ? state.seasons : [],
+      ...(actor.isAppAdmin ? { accessUsers: this.accessUsers, accessGroups: this.accessGroups } : {}),
       ...(admin
         ? {
             contacts: state.contacts,
@@ -208,11 +231,11 @@ export class MockReviewProvider implements ReviewProvider {
     });
   }
   previewSchedule(key: PersonaKey, csv: string): SchedulePreview {
-    coordinator(key);
+    coordinator(this.actor(key));
     return previewScheduleCsv(csv);
   }
   availability(key: PersonaKey): string {
-    coordinator(key);
+    coordinator(this.actor(key));
     const available = this.snapshot(key).catalog.filter(
       (g) =>
         g.released &&
@@ -224,85 +247,46 @@ export class MockReviewProvider implements ReviewProvider {
     return `${count} tickets available across ${available.length} released events. Express interest in the app; a coordinator decides allocations. Requests do not guarantee tickets.`;
   }
   rank(key: PersonaKey, gameId: string): GameRankingResult {
-    coordinator(key);
-    const state = this.state,
-      game = state.games.find((g) => g.id === gameId);
-    if (!game) invalid('Select an inventory item to score');
-    const inputs: ScoringRequestInput[] = state.requests
-      .filter(
-        (r) =>
-          r.gameId === gameId && !['cancelled', 'fulfilled'].includes(r.status),
-      )
-      .map((r) => {
-        const contacts = state.contacts.filter((c) =>
-          r.contactIds.includes(c.id),
-        );
-        const primary = contacts[0];
-        const history = state.allocations.filter((a) =>
-          r.contactIds.includes(a.contactId),
-        );
-        const seasonAwards = new Set(
-          state.allocations
-            .filter(
-              (a) =>
-                active(a) &&
-                a.requestId !== r.id &&
-                game.seasonId !== null &&
-                state.games.find((g) => g.id === a.gameId)?.seasonId ===
-                  game.seasonId &&
-                (r.contactIds.includes(a.contactId) ||
-                  (r.purpose === 'customer' &&
-                    state.contacts.find((c) => c.id === a.contactId)
-                      ?.company === primary?.company)),
-            )
-            .map((a) => a.requestId),
-        ).size;
-        return {
-          requestId: r.id,
-          contactId: primary?.id ?? null,
-          contactType: r.purpose,
-          requesterName: contacts.map((c) => c.name).join(', '),
-          quantity:
-            r.quantity -
-            state.allocations.filter((a) => a.requestId === r.id && active(a))
-              .length,
-          salesOpportunityUsd: 0,
-          createdAt: instant(r.createdAt),
-          businessRationale: r.rationale,
-          opportunityName: r.opportunity,
-          seasonAwardCount: seasonAwards,
-          tier: primary?.tier ?? 'prospect',
-          attendedCount: history.filter((a) => a.outcome === 'attended').length,
-          noShowCount: history.filter((a) => a.outcome === 'no_show').length,
-          awardedCount: history.length,
-          lastTicketDate: null,
-          futurePriorityFlag: 'normal',
-        };
-      });
-    return rankGameRequests(
-      inputs,
-      { id: game.id, gameDate: instant(game.gameDate), premiumScore: 0.5 },
-      {
-        id: 'mock-review',
-        weights: { ...state.scoring.weights },
-        params: {
-          ...DEFAULT_SCORING_PARAMS,
-          categoryCustomerScore: state.scoring.category.customer,
-          categoryProspectScore: state.scoring.category.prospect,
-          categoryEmployeeScore: state.scoring.category.employee,
-        },
-      },
-      state.seats.filter((s) => s.gameId === gameId && s.status === 'available')
-        .length,
-      this.clock(),
-    );
+    coordinator(this.actor(key));
+    return rankReviewState(this.state, gameId, this.clock());
   }
+
   async execute(
     key: PersonaKey,
     command: ReviewCommand,
   ): Promise<CommandResult> {
-    const actor = persona(key);
-    if (command.type !== 'interest') coordinator(key);
+    const actor = this.actor(key);
+    if (command.type !== 'interest') coordinator(actor);
+    if (command.type === 'setUserRole') {
+      if (!actor.isAppAdmin) throw new ReviewError('forbidden', 'Only an app admin can assign roles.');
+      const user = this.accessUsers.find(u => u.id === command.userId);
+      if (!user || user.isAppAdmin) invalid('Select a user whose app role can be changed.');
+      if (JSON.stringify([...user.directRoles].sort()) !== JSON.stringify([...command.expectedDirectRoles].sort())) throw new ReviewError('conflict', 'This user’s roles changed. Refresh and review before saving.');
+      if (!['none', 'coordinator', 'rep', 'employee'].includes(command.role)) invalid('Select a supported Ticket Manager role.');
+      user.directRoles = command.role === 'none' ? [] : [command.role as AppRole];
+      this.updateEffectiveAccess();
+      this.refresh();
+      return { message: 'Synthetic access updated.' };
+    }
+    if (command.type === 'setGroupRole' || command.type === 'connectGroup') {
+      if (!actor.isAppAdmin) throw new ReviewError('forbidden', 'Only an app admin can assign group roles.');
+      if (!['none', 'coordinator', 'rep', 'employee'].includes(command.role)) invalid('Select a supported Ticket Manager role.');
+      let group: AccessGroup;
+      if (command.type === 'connectGroup') {
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(command.directoryId) || command.directoryId === '00000000-0000-0000-0000-000000000000') invalid('Enter the Microsoft Entra group’s Object ID.');
+        if (this.accessGroups.some(g => g.directoryId.toLowerCase() === command.directoryId.toLowerCase() && g.membership === 'members')) invalid('This group is already linked for members. Select it from Groups to change its role.');
+        group = { id: this.id(), directoryId: command.directoryId, name: 'Demo directory group', type: 'security', membership: 'members', roles: [] };
+        this.accessGroups.push(group);
+      } else {
+        const selected = this.accessGroups.find(g => g.id === command.groupId);
+        if (!selected) invalid('Select a linked group.');
+        group = selected;
+        if (JSON.stringify([...group.roles].sort()) !== JSON.stringify([...command.expectedRoles].sort())) throw new ReviewError('conflict', 'The assigned roles changed. Refresh and review before saving.');
+      }
+      group.roles = command.role === 'none' ? [] : [command.role];
+      this.updateEffectiveAccess(); this.refresh();
+      return { message: 'Synthetic group access updated.', id: group.id };
+    }
     // Only the synthetic directory interface can be awaited; after it completes the transaction
     // clones the latest state. No await or fallible external operation occurs inside the commit.
     const entries =
@@ -468,7 +452,7 @@ export class MockReviewProvider implements ReviewProvider {
         if (
           actor.role !== 'coordinator' &&
           (command.onBehalfOf ||
-            (key === 'employee' && command.purpose !== 'employee') ||
+            (actor.key === 'employee' && command.purpose !== 'employee') ||
             (command.purpose === 'employee' &&
               contacts.some((c) => c?.directoryId !== actor.directoryId)))
         )

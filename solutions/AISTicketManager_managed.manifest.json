@@ -1,0 +1,132 @@
+{
+  "file": "AISTicketManager_managed.zip",
+  "bytes": 565585,
+  "rootComponents": [
+    {
+      "type": "1",
+      "schemaName": "cr9cd_assignment",
+      "behavior": "0"
+    },
+    {
+      "type": "1",
+      "schemaName": "cr9cd_attendancerecord",
+      "behavior": "0"
+    },
+    {
+      "type": "1",
+      "schemaName": "cr9cd_contact_beneficiary",
+      "behavior": "0"
+    },
+    {
+      "type": "1",
+      "schemaName": "cr9cd_game",
+      "behavior": "0"
+    },
+    {
+      "type": "1",
+      "schemaName": "cr9cd_integrationlog",
+      "behavior": "0"
+    },
+    {
+      "type": "1",
+      "schemaName": "cr9cd_notification",
+      "behavior": "0"
+    },
+    {
+      "type": "1",
+      "schemaName": "cr9cd_notificationtemplate",
+      "behavior": "0"
+    },
+    {
+      "type": "1",
+      "schemaName": "cr9cd_requestcontact",
+      "behavior": "0"
+    },
+    {
+      "type": "1",
+      "schemaName": "cr9cd_reservation",
+      "behavior": "0"
+    },
+    {
+      "type": "1",
+      "schemaName": "cr9cd_reviewworkspace",
+      "behavior": "0"
+    },
+    {
+      "type": "1",
+      "schemaName": "cr9cd_scoringconfig",
+      "behavior": "0"
+    },
+    {
+      "type": "1",
+      "schemaName": "cr9cd_season",
+      "behavior": "0"
+    },
+    {
+      "type": "1",
+      "schemaName": "cr9cd_seat",
+      "behavior": "0"
+    },
+    {
+      "type": "1",
+      "schemaName": "cr9cd_team",
+      "behavior": "0"
+    },
+    {
+      "type": "1",
+      "schemaName": "cr9cd_ticketrequest",
+      "behavior": "0"
+    },
+    {
+      "type": "1",
+      "schemaName": "cr9cd_waitlistentry",
+      "behavior": "0"
+    },
+    {
+      "type": "20",
+      "id": "{0879e780-1ecf-f111-a05c-6045bd069cda}",
+      "behavior": "0"
+    },
+    {
+      "type": "20",
+      "id": "{6be64c8f-51d1-f111-a05b-6045bd0695f8}",
+      "behavior": "0"
+    },
+    {
+      "type": "20",
+      "id": "{7ae64c8f-51d1-f111-a05b-6045bd0695f8}",
+      "behavior": "0"
+    },
+    {
+      "type": "20",
+      "id": "{86e64c8f-51d1-f111-a05b-6045bd0695f8}",
+      "behavior": "0"
+    },
+    {
+      "type": "91",
+      "id": "{92e64c8f-51d1-f111-a05b-6045bd0695f8}",
+      "schemaName": "TicketReview, Version=1.0.0.0, Culture=neutral, PublicKeyToken=7dcfea7291924748",
+      "behavior": "0"
+    },
+    {
+      "type": "300",
+      "schemaName": "cr9cd_aisticketconcierge_af330",
+      "behavior": "0"
+    }
+  ],
+  "missingDependencies": [],
+  "files": [
+    "customizations.xml",
+    "solution.xml",
+    "PluginAssemblies/TicketReview-92E64C8F-51D1-F111-A05B-6045BD0695F8/TicketReview.dll",
+    "CanvasApps/cr9cd_aisticketconcierge_af330_CodeAppPackages/index.html",
+    "CanvasApps/cr9cd_aisticketconcierge_af330_CodeAppPackages/assets/ais-logo-BoPNiIQd.webp",
+    "CanvasApps/cr9cd_aisticketconcierge_af330_CodeAppPackages/assets/index-Cpb3i6mg.css",
+    "CanvasApps/cr9cd_aisticketconcierge_af330_CodeAppPackages/assets/index-D9BiU8LM.js",
+    "CanvasApps/cr9cd_aisticketconcierge_af330_CodeAppPackages/vite.svg",
+    "customapis/cr9cd_TicketReview/customapirequestparameters/Payload/customapirequestparameter.xml",
+    "customapis/cr9cd_TicketReview/customapiresponseproperties/Result/customapiresponseproperty.xml",
+    "customapis/cr9cd_TicketReview/customapi.xml",
+    "[Content_Types].xml"
+  ]
+}

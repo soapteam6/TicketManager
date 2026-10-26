@@ -1,0 +1,10 @@
+{
+  "retiredSolution": "AISTicketReviewQA",
+  "retiredSolutionId": "40fd135d-51d1-f111-a05b-6045bd0695f8",
+  "activeSolution": "AISTicketManager",
+  "activeSolutionId": "1c411462-63d1-f111-a05b-6045bd069cda",
+  "sourceComponentsCovered": 29,
+  "workspaceRevision": 14,
+  "workspaceUnchanged": true,
+  "backup": "AISTicketReviewQA_before_consolidation.zip"
+}

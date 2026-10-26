@@ -65,7 +65,7 @@ function TopbarExportButton() {
 const NAV: NavSection[] = [
   {
     heading: 'Overview',
-    items: [{ to: '/review', label: 'Review workflow', icon: <Icon path="M4 6h16M4 12h16M4 18h16" /> }, { to: '/', label: 'Dashboard', icon: <Icon path="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10" /> }],
+    items: [{ to: '/review', label: 'Ticket workspace', icon: <Icon path="M4 6h16M4 12h16M4 18h16" /> }, { to: '/legacy', label: 'Previous dashboard', icon: <Icon path="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10" /> }],
   },
   {
     heading: 'Inventory',

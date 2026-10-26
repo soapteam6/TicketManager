@@ -13,14 +13,15 @@ import {
   TextInput,
 } from './ui';
 import { dateTime, value } from './form';
-function ContactForm({
+import { personName } from './personName';
+export function ContactForm({
   contact,
   close,
 }: {
   contact?: Contact;
   close: () => void;
 }) {
-  const { run, busy } = useReview();
+  const { run, busy, snapshot } = useReview();
   return (
     <form
       className="space-y-4"
@@ -103,7 +104,7 @@ function ContactForm({
           Cancel
         </Button>
         <Button type="submit" disabled={busy}>
-          Save synthetic contact
+          {snapshot.mode === 'dataverse' ? 'Save QA contact' : 'Save synthetic contact'}
         </Button>
       </div>
     </form>
@@ -144,12 +145,11 @@ export function PeoplePanel() {
           disabled={busy}
           onClick={() => run({ type: 'syncDirectory' })}
         >
-          Sync synthetic directory
+          {snapshot.mode === 'dataverse' ? 'Sync Dataverse users' : 'Sync synthetic directory'}
         </Button>
       </div>
       <p className="text-xs text-slate-500">
-        Directory sync reads built-in synthetic entries only. It never changes a
-        directory or reactivates an app-disabled person.
+        {snapshot.mode === 'dataverse' ? 'Directory sync reads active users from this Dataverse environment. App-disabled contacts remain disabled. A leading # from a profile name is omitted for readability; it is not an app eligibility flag. Hover over a name to see its source spelling.' : 'Directory sync reads built-in synthetic entries only. It never changes a directory or reactivates an app-disabled person.'}
       </p>
       {!contacts.length && (
         <Empty>
@@ -169,7 +169,7 @@ export function PeoplePanel() {
               aria-label={`Contact ${c.name}`}
             >
               <div className="flex flex-wrap justify-between gap-2">
-                <h3 className="font-semibold">{c.name}</h3>
+                <h3 className="font-semibold" title={c.name}>{personName(c.name)}</h3>
                 <Badge>
                   {c.type === 'employee'
                     ? 'Directory employee'
@@ -245,7 +245,7 @@ export function PeoplePanel() {
         title={
           editing ? 'Edit customer contact' : 'Add synthetic customer contact'
         }
-        description="This repository is retained across seasons in the demo session."
+        description={snapshot.mode === 'dataverse' ? 'QA contacts and history persist in AIS Development across sessions.' : 'This repository is retained across seasons in the demo session.'}
       >
         {editing !== undefined && (
           <ContactForm
@@ -257,7 +257,7 @@ export function PeoplePanel() {
       <Modal
         open={Boolean(history)}
         onClose={() => setHistory(null)}
-        title={`History · ${history?.name ?? ''}`}
+        title={`History · ${personName(history?.name ?? '')}`}
         size="lg"
         footer={
           <Button variant="secondary" onClick={() => setHistory(null)}>

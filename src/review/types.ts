@@ -20,6 +20,25 @@ export interface Persona {
   email: string;
   role: 'coordinator' | 'requester';
   directoryId?: string;
+  isAppAdmin?: boolean;
+}
+export type AppRole = 'coordinator' | 'rep' | 'employee';
+export interface AccessUser {
+  id: string;
+  name: string;
+  email: string;
+  isAppAdmin: boolean;
+  directRoles: AppRole[];
+  inheritedRoles: AppRole[];
+  effectiveRole: AppRole | 'none';
+}
+export interface AccessGroup {
+  id: string;
+  directoryId: string;
+  name: string;
+  type: 'security' | 'microsoft365';
+  membership: 'membersAndGuests' | 'members' | 'owners' | 'guests';
+  roles: AppRole[];
 }
 export interface Team {
   id: string;
@@ -172,10 +191,14 @@ export interface InterestView {
   createdAt: string;
   contactIds?: ContactId[];
   requesterId?: string;
+  requesterName?: string;
+  requesterEmail?: string;
+  recordedById?: string;
+  recordedByName?: string;
   confirmedNoShows?: number;
 }
 export interface ReviewSnapshot {
-  mode: 'mock' | 'platform-unavailable';
+  mode: 'mock' | 'dataverse' | 'platform-unavailable';
   persona: Persona;
   catalog: InventoryView[];
   requests: InterestView[];
@@ -188,6 +211,9 @@ export interface ReviewSnapshot {
   outbox?: OutboxItem[];
   followup?: FollowupTemplate;
   scoring?: ScoreSettings;
+  requesters?: { id: string; name: string; email?: string }[];
+  accessUsers?: AccessUser[];
+  accessGroups?: AccessGroup[];
 }
 export interface ScheduleRow {
   gameDate: string;
@@ -210,6 +236,9 @@ export type ReleaseCommand = {
   at?: string;
 };
 export type ReviewCommand =
+  | { type: 'setUserRole'; userId: string; role: AppRole | 'none'; expectedDirectRoles: AppRole[] }
+  | { type: 'setGroupRole'; groupId: string; role: AppRole | 'none'; expectedRoles: AppRole[] }
+  | { type: 'connectGroup'; directoryId: string; role: AppRole }
   | { type: 'createTeam'; name: string; defaultTickets: number }
   | {
       type: 'createSeason';

@@ -14,6 +14,8 @@ import {
   TextInput,
 } from './ui';
 import { dateTime, number, value } from './form';
+import { RequestIdentity } from './RequestIdentity';
+import { beneficiaryNames, personName } from './personName';
 function AllocationForm({
   request,
   close,
@@ -41,8 +43,9 @@ function AllocationForm({
       }}
     >
       <FormError />
+      <RequestIdentity request={request} snapshot={snapshot} />
       <p className="text-sm">
-        {request.contactNames} · {request.quantity - request.allocated}{' '}
+        {beneficiaryNames(request, snapshot)} · {request.quantity - request.allocated}{' '}
         requested tickets remaining · {game?.availableTickets ?? 0} tickets
         available. Private inventory may be assigned by a coordinator.
       </p>
@@ -72,15 +75,14 @@ function AllocationForm({
         />
       </Field>
       <p className="text-sm text-slate-600">
-        This records a local allocation only. Transfer in the provider app
-        remains manual.
+        {snapshot.mode === 'dataverse' ? 'This saves the allocation in Dataverse. Transfer in the provider app remains manual.' : 'This records a local allocation only. Transfer in the provider app remains manual.'}
       </p>
       <div className="flex justify-end gap-2">
         <Button type="button" variant="secondary" onClick={close}>
           Cancel
         </Button>
         <Button type="submit" disabled={busy || !game?.availableTickets}>
-          Confirm local allocation
+          {snapshot.mode === 'dataverse' ? 'Confirm allocation' : 'Confirm local allocation'}
         </Button>
       </div>
     </form>
@@ -133,7 +135,7 @@ export function RequestsPanel() {
             <article
               key={r.id}
               className="rounded-xl border border-slate-200 p-4 space-y-3"
-              aria-label={`Interest ${r.contactNames}`}
+              aria-label={`Interest ${beneficiaryNames(r, snapshot)}`}
             >
               <div className="flex flex-wrap justify-between gap-2">
                 <div>
@@ -148,8 +150,9 @@ export function RequestsPanel() {
                 </div>
                 <Badge>{r.status.replaceAll('_', ' ')}</Badge>
               </div>
+              <RequestIdentity request={r} snapshot={snapshot} />
               <p className="text-sm">
-                {r.contactNames} ·{' '}
+                Beneficiaries: {beneficiaryNames(r, snapshot)} ·{' '}
                 {r.purpose === 'employee'
                   ? 'Employee / self'
                   : 'Customer / prospect'}{' '}
@@ -232,18 +235,18 @@ export function RequestsPanel() {
     </Panel>
   );
 }
-export function FollowthroughPanel() {
+export function FollowthroughPanel({ assignmentId }: { assignmentId?: string } = {}) {
   const { snapshot, run, busy } = useReview(),
     [gameId, setGameId] = useState('');
   const allocations = (snapshot.allocations ?? []).filter(
-    (a) => !gameId || a.gameId === gameId,
+    (a) => (!assignmentId || a.id === assignmentId) && (!gameId || a.gameId === gameId),
   );
   return (
     <Panel
       title="Manual transfer & attendance"
       description="Record the provider-app step separately from attendance. No evidence leaves attendance unknown; a confirmed no-show requires an explicit note."
     >
-      <Field label="Filter allocations by event">
+      {!assignmentId && <Field label="Filter allocations by event">
         <Select value={gameId} onChange={(e) => setGameId(e.target.value)}>
           <option value="">All events and seasons</option>
           {snapshot.catalog.map((g) => (
@@ -252,7 +255,7 @@ export function FollowthroughPanel() {
             </option>
           ))}
         </Select>
-      </Field>
+      </Field>}
       {!allocations.length && (
         <Empty>
           No allocations yet. Review interest and make a coordinator allocation
@@ -272,7 +275,7 @@ export function FollowthroughPanel() {
               <div>
                 <div className="flex flex-wrap justify-between gap-2">
                   <h3 className="font-semibold">
-                    {game?.title} · {contact?.name}
+                    {game?.title} · {personName(contact?.name ?? '')}
                   </h3>
                   <Badge>
                     {a.status === 'transferred'
@@ -291,7 +294,7 @@ export function FollowthroughPanel() {
                   {contact?.phone || 'No phone recorded'}
                 </p>
                 <p className="text-xs text-slate-500 break-all">
-                  Local ticket ID: {a.seatId}
+                  {snapshot.mode === 'dataverse' ? 'Dataverse ticket ID' : 'Local ticket ID'}: {a.seatId}
                 </p>
                 <p className="text-sm mt-2">Decision: {a.decision}</p>
               </div>
@@ -339,7 +342,7 @@ export function FollowthroughPanel() {
                       Record manual transfer
                     </Button>
                     <p className="text-xs text-slate-500">
-                      Local record only; this app never delivers tickets.
+                      {snapshot.mode === 'dataverse' ? 'Confirmation saved in Dataverse; this app never delivers tickets.' : 'Local record only; this app never delivers tickets.'}
                     </p>
                   </form>
                   <form
@@ -404,7 +407,7 @@ export function FollowthroughPanel() {
                     run({ type: 'cancelAllocation', assignmentId: a.id })
                   }
                 >
-                  Cancel local allocation
+                  {snapshot.mode === 'dataverse' ? 'Cancel allocation' : 'Cancel local allocation'}
                 </Button>
               )}
             </article>

@@ -3,6 +3,7 @@ import { Modal } from '../components/Modal';
 import { useReview } from './context';
 import { utcDateTimeInputToIso } from './dates';
 import { PERSONAS } from './fixtures';
+import { personName } from './personName';
 import type { InventoryView, ReleaseCommand } from './types';
 import {
   Badge,
@@ -17,7 +18,7 @@ import {
 } from './ui';
 import { dateTime, number, value } from './form';
 
-function InventoryForm({ close }: { close: () => void }) {
+export function InventoryForm({ close }: { close: () => void }) {
   const { snapshot, run, busy } = useReview(),
     [kind, setKind] = useState<'game' | 'event'>('event');
   const [seasonId, setSeasonId] = useState('');
@@ -108,7 +109,7 @@ function InventoryForm({ close }: { close: () => void }) {
     </form>
   );
 }
-function InterestForm({
+export function InterestForm({
   game,
   close,
 }: {
@@ -157,17 +158,19 @@ function InterestForm({
       {admin && (
         <Field label="Requesting person">
           <Select name="onBehalfOf">
-            <option value="">Demo Coordinator (self)</option>
-            {Object.values(PERSONAS)
-              .filter((p) => p.role === 'requester')
+            <option value="">{personName(snapshot.persona.name)} — {snapshot.persona.email} (self)</option>
+            {(snapshot.requesters ?? Object.values(PERSONAS).filter((p) => p.role === 'requester'))
               .map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name} — on behalf
+                  {personName(p.name)} — {p.email || `No email (ID ${p.id.slice(-8)})`} — on behalf
                 </option>
               ))}
           </Select>
         </Field>
       )}
+      {snapshot.mode === 'dataverse' && admin && <p className="text-xs text-slate-500">
+        A leading # in a Dataverse profile name is omitted here for readability. Eligibility is shown separately in Contacts &amp; history.
+      </p>}
       <div className="grid sm:grid-cols-2 gap-4">
         <Field label="Purpose">
           <Select
@@ -235,7 +238,10 @@ function InterestForm({
                 className="mt-1"
               />
               <span>
-                {c.name}
+                <span title={c.name}>{personName(c.name)}</span>
+                <span className="block text-xs text-slate-700 break-all">
+                  {c.email || `No email recorded (ID ${c.id.slice(-8)})`}
+                </span>
                 <span className="block text-xs text-slate-500">
                   {c.company} · {c.phone || 'No phone recorded'}
                 </span>
@@ -275,7 +281,7 @@ function InterestForm({
     </form>
   );
 }
-function ReleasePanel({
+export function ReleasePanel({
   selected,
   clear,
 }: {

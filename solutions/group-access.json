@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "groups": [
+    {
+      "name": "CRM Sales Rep",
+      "directoryId": "e4f13002-21b5-4479-a530-f73c8579eaf7",
+      "membership": "members",
+      "role": "rep"
+    }
+  ]
+}

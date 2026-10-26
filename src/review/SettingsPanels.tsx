@@ -122,7 +122,7 @@ export function MessagesPanel() {
     <div className="space-y-5">
       <Panel
         title="Availability announcement preview"
-        description="Choose when to announce released inventory. Saving visibility never announces it. Only a local mock outbox is supported; no email or SMS delivery."
+        description={snapshot.mode === 'dataverse' ? 'Availability previews are saved in the QA workspace. No email or SMS is sent.' : 'Choose when to announce released inventory. Saving visibility never announces it. Only a local mock outbox is supported; no email or SMS delivery.'}
       >
         <form
           className="space-y-4"

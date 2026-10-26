@@ -1,4 +1,109 @@
-# Reproduce the synthetic Code App review
+# Test the Code App review in Dataverse
+
+**Live QA setup: ready in AIS Development.** The `/review` route now uses the
+`cr9cd_TicketReview` Custom API and persistent native Dataverse records. The
+environment setup and live API checks were run on 2026-10-26, authenticated as
+**emikes@ais-now.com**. No other user was authenticated or impersonated.
+
+Run **both** local servers on this computer:
+
+```powershell
+# Terminal 1: Vite application server
+npm run dev -- --port 3000
+
+# Terminal 2: Power Platform connection server (PAC account must be emikes@ais-now.com)
+pac code run
+```
+
+Open the exact Local Play URL printed by **pac code run**. The user confirmed
+this command pair works on 2026-10-26. Use the printed host, ports and URLs
+without substituting `127.0.0.1` or a manually assembled link.
+Sign in as **emikes@ais-now.com**, the Allocation desk opens directly.
+Confirm the workspace header shows your email and coordinator access. Allow the
+browser's local network access prompt if shown.
+
+If the host still reports an app-load error, the URL-only workaround
+`&PAOverrideFGRollout.EnableAuthenticatedGateway=false` is described in
+[Microsoft issue #504](https://github.com/microsoft/PowerAppsCodeApps/issues/504).
+The hosted app has not been republished. See
+[Dataverse QA setup and acceptance checks](DATAVERSE_REVIEW_QA.md) for the
+applied environment changes, test evidence, roles, and remaining checks.
+
+## Main UI
+
+Allocation desk (B) is the only UI, available at `#/` and `#/review`. The layout
+comparison bar and alternate-layout routes have been removed. Old bookmarks
+redirect to the main workspace. The isolated synthetic preview uses this same UI. Refresh progress and a brief Updated confirmation appear on the refresh button. Decorative page and list footers have been removed.
+
+Lists start without an automatically selected record. Close buttons clear the selection and return the space to the list. Routine successful saves do not display banners; errors remain explicit.
+
+B keeps the workspace within the viewport. Lists, details, and editor panes
+scroll independently. Inventory, allocation, contact, team and season rows can
+be selected by clicking the row or using Tab and Enter/Space. Nested action
+buttons and checkboxes retain their own actions. Allocation and contact details
+open on the right. Setup has separate Teams, Seasons and Schedule import
+sections; import uses a source editor and a validation table before commit.
+
+Desktop and iPad are the target sizes. Browser checks against isolated synthetic
+fixtures passed at 1440?1050, 1024?768 and 768?1024, with no page errors or external
+requests. They covered row/keyboard selection, event creation, interest,
+allocation, visible rejection reasons, history, directory-role projections,
+team/season creation, schedule preview/import, bounded page height, and separate
+pane scrolling. These checks do not claim live browser or physical iPad acceptance.
+
+Reproduce using `npm run dev:review`, a separate Chrome debugging instance on
+port 9224, and `node scripts/design-browser-checks.mjs`. Screenshots and results
+are stored in ignored `design-artifacts.local/`. Both Vite configurations exclude
+that folder from file watching so browser profile locks do not stop the servers.
+
+The live workspace uses real signed-in identity and server time. It has **no
+persona selector, clock override, or reset button**. Refresh and page reload
+preserve records. Messages remain saved previews and transfers remain manual.
+
+Live verification passed: native record persistence, invalid-date rollback,
+idempotent replay, demand without reservation, competing allocations with exactly
+one winner, future-attendance rejection, cancellation without auto-promotion,
+and directory synchronization preserving app eligibility. Local checks: **64
+frontend tests and 24 offline C# security tests pass**, typecheck and
+changed-source lint pass, and platform build passes.
+Browser click-through and requester testing with separately authorized accounts
+remain pending; these results are API verification, not browser acceptance.
+
+## App admins and solution packaging
+
+The backend now gives `emikes@ais-now.com`, `jjackson@ais-now.com`, and
+`aharouff@ais-now.com` fixed coordinator access plus **User access** administration.
+Other coordinators cannot assign roles. User access shows name/email, direct
+roles, inherited roles and effective access. Choose a row, select an app role
+in the right panel and save; refresh to verify it. Group-inherited access can be
+managed through Groups; directory membership remains in Entra. Other team roles
+remain in Dataverse team administration. Customers remain beneficiary
+contacts, not a separate sign-in role.
+
+Live read-only checks verified exactly these three admins and 103 active users;
+the setup did not assign individual users new roles. **CRM Sales Rep** is now
+connected as a members-only group with Sales representative access. All 301
+individual role associations were verified unchanged. Admins can manage it under
+**User access → Groups** or connect another security/Microsoft 365 group using
+its Object ID. Group members inherit access through Dataverse; membership changes
+may require a new sign-in or cache refresh. App sharing and environment access
+remain separate. Requester sign-in with approved testers remains an acceptance
+task.
+
+The single **AIS Ticket Manager** authoring solution contains the existing app,
+16 custom table definitions, the three app roles plus the legacy Ticket Manager
+User role definition, signed plug-in and Custom API. The old unmanaged QA
+container was backed up and retired after all 29 component entries were verified
+as covered. Future setup runs target the main solution.
+Managed/unmanaged exports passed inspection with zero missing dependencies.
+See [solution artifacts, commands and deployment boundaries](../solutions/README.md).
+The exports contain the existing hosted bundle; the latest UI is available locally
+and has not been republished.
+
+## Isolated synthetic regression testing
+
+The instructions below describe the separate in-memory regression entry. Use
+the live workflow above for Dataverse testing. Its earlier implementation handoff follows.
 
 Status: **READY_FOR_PARENT_QA**. Implementation checks below were performed by the implementing agent. Independent parent browser QA and human acceptance are pending; this document does not claim either has happened.
 

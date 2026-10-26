@@ -41,7 +41,7 @@ export function Badge({ children }: { children: ReactNode }) {
 }
 
 export function FormError() {
-  const { error, busy } = useReview();
+  const { error } = useReview();
   return (
     <>
       {error && (
@@ -50,11 +50,6 @@ export function FormError() {
           className="rounded-lg bg-rose-50 p-3 text-sm text-rose-900"
         >
           {error}
-        </p>
-      )}
-      {busy && (
-        <p role="status" className="text-sm">
-          Saving local change…
         </p>
       )}
     </>
