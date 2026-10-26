@@ -124,6 +124,10 @@ def main():
     ]:
         existing = find("connectionreferences", "connectionreferenceid,connectionreferencelogicalname", f"connectionreferencelogicalname eq '{logical_name}'")
         body = {"connectionreferencelogicalname": logical_name, "connectionreferencedisplayname": "Ticket Manager schedule " + alias, "connectorid": api, "connectionid": connection}
+        if alias == "claude":
+            # The runtime API ID alone works but cannot be exported. Dataverse
+            # also requires the native connector relationship for solution ALM.
+            body["CustomConnectorId@odata.bind"] = f"/connectors({connector['connectorid']})"
         if existing:
             d.call("PATCH", f"connectionreferences({existing[0]['connectionreferenceid']})", body)
         else:

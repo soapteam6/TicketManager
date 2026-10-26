@@ -190,6 +190,15 @@ repository, the app or flow definition. Existing Claude flows were not changed.
 Exports include connector metadata and connection references, **not credentials
 or live connections**. Another environment needs its own deliberate connection
 binding and activation. Current setup refuses to overwrite an active flow.
+The Claude connection reference must also bind its native `CustomConnectorId`;
+the runtime API address alone works for searches but prevents solution export.
+The setup and export checks enforce this relationship.
+
+Microsoft documents a connector-registration limitation on a first deployment:
+the custom connector must exist before importing its connection references and
+flows. Plan a connector-first import stage for a fresh environment while keeping
+AIS Ticket Manager as the authoring solution. A clean-environment deployment has
+not been tested. See [Microsoft's custom connector solution guidance](https://learn.microsoft.com/en-us/connectors/custom-connectors/customconnectorssolutions).
 
 ```powershell
 # Read-only setup plan; announce environment changes before applying:

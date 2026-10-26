@@ -57,6 +57,8 @@ def main():
         assert any(c["componenttype"] == 1 and c["objectid"] == metadata["MetadataId"] and c["rootcomponentbehavior"] == 0 for c in members), "Search table missing from solution"
         refs = d.call("GET", "connectionreferences", params={"$select": "connectionreferenceid", "$filter": "connectionreferencelogicalname eq 'cr9cd_ticketscheduledataverse' or connectionreferencelogicalname eq 'cr9cd_ticketscheduleclaude'"})["value"]
         assert len(refs) == 2 and all(any(c["componenttype"] == 10083 and c["objectid"] == r["connectionreferenceid"] for c in members) for r in refs), "Search connection references missing"
+        claude_ref = d.call("GET", "connectionreferences", params={"$select": "_customconnectorid_value", "$filter": "connectionreferencelogicalname eq 'cr9cd_ticketscheduleclaude'"})["value"][0]
+        assert claude_ref["_customconnectorid_value"] == search["connectorId"], "Claude reference lacks its native connector relationship"
     legacy = d.call("GET", "roles", params={"$select": "roleid,_parentrootroleid_value", "$filter": "name eq 'Ticket Manager User'"})["value"]
     legacy = [r for r in legacy if r.get("_parentrootroleid_value", r["roleid"]) == r["roleid"]]
     for role in roles + legacy:

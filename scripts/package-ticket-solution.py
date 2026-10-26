@@ -9,6 +9,7 @@ import argparse
 import base64
 import json
 from pathlib import Path
+import re
 import zipfile
 import xml.etree.ElementTree as ET
 
@@ -73,6 +74,45 @@ def plan(d):
     return components, roles
 
 
+def inspect_schedule_search(archive, roots):
+    config = ROOT / "solutions/schedule-search.json"
+    if not config.exists():
+        return None
+    from schedule_search_flow import definition
+    search = json.loads(config.read_text(encoding="utf-8"))
+    if not any(r.attrib.get("schemaName") == search["jobTable"] and r.attrib.get("type") == "1" and r.attrib.get("behavior") == "0" for r in roots):
+        raise RuntimeError("Export is missing the full schedule-search table.")
+    flows = [n for n in archive.namelist() if n.startswith("Workflows/") and search["workflowId"] in n.lower()]
+    if len(flows) != 1:
+        raise RuntimeError("Export is missing the schedule-search flow.")
+    flow = json.loads(archive.read(flows[0]))
+    if flow["properties"]["definition"] != definition(search["jobEntitySet"], search["connectorApi"]):
+        raise RuntimeError("Exported schedule-search flow differs from its source definition.")
+    connectors = [r for r in roots if r.attrib.get("type") == "372" and r.attrib.get("id", "").strip("{}").lower() == search["connectorId"]]
+    if len(connectors) != 1:
+        raise RuntimeError("Export is missing the custom Claude connector.")
+    prefix = "Connector/" + connectors[0].attrib["schemaName"]
+    swagger = json.loads(archive.read(prefix + "_openapidefinition.json"))
+    routes = {swagger.get("basePath", "").rstrip("/") + p for p in swagger["paths"]}
+    if swagger["host"] != "api.anthropic.com" or "/v1/messages" not in routes:
+        raise RuntimeError("Unexpected schedule-search connector endpoint.")
+    parameters = json.loads(archive.read(prefix + "_connectionparameters.json"))
+    if parameters.get("api_key", {}).get("type") != "securestring" or "value" in parameters["api_key"]:
+        raise RuntimeError("Expected a credential-free encrypted connection parameter definition.")
+    customizations = ET.fromstring(archive.read("customizations.xml"))
+    refs = {r.attrib["connectionreferencelogicalname"]: r for r in customizations.iter("connectionreference")}
+    for name in ["cr9cd_ticketscheduledataverse", "cr9cd_ticketscheduleclaude"]:
+        if name not in refs or refs[name].find("connectionid") is not None:
+            raise RuntimeError("Missing connection reference or environment-specific connection exported.")
+    if refs["cr9cd_ticketscheduleclaude"].findtext("customconnectorid/connectorid") != search["connectorId"]:
+        raise RuntimeError("The exported reference lacks its native custom-connector relationship.")
+    if any(re.search(rb"sk-ant-[A-Za-z0-9_-]{20,}", archive.read(n)) for n in archive.namelist() if not n.endswith("/")):
+        raise RuntimeError("An API-key pattern was detected in the solution export; contents withheld.")
+    return {"flowDefinitionMatchesSource": True, "customConnectorIncluded": True,
+            "nativeConnectorReferenceBound": True, "apiKeyPatternsDetected": False,
+            "liveConnectionsExported": False}
+
+
 def inspect_zip(path):
     with zipfile.ZipFile(path) as archive:
         solution = ET.fromstring(archive.read("solution.xml"))
@@ -84,6 +124,9 @@ def inspect_zip(path):
             "missingDependencies": [ET.tostring(r, encoding="unicode") for r in missing],
             "files": archive.namelist(),
         }
+        search = inspect_schedule_search(archive, roots)
+        if search:
+            summary["scheduleSearch"] = search
         (path.with_suffix(".manifest.json")).write_text(json.dumps(summary, indent=2), encoding="utf-8")
         types = {int(r.attrib["type"]) for r in roots}
         # Custom APIs export as separate XML files rather than RootComponents entries.

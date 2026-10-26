@@ -1,6 +1,6 @@
 {
   "file": "AISTicketManager_managed.zip",
-  "bytes": 282193,
+  "bytes": 298793,
   "rootComponents": [
     {
       "type": "1",
@@ -54,6 +54,11 @@
     },
     {
       "type": "1",
+      "schemaName": "cr9cd_schedulesearch",
+      "behavior": "0"
+    },
+    {
+      "type": "1",
       "schemaName": "cr9cd_scoringconfig",
       "behavior": "0"
     },
@@ -103,6 +108,11 @@
       "behavior": "0"
     },
     {
+      "type": "29",
+      "id": "{c5df18a1-df8f-4f17-bac4-e04d99d6be79}",
+      "behavior": "0"
+    },
+    {
       "type": "91",
       "id": "{92e64c8f-51d1-f111-a05b-6045bd0695f8}",
       "schemaName": "TicketReview, Version=1.0.0.0, Culture=neutral, PublicKeyToken=7dcfea7291924748",
@@ -112,20 +122,37 @@
       "type": "300",
       "schemaName": "cr9cd_aisticketconcierge_af330",
       "behavior": "0"
+    },
+    {
+      "type": "372",
+      "id": "{b811dfc7-70d1-f111-a05b-6045bd069cda}",
+      "schemaName": "new_ticket-20manager-20claude",
+      "behavior": "0"
     }
   ],
   "missingDependencies": [],
   "files": [
     "customizations.xml",
     "solution.xml",
+    "Workflows/TicketManager-Findschedule-C5DF18A1-DF8F-4F17-BAC4-E04D99D6BE79.json",
     "PluginAssemblies/TicketReview-92E64C8F-51D1-F111-A05B-6045BD0695F8/TicketReview.dll",
     "CanvasApps/cr9cd_aisticketconcierge_af330_CodeAppPackages/index.html",
-    "CanvasApps/cr9cd_aisticketconcierge_af330_CodeAppPackages/assets/index-DF2NMKrg.js",
-    "CanvasApps/cr9cd_aisticketconcierge_af330_CodeAppPackages/assets/index-DlhIaoG6.css",
+    "CanvasApps/cr9cd_aisticketconcierge_af330_CodeAppPackages/assets/index-B0oA2fw4.css",
+    "CanvasApps/cr9cd_aisticketconcierge_af330_CodeAppPackages/assets/index-CqoW05Dq.js",
     "CanvasApps/cr9cd_aisticketconcierge_af330_CodeAppPackages/vite.svg",
+    "Connector/new_ticket-20manager-20claude_openapidefinition.json",
+    "Connector/new_ticket-20manager-20claude_connectionparameters.json",
+    "Connector/new_ticket-20manager-20claude_policytemplateinstances.json",
     "customapis/cr9cd_TicketReview/customapirequestparameters/Payload/customapirequestparameter.xml",
     "customapis/cr9cd_TicketReview/customapiresponseproperties/Result/customapiresponseproperty.xml",
     "customapis/cr9cd_TicketReview/customapi.xml",
     "[Content_Types].xml"
-  ]
+  ],
+  "scheduleSearch": {
+    "flowDefinitionMatchesSource": true,
+    "customConnectorIncluded": true,
+    "nativeConnectorReferenceBound": true,
+    "apiKeyPatternsDetected": false,
+    "liveConnectionsExported": false
+  }
 }
