@@ -1,4 +1,4 @@
-import { isCalendarDate, parseIsoTimestamp } from './dates';
+import { isCalendarDate, localDateTimeInputToIso, parseIsoTimestamp } from './dates';
 import type { InventoryView, ScheduleSearchJob } from './types';
 
 export interface ScheduleSource { url: string; title: string }
@@ -7,6 +7,7 @@ export interface DiscoveredGame {
   title: string;
   startAt: string;
   localDate: string;
+  timezone: string;
   venue: string;
   home: boolean | null;
   sourceUrl: string;
@@ -60,26 +61,9 @@ function verifiedStart(row: Record<string, unknown>, timezone: string): { startA
   const date = text(row.localDate, 10), time = text(row.localTime, 5);
   if (!isCalendarDate(date) || !/^\d{2}:\d{2}$/.test(time) || !timezone) return { startAt: '', issue: 'Source date/timezone not confirmed' };
   try {
-    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
-    const local = (instant: number) => {
-      const parts = formatter.formatToParts(new Date(instant));
-      const part = (key: string) => parts.find(p => p.type === key)?.value;
-      return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}:00Z`;
-    };
-    const target = `${date}T${time}:00Z`, naive = Date.parse(target);
-    const candidates = new Set<number>();
-    // Probe both sides of a possible DST transition. A repeated local time is
-    // ambiguous and a skipped local time has no candidate; neither is guessed.
-    for (const hours of [-36, 0, 36]) {
-      const probe = naive + hours * 3600000;
-      const offset = Date.parse(local(probe)) - probe;
-      const candidate = naive - offset;
-      if (local(candidate) === target) candidates.add(candidate);
-    }
-    if (candidates.size !== 1) return { startAt: '', issue: 'Source time is ambiguous or invalid during a timezone change' };
-    const instant = [...candidates][0];
-    return { startAt: new Date(instant).toISOString(), issue: '', corrected: instant !== ms };
-  } catch { return { startAt: '', issue: 'Source timezone is not recognized' }; }
+    const startAt = localDateTimeInputToIso(`${date}T${time}`, timezone);
+    return { startAt, issue: '', corrected: Date.parse(startAt) !== ms };
+  } catch (error) { return { startAt: '', issue: error instanceof RangeError ? 'Source timezone is not recognized' : 'Source time is ambiguous or invalid during a timezone change' }; }
 }
 
 // Only actual Anthropic server-tool results count as verified sources. A URL in
@@ -127,7 +111,7 @@ export function parseScheduleDiscovery(raw: unknown, request: ScheduleSearchJob[
     corrected ||= !!timing.corrected;
     const title = text(row.title, 200).replace(/[\r\n]+/g, ' ');
     const home = typeof row.home === 'boolean' ? row.home : null;
-    return { id: String(index), title, startAt: timing.startAt, localDate: text(row.localDate, 10), venue: text(row.venue, 200), home,
+    return { id: String(index), title, startAt: timing.startAt, localDate: text(row.localDate, 10), timezone: text(row.timezone, 100) || timezone, venue: text(row.venue, 200), home,
       sourceUrl, sourceVerified, timeIssue: timing.issue, tickets: request.ticketsPerEvent,
       selected: !!title && sourceVerified && !!timing.startAt && (!request.homeOnly || home === true) };
   });

@@ -90,7 +90,7 @@ export function RequestQueue({ desk = false, gameId, onGameChange }: {
         const identity = requesterIdentity(r, snapshot);
         const game = snapshot.catalog.find(g => g.id === r.gameId);
         return <button type="button" className={`work-queue-item ${selected?.id === r.id ? 'is-selected' : ''}`} key={r.id} aria-pressed={selected?.id === r.id} onClick={() => setSelectedId(r.id)}>
-          <div><strong>{identity.name}</strong><span>{r.quantity - r.allocated} tix</span></div><small>{identity.email || 'Email not recorded'}</small><p>{game?.title ?? 'Historical event'}</p><div><Status value={r.status} /><time>{new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}</time></div>
+          <div><strong>{identity.name}</strong><span>{r.quantity - r.allocated} tix</span></div><small>{identity.email || 'Email not recorded'}</small><p>{game?.title ?? 'Historical event'}</p><div><Status value={r.status} /><time>{new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</time></div>
         </button>;
       })}</div> : <div className="work-table-scroll"><table className="work-table work-request-table"><thead><tr><th>Requester</th><th>Event</th><th className="numeric">Tickets</th><th>Status</th><th><span className="sr-only">Review</span></th></tr></thead><tbody>{requests.map(r => {
         const identity = requesterIdentity(r, snapshot);

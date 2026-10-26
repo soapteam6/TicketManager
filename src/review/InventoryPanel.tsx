@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Modal } from '../components/Modal';
 import { useReview } from './context';
-import { utcDateTimeInputToIso } from './dates';
+import { localDateTimeInputToIso, timeZoneLabel } from './dates';
 import { PERSONAS } from './fixtures';
 import { personName } from './personName';
 import type { InventoryView, ReleaseCommand } from './types';
@@ -36,7 +36,7 @@ export function InventoryForm({ close }: { close: () => void }) {
             type: 'createInventory',
             kind,
             title: value(form, 'title'),
-            gameDate: utcDateTimeInputToIso(value(form, 'date')),
+            gameDate: localDateTimeInputToIso(value(form, 'date')),
             tickets: number(form, 'tickets'),
             seasonId: kind === 'game' ? value(form, 'season') : undefined,
           }))
@@ -76,7 +76,7 @@ export function InventoryForm({ close }: { close: () => void }) {
         </Field>
       )}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Event date and time (UTC)" required>
+        <Field label={`Event date and time (${timeZoneLabel()})`} required>
           <TextInput name="date" type="datetime-local" required />
         </Field>
         <Field label="Ticket inventory" required>
@@ -294,7 +294,7 @@ export function ReleasePanel({
   return (
     <Panel
       title="Control inventory visibility"
-      description="Release individual selections, batches or an inclusive UTC date window. Announcements are a separate coordinator choice."
+      description="Release individual selections, batches or an inclusive local date window. Announcements are a separate coordinator choice."
     >
       <form
         className="space-y-3"
@@ -307,13 +307,13 @@ export function ReleasePanel({
               ...(scope === 'selected'
                 ? { ids: selected }
                 : {
-                    from: utcDateTimeInputToIso(value(form, 'from')),
-                    through: utcDateTimeInputToIso(value(form, 'through')),
+                    from: localDateTimeInputToIso(value(form, 'from')),
+                    through: localDateTimeInputToIso(value(form, 'through')),
                   }),
               action,
               at:
                 action === 'scheduled'
-                  ? utcDateTimeInputToIso(value(form, 'at'))
+                  ? localDateTimeInputToIso(value(form, 'at'))
                   : undefined,
             }))
           )
@@ -326,7 +326,7 @@ export function ReleasePanel({
               <option value="selected">
                 Selected inventory ({selected.length})
               </option>
-              <option value="window">Date window (UTC)</option>
+              <option value="window">Date window</option>
             </Select>
           </Field>
           <Field label="Visibility">
@@ -342,17 +342,17 @@ export function ReleasePanel({
             </Select>
           </Field>
           {action === 'scheduled' && (
-            <Field label="Release at (UTC)" required>
+            <Field label={`Release at (${timeZoneLabel()})`} required>
               <TextInput name="at" type="datetime-local" required />
             </Field>
           )}
         </div>
         {scope === 'window' && (
           <div className="grid sm:grid-cols-2 gap-3">
-            <Field label="Event window from (UTC)" required>
+            <Field label={`Event window from (${timeZoneLabel()})`} required>
               <TextInput type="datetime-local" name="from" required />
             </Field>
-            <Field label="Event window through (UTC, inclusive)" required>
+            <Field label={`Event window through (${timeZoneLabel()}, inclusive)`} required>
               <TextInput type="datetime-local" name="through" required />
             </Field>
           </div>

@@ -41,11 +41,11 @@ export function InventoryGrid({ onRequests }: { onRequests: (gameId: string) => 
     <div className={`work-grid-and-inspector ${focused ? 'has-inspector' : ''}`}>
       <div className="work-table-scroll"><table className="work-table">
         <thead><tr>{admin && <th className="work-check"><input type="checkbox" aria-label="Select visible events" checked={allSelected} ref={el => { if (el) el.indeterminate = partial; }} onChange={e => setSelected(e.target.checked ? [...new Set([...selected, ...games.map(g => g.id)])] : selected.filter(id => !games.some(g => g.id === id)))} /></th>}
-          <th>Event / season</th><th><button className="work-sort" onClick={() => setDescending(!descending)}>Date (UTC) {descending ? '↓' : '↑'}</button></th><th>Visibility</th><th className="numeric">Available</th><th className="numeric">Demand</th><th><span className="sr-only">Open record</span></th></tr></thead>
+          <th>Event / season</th><th><button className="work-sort" onClick={() => setDescending(!descending)}>Date {descending ? '↓' : '↑'}</button></th><th>Visibility</th><th className="numeric">Available</th><th className="numeric">Demand</th><th><span className="sr-only">Open record</span></th></tr></thead>
         <tbody>{games.map(g => <tr key={g.id} className={focusedId === g.id ? 'is-selected' : ''} {...rowSelection(focusedId === g.id, () => setFocusedId(g.id))}>
           {admin && <td className="work-check"><input type="checkbox" aria-label={`Select ${g.title}`} checked={selected.includes(g.id)} onChange={e => setSelected(e.target.checked ? [...selected, g.id] : selected.filter(id => id !== g.id))} /></td>}
           <td><button className="work-record-link" onClick={() => setFocusedId(g.id)}>{g.title}</button><small>{g.seasonLabel || 'Independent event'}</small></td>
-          <td className="nowrap">{dateTime(g.gameDate).replace(' UTC', '')}</td>
+          <td className="nowrap">{dateTime(g.gameDate)}</td>
           <td><Status value={g.released ? 'released' : g.release}>{g.released ? 'Released' : g.release === 'scheduled' ? 'Scheduled release' : 'Private'}</Status></td>
           <td className="numeric"><strong>{g.availableTickets}</strong><span className="muted"> / {g.totalTickets}</span></td>
           <td className="numeric">{g.requestedTickets}<small>{g.requestCount} {g.requestCount === 1 ? 'request' : 'requests'}</small></td>

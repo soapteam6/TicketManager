@@ -75,7 +75,7 @@ preserve records. Messages remain saved previews and transfers remain manual.
 Live verification passed: native record persistence, invalid-date rollback,
 idempotent replay, demand without reservation, competing allocations with exactly
 one winner, future-attendance rejection, cancellation without auto-promotion,
-and directory synchronization preserving app eligibility. Local checks: **81
+and directory synchronization preserving app eligibility. Local checks: **86
 frontend tests and 36 offline C# security tests pass**, typecheck and
 changed-source lint pass, and platform build passes.
 Browser click-through and requester testing with separately authorized accounts
@@ -140,8 +140,11 @@ cannot be imported as ready rows. Confirmed times are checked against the source
 timezone, including daylight saving. UTC is calculated from the source local
 date/time and IANA timezone; ambiguous or skipped DST times are excluded. A
 current-season substitution for a next-season request is withheld. The preview
-date controls use UTC, as do
-the other event screens. **CSV import** remains available beside AI Import.
+date controls display and accept the browser's local timezone, shown beside the
+selected count. Event lists, details, event creation and scheduled releases use
+that same local timezone. Instants remain stored/transmitted as UTC; existing
+inventory timestamps are not rewritten. **CSV import** retains its explicit UTC
+input contract and remains available beside AI Import.
 
 The new **Ticket Manager - AI Import** Power Automate flow, its custom
 Claude connector, two connection references and search-job table are included
@@ -164,7 +167,7 @@ inventory was imported and workspace revision 18 was unchanged. An earlier
 current-season substitution was rejected; UTC conversion is now calculated in
 the client from source local fields. See [AI Import evidence](../solutions/ai-import-test.json).
 
-Local regression coverage now includes **81 frontend tests and 36 backend
+Local regression coverage now includes **86 frontend tests and 36 backend
 security tests**, plus the desktop and iPad preview/import checks. Requester
 sign-in and human acceptance in the hosted app remain pending.
 
@@ -207,7 +210,7 @@ All records are invented: Synthetic Comets, Juniper Example Labs, Cobalt Sample 
 - **Demo Representative**: released inventory, own interest, customer contacts and self employee option. It never receives other requesters' private requests, scores, reliability history or coordinator datasets.
 - **Demo Employee**: released inventory and self employee interest only. No other employee choices.
 
-The fixed initial demo clock is **2026-10-26 12:00 UTC**. Expand “Demo clock” as coordinator to apply a different instant. This is an explicit test control, not an authoritative production clock. All review event/release/history timestamps show UTC even when the browser is in another timezone. Seasons keep date-only calendar strings; existing Code App date-only helpers are unchanged.
+The fixed initial demo clock is **2026-10-26 12:00 UTC**. Expand “Demo clock” as coordinator to apply a different instant. This is an explicit test control, not an authoritative production clock. Event/release/history timestamps display in the browser's local timezone; stored instants and the fixture reference table below use UTC. Seasons keep date-only calendar strings; existing Code App date-only helpers are unchanged.
 
 Data is held only in one provider instance in browser memory. Switching personas preserves it for that tab. **Reset synthetic demo** or a page reload restores fixtures, the clock, eligibility overrides, scores and empty outbox. Each tab starts independently. There is no persistence, localStorage, database or shared server, and no real service call.
 
@@ -223,7 +226,7 @@ Initial inventory:
 
 ## Independent click-through
 
-1. As coordinator, add a **Dated event** titled “QA Concert”, date/time **2026-12-20 18:00 UTC**, 2 tickets. It needs no season and starts private. Verify the displayed instant stays Dec 20, 18:00 UTC in another browser timezone. Malformed date inputs such as `:00Z` are rejected by the service as well as form validation.
+1. In a Pacific-time browser, add a **Dated event** titled “QA Concert”, date/time **2026-12-20 18:00 local**, 2 tickets. It needs no season and starts private. This is Dec 21 02:00 UTC; an Eastern-time browser should show Dec 20 21:00. Malformed dates and ambiguous/skipped daylight-saving times must fail validation.
 2. Switch to representative: only Sample Visitors is initially visible. Return to coordinator, select Example Rivals and Winter Performance, choose Release now and Save visibility. Return to representative and verify both appear. In Mock messages the outbox stays empty.
 3. On Sample Visitors, express customer interest for 2 tickets. Choose Juniper Example Labs, Alex and Quinn, optional synthetic opportunity, and a concise rationale. Verify 4/4 tickets remain available; demand becomes 1 request / 1 requesting person / 2 tickets requested. These count requesting people, not contact/beneficiary headcount. Fulfilled interest stays included in the demand totals; cancelled interest does not.
 4. As employee, enter self interest for 1 ticket on the same game. Verify availability is still 4/4. My interest shows only the employee's own request; other requesters' identities and rationale are absent.
@@ -232,7 +235,7 @@ Initial inventory:
 7. On Past Demo Night, No-show without evidence must fail. Add explicit synthetic confirmation and save, then inspect Alex's coordinator reliability flag/history. Correcting back to Unknown retains the audit trail and removes it from confirmed no-show evidence. Silence or missing photos never creates a no-show.
 8. In Contacts & history, search “Demo Employee”, make app inactive, then Sync synthetic directory. App inactive and directory active remain distinct. Employee persona now has no eligible beneficiary and cannot submit self interest. Reactivate only if wanted. Alex's history remains across both seasons; search also supports business, email and phone. Customer contacts can be added/edited without changing directory state.
 9. In Setup & import, add a synthetic team/season or preview the supplied two-row CSV. Preview does not create inventory. Import explicitly and verify both new items are private, with the dated event outside any season. Wrong calendar dates, extra columns or duplicate rows must fail the command atomically.
-10. Select QA Concert, choose Schedule release, set **2026-10-26 13:00 UTC**. It stays hidden to requesters before that instant. Apply demo clock 13:00 as coordinator; the requester catalog now includes it. No external scheduler or automatic message runs. Date-window release supports inclusive UTC boundaries for rolling batches.
+10. In a Pacific-time browser, select QA Concert, choose Schedule release, set **2026-10-26 06:00 local** (13:00 UTC). It stays hidden to requesters before that instant. Apply demo clock 13:00 UTC as coordinator; the requester catalog now includes it. No external scheduler or automatic message runs. Date-window inputs use local wall time and are converted to UTC instants for comparison.
 11. In Scoring, adjust demonstration weights/category values and save. Values are transparent and advisory; no automatic allocations or employment decision follows. Lead time, premium balance, employee/customer balance and duplicate attendance weighting stay disabled. Equal scores use stable IDs, with no hidden tier/lead-time tiebreak.
 12. In Mock messages, refresh the availability summary and explicitly add it to the mock outbox. Follow-up is disabled initially. Enable and save the optional template before adding a follow-up preview. No send control, SMS, game-day reminders, subscription, upload or real delivery exists.
 13. At a narrow viewport (390px), verify wrapped navigation/cards, labels, empty/error states, dialog initial focus, Tab/Shift+Tab loop, Escape dismissal and focus return. Reset the demo and verify all changes disappear.

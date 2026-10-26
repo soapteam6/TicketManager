@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from 'react';
 import { useReview } from '../context';
-import { isCalendarDate } from '../dates';
+import { isCalendarDate, isoToLocalDateTimeInput, localDateTimeInputToIso, timeZoneLabel } from '../dates';
 import { reviewErrorMessage } from '../errorMessage';
 import { discoveredGameIssues, discoveredGamesCsv, parseScheduleDiscovery, type DiscoveredGame, type ScheduleDiscovery } from '../scheduleDiscovery';
 import type { ScheduleSearchJob } from '../types';
@@ -67,6 +67,15 @@ export function ScheduleFinder({ initialSeasonId = '' }: { initialSeasonId?: str
   const ticketsValid = tickets !== '' && Number.isInteger(Number(tickets)) && Number(tickets) >= 0 && Number(tickets) <= 1000;
   const targetValid = !!season || !!(draft.label.trim() && (draft.teamId || draft.teamName.trim()) && isCalendarDate(draft.startDate) && isCalendarDate(draft.endDate) && draft.startDate <= draft.endDate);
   const update = (id: string, patch: Partial<DiscoveredGame>) => setDiscovery(current => current && ({ ...current, games: current.games.map(g => g.id === id ? { ...g, ...patch } : g) }));
+  function updateStart(game: DiscoveredGame, input: string) {
+    if (!input) { update(game.id, { startAt: '', timeIssue: 'Enter the confirmed start time' }); return; }
+    try {
+      const startAt = localDateTimeInputToIso(input);
+      let localDate = input.slice(0, 10);
+      try { localDate = isoToLocalDateTimeInput(startAt, game.timezone).slice(0, 10); } catch { /* A manual local edit can correct an unknown source timezone. */ }
+      update(game.id, { startAt, timeIssue: '', localDate });
+    } catch (err) { update(game.id, { startAt: '', timeIssue: reviewErrorMessage(err) }); }
+  }
   return <div className={`work-import-section work-schedule-finder ${discovery ? 'has-result' : 'is-prompt'}`}>
     <form className="work-import-editor" onSubmit={async e => {
       e.preventDefault(); if (!available || !provider.startScheduleSearch) return;
@@ -88,7 +97,7 @@ export function ScheduleFinder({ initialSeasonId = '' }: { initialSeasonId?: str
       <Button type="submit" disabled={busy || searching || !available || !query.trim()}>{searching ? 'Preparing import…' : 'Prepare import'}</Button>
       {searching && <p className="work-help" role="status">Checking public sources. You can leave this screen and return while the search runs.</p>}
     </form>
-    {discovery && <section className="work-import-preview" aria-label="Found schedule"><div className="work-subtoolbar"><h3>{discovery.team || 'Import preview'}{discovery.season ? ` · ${discovery.season}` : ''}</h3><span className="work-help">{ready.length} selected</span></div>
+    {discovery && <section className="work-import-preview" aria-label="Found schedule"><div className="work-subtoolbar"><h3>{discovery.team || 'Import preview'}{discovery.season ? ` · ${discovery.season}` : ''}</h3><span className="work-help">{ready.length} selected · {timeZoneLabel()}</span></div>
       <div className="work-table-scroll">
         {discovery.warnings.length > 0 && <div className="work-import-errors">{discovery.warnings.map((w, i) => <p key={i}>{w}</p>)}</div>}
         <details className="work-schedule-source-disclosure"><summary>Sources ({discovery.sources.length})</summary><div className="work-schedule-sources">{discovery.sources.map(s => <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer">{s.title}</a>)}</div></details>
@@ -107,7 +116,7 @@ export function ScheduleFinder({ initialSeasonId = '' }: { initialSeasonId?: str
           const errors = issues(game);
           return <tr key={game.id}><td><input type="checkbox" aria-label={`Import ${game.title}`} checked={game.selected && !errors.length} disabled={imported || busy || !!errors.length} onChange={e => update(game.id, { selected: e.target.checked })} /></td>
             <td><TextInput aria-label={`Title for ${game.title}`} disabled={imported || busy} value={game.title} maxLength={200} onChange={e => update(game.id, { title: e.target.value })} />{game.sourceUrl && <a className="work-source-link" href={game.sourceUrl} target="_blank" rel="noopener noreferrer">View source</a>}<small>{game.venue}{game.home === false ? ' · Away' : ''}</small></td>
-            <td><TextInput type="datetime-local" disabled={imported || busy} aria-label={`UTC start for ${game.title}`} value={game.startAt.slice(0, 16)} onChange={e => update(game.id, { startAt: e.target.value ? `${e.target.value}:00Z` : '', timeIssue: '', localDate: e.target.value.slice(0, 10) })} />{!game.startAt && game.localDate && <small>Source date: {game.localDate}; time TBD</small>}</td>
+            <td><TextInput type="datetime-local" disabled={imported || busy} aria-label={`Local start for ${game.title}`} value={isoToLocalDateTimeInput(game.startAt)} onChange={e => updateStart(game, e.target.value)} />{!game.startAt && game.localDate && <small>Source date: {game.localDate}; time TBD</small>}</td>
             <td><TextInput type="number" min={0} max={1000} disabled={imported || busy} aria-label={`Tickets for ${game.title}`} value={game.tickets} onChange={e => update(game.id, { tickets: Number(e.target.value) })} /></td><td>{errors.length ? errors.map(issue => <small key={issue}>{issue}</small>) : 'Ready'}</td></tr>;
         })}</tbody></table>{!discovery.games.length && <EmptyRows>No published games were found for this request. Check the notes above or add a team and season year to your request.</EmptyRows>}
       </div>

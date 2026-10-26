@@ -256,12 +256,15 @@ Six offline checks in `scripts/test-schedule-flow-security.py` cover masked key
 reads/calls, key exclusion from messages/results and rejection of unknown modes.
 The exporter rejects API-key material in memory before writing a ZIP.
 
-On 2026-10-26: production build and changed-source lint passed; **81 frontend
+On 2026-10-26: production build and changed-source lint passed; **86 frontend
 tests** and **36 offline C# security tests** passed. Synthetic browser checks
 passed at desktop, iPad landscape and iPad portrait sizes, including granting
 and reversing a role, ordinary coordinator privacy, row selection, closable
 right-side details and bounded page scrolling. Schedule checks cover source
 validation, DST, TBD exclusion, preview, selected import and CSV fallback.
+AI Import and event display/edit controls use the browser's local timezone;
+storage and the explicit CSV input format remain UTC. Tests cover Pacific,
+Eastern and fractional-hour offsets, midnight/year boundaries and DST gaps/folds.
 Group checks covered connecting
 a group, assigning its role, admin-only management, inherited access, stale
 edits, preservation of other roles and members-only scope.

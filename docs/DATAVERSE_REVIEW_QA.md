@@ -105,7 +105,10 @@ lock/revision; the flow writes only job status/results, never inventory.
 
 The screen previews editable games and source links. Native web-tool results
 must support each source URL. UTC conversion is checked against each source's
-local date, time and IANA timezone. TBD or mismatched times are excluded. Games
+local date, time and IANA timezone. UTC instants are calculated independently;
+TBD or ambiguous DST times are excluded. The preview and event screens display
+and accept the browser's local timezone. Existing timestamps remain UTC and are
+not rewritten. CSV text continues to require UTC input. Games
 stay unimported until the coordinator selects **Import selected games**; normal
 transactional CSV validation then creates private inventory. CSV input remains
 available as a fallback.

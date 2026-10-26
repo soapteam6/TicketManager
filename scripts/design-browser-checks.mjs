@@ -72,6 +72,7 @@ try {
     await page.call('Runtime.enable');
     await page.call('Network.enable');
     await page.call('Network.setBlockedURLs', { urls: ['https://*'] });
+    await page.call('Emulation.setTimezoneOverride', { timezoneId: 'America/Los_Angeles' });
     await page.call('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1050, deviceScaleFactor: 1, mobile: false });
     await page.call('Page.navigate', { url: `${base}/` });
     await page.wait(`document.querySelector('.work-shell--${design}') && document.querySelector('table, .work-queue-list')`);
@@ -170,8 +171,15 @@ try {
       await set('textarea[name="scheduleQuery"]', 'I got tickets for next season. Find their home schedule.');
       await click('Prepare import', 'document.querySelector(".work-schedule-finder form")');
       await page.wait(`document.querySelector('input[name="importTeamName"]')`);
-      assert(await page.evaluate(`document.querySelector('input[name="importTeamName"]').value==='Demo schedule search'`));
       assert(await page.evaluate(`[...document.querySelectorAll('button')].find(b=>b.textContent==='Create season & import').disabled`), 'Unknown ticket quantity allowed import');
+      assert(await page.evaluate(`document.querySelector('.work-found-schedule input[type="datetime-local"]').value==='2027-09-11T05:00'`), 'AI preview is showing UTC instead of Pacific local time');
+      await page.call('Emulation.setTimezoneOverride', { timezoneId: 'America/New_York' });
+      await set('input[name="searchTickets"]', '2');
+      assert(await page.evaluate(`document.querySelector('.work-found-schedule input[type="datetime-local"]').value==='2027-09-11T08:00'`), 'AI preview did not respect the viewer timezone');
+      await page.call('Emulation.setTimezoneOverride', { timezoneId: 'America/Los_Angeles' });
+      await set('input[name="searchTickets"]', '3');
+      await set('.work-found-schedule input[type="datetime-local"]', '2027-09-11T06:30');
+      assert(await page.evaluate(`document.querySelector('input[name="importTeamName"]').value==='Demo schedule search'`));
       await set('input[name="searchTickets"]', '2');
       await screenshot('ai-import-review');
       await click('Create season & import');

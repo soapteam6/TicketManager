@@ -1,7 +1,9 @@
+import { localTimeZone } from './dates';
+
 export const value = (form: FormData, key: string) =>
   String(form.get(key) ?? '');
 export const number = (form: FormData, key: string) => Number(value(form, key));
-export function dateTime(iso: string) {
+export function dateTime(iso: string, timeZone = localTimeZone()) {
   return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: 'short',
@@ -9,7 +11,7 @@ export function dateTime(iso: string) {
     hour: '2-digit',
     minute: '2-digit',
     hourCycle: 'h23',
-    timeZone: 'UTC',
+    timeZone,
     timeZoneName: 'short',
   }).format(new Date(iso));
 }
