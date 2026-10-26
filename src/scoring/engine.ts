@@ -1,6 +1,5 @@
 import {
   FACTOR_KEYS,
-  TIER_RANK,
 } from '../domain/enums';
 import { FACTOR_LABELS } from '../domain/constants';
 import type { FactorContribution, ScoredRequestResult, RankedRequest, GameRankingResult } from '../domain/scoring-types';
@@ -47,7 +46,7 @@ function computePool(requests: ScoringRequestInput[]): PoolStats {
   return { total: requests.length, employeeCount, customerCount };
 }
 
-// Score, rank (deterministic tiebreak chain), and greedily allocate against inventory.
+// Score and rank advisory suggestions against inventory; this pure function never assigns tickets.
 export function rankGameRequests(
   requests: ScoringRequestInput[],
   game: ScoringGameInput,
@@ -62,14 +61,7 @@ export function rankGameRequests(
 
   scored.sort((a, b) => {
     if (b.finalScore !== a.finalScore) return b.finalScore - a.finalScore;
-    const ra = byId.get(a.requestId)!;
-    const rb = byId.get(b.requestId)!;
-    // Tiebreak: tier desc -> attendance rate desc -> earlier request -> id (stable).
-    if (TIER_RANK[rb.tier] !== TIER_RANK[ra.tier]) return TIER_RANK[rb.tier] - TIER_RANK[ra.tier];
-    const attA = ra.awardedCount ? ra.attendedCount / ra.awardedCount : 0;
-    const attB = rb.awardedCount ? rb.attendedCount / rb.awardedCount : 0;
-    if (attB !== attA) return attB - attA;
-    if (ra.createdAt !== rb.createdAt) return ra.createdAt - rb.createdAt;
+    // Stable IDs break equal scores without a hidden tier, attendance or lead-time rule.
     return a.requestId.localeCompare(b.requestId);
   });
 

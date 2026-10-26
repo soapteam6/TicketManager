@@ -11,10 +11,10 @@ function out(raw: number | null, norm: number, explain: string): FactorOutput {
 // Strategic value from the beneficiary tier, nudged by the future-priority flag.
 const strategicValue: Factor = {
   key: 'strategicValue',
-  extract(req) {
-    const base = (TIER_RANK[req.tier] - 1) / (MAX_TIER_RANK - 1);
+  extract(req, ctx) {
+    const base = req.contactType === 'employee' ? ctx.config.params.categoryEmployeeScore ?? 0.2 : req.tier === 'prospect' ? ctx.config.params.categoryProspectScore ?? 0.7 : ctx.config.params.categoryCustomerScore ?? 0.8;
     const nudge = req.futurePriorityFlag === 'elevated' ? 0.15 : req.futurePriorityFlag === 'deprioritized' ? -0.2 : 0;
-    return out(TIER_RANK[req.tier], base + nudge, `${req.tier} tier${nudge ? ` (${req.futurePriorityFlag})` : ''}`);
+    return out(TIER_RANK[req.tier], base + nudge, `${req.contactType === 'employee' ? 'Employee' : req.tier === 'prospect' ? 'Prospect' : 'Customer'} category base ${base}; configurable demo priority${nudge ? ` (${req.futurePriorityFlag})` : ''}`);
   },
 };
 
@@ -22,9 +22,10 @@ const strategicValue: Factor = {
 const attendanceRate: Factor = {
   key: 'attendanceRate',
   extract(req) {
-    if (req.awardedCount <= 0) return out(null, 0.5, 'No history (neutral)');
-    const rate = req.attendedCount / req.awardedCount;
-    return out(rate, rate, `Attended ${req.attendedCount}/${req.awardedCount} prior awards`);
+    const known = req.attendedCount + req.noShowCount;
+    if (!known) return out(null, 0.5, 'Unknown attendance; neutral');
+    const rate = req.attendedCount / known;
+    return out(rate, rate, `Attended ${req.attendedCount}/${known} confirmed outcomes; unknown excluded`);
   },
 };
 
@@ -32,19 +33,19 @@ const attendanceRate: Factor = {
 const reliability: Factor = {
   key: 'reliability',
   extract(req) {
-    if (req.awardedCount <= 0) return out(null, 1, 'No no-shows on record');
-    const noShowRate = req.noShowCount / req.awardedCount;
-    return out(noShowRate, 1 - noShowRate, `${req.noShowCount} no-shows of ${req.awardedCount}`);
+    const known = req.attendedCount + req.noShowCount;
+    if (!known) return out(null, 0.5, 'Unknown attendance; neutral');
+    const noShowRate = req.noShowCount / known;
+    return out(noShowRate, 1 - noShowRate, `${req.noShowCount} confirmed no-shows / ${known} confirmed outcomes; unknown excluded`);
   },
 };
 
-// Potential business, capped so a single large deal cannot dominate.
+// Context completeness is advisory; a coordinator evaluates rationale and value manually.
 const salesOpportunity: Factor = {
   key: 'salesOpportunity',
-  extract(req, ctx) {
-    const cap = ctx.config.params.salesOppCapUsd;
-    const norm = Math.min(req.salesOpportunityUsd, cap) / cap;
-    return out(req.salesOpportunityUsd, norm, req.salesOpportunityUsd > 0 ? `$${Math.round(req.salesOpportunityUsd).toLocaleString()} potential` : 'No stated opportunity');
+  extract(req) {
+    const stated = Boolean(req.businessRationale?.trim() || req.opportunityName?.trim() || req.salesOpportunityUsd > 0);
+    return out(stated ? 1 : 0, stated ? 1 : 0, stated ? 'Context provided; coordinator reviews rationale and value/MRR manually' : 'No stated rationale/opportunity');
   },
 };
 
@@ -52,6 +53,7 @@ const salesOpportunity: Factor = {
 const fairness: Factor = {
   key: 'fairness',
   extract(req, ctx) {
+    if (req.seasonAwardCount !== undefined) return out(req.seasonAwardCount, 1 / (1 + req.seasonAwardCount), `${req.seasonAwardCount} other allocations this season; earlier seasons excluded`);
     if (req.lastTicketDate == null) return out(null, 1, 'Never awarded before');
     const days = Math.max(0, (ctx.now - req.lastTicketDate) / DAY_MS);
     const norm = 1 - Math.pow(0.5, days / ctx.config.params.fairnessHalfLifeDays);

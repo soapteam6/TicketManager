@@ -45,20 +45,23 @@ export const TEAM_SEEDS: TeamSeed[] = [
   },
 ];
 
-// Default weights for the priority scoring engine (admin-editable via ais_scoringconfig).
+// Transparent demonstration defaults for advisory ranking; not settled numeric business policy.
 export const DEFAULT_SCORING_WEIGHTS: Record<FactorKey, number> = {
-  strategicValue: 0.22,
-  attendanceRate: 0.14,
-  reliability: 0.12,
-  salesOpportunity: 0.2,
-  fairness: 0.14,
-  employeeCustomerBalance: 0.06,
-  leadTime: 0.06,
-  premiumDemandBalance: 0.06,
+  strategicValue: 0.35,
+  attendanceRate: 0,
+  reliability: 0.15,
+  salesOpportunity: 0.25,
+  fairness: 0.25,
+  employeeCustomerBalance: 0,
+  leadTime: 0,
+  premiumDemandBalance: 0,
 };
 
 export interface ScoringParams {
-  salesOppCapUsd: number; // sales opportunity is normalized against this cap
+  categoryCustomerScore?: number;
+  categoryProspectScore?: number;
+  categoryEmployeeScore?: number;
+  salesOppCapUsd: number; // retained legacy configuration field; rationale factor does not use a financial cap
   fairnessHalfLifeDays: number; // days-since-last-award half-life for the fairness curve
   leadTimeSweetSpotDays: number; // ideal lead time before a game (tent-function peak)
   leadTimeWindowDays: number; // width of the lead-time tent function
@@ -66,6 +69,9 @@ export interface ScoringParams {
 }
 
 export const DEFAULT_SCORING_PARAMS: ScoringParams = {
+  categoryCustomerScore: 0.8,
+  categoryProspectScore: 0.7,
+  categoryEmployeeScore: 0.2,
   salesOppCapUsd: 50000,
   fairnessHalfLifeDays: 45,
   leadTimeSweetSpotDays: 21,
@@ -74,11 +80,11 @@ export const DEFAULT_SCORING_PARAMS: ScoringParams = {
 };
 
 export const FACTOR_LABELS: Record<FactorKey, string> = {
-  strategicValue: 'Strategic Value',
+  strategicValue: 'Customer / prospect / employee category',
   attendanceRate: 'Attendance Rate',
   reliability: 'Reliability (No-Show)',
-  salesOpportunity: 'Sales Opportunity',
-  fairness: 'Fairness (Time Since Last)',
+  salesOpportunity: 'Business rationale / opportunity',
+  fairness: 'Fairness within the season',
   employeeCustomerBalance: 'Employee/Customer Balance',
   leadTime: 'Lead Time',
   premiumDemandBalance: 'Premium Demand Balance',

@@ -34,3 +34,7 @@ plugins/**/bin/
 plugins/**/obj/
 __pycache__/
 *.pyc
+
+# Legacy standalone data is never used by the Code App review.
+/data/
+/review-dist/

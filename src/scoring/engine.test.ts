@@ -58,7 +58,7 @@ describe('scoreRequest', () => {
 });
 
 describe('rankGameRequests', () => {
-  it('allocates against inventory: awards up to capacity, waitlists the rest', () => {
+  it('suggests within capacity without mutating requests', () => {
     const requests = ['req-1', 'req-2', 'req-3', 'req-4'].map((id) => req({ requestId: id, quantity: 2 }));
     const result = rankGameRequests(requests, game, config, 5, NOW);
     const awarded = result.ranked.filter((r) => r.recommendation === 'award');
@@ -69,10 +69,10 @@ describe('rankGameRequests', () => {
     expect(result.ranked.map((r) => r.rank)).toEqual([1, 2, 3, 4]);
   });
 
-  it('breaks ties deterministically by tier then earlier request', () => {
-    // Two identical-scoring requests except tier; higher tier must rank first.
-    const a = req({ requestId: 'req-10', tier: 'gold', createdAt: NOW });
-    const b = req({ requestId: 'req-11', tier: 'bronze', createdAt: NOW });
+  it('breaks equal scores deterministically by ID without hidden tier or lead-time policy', () => {
+    // Two identical-scoring customer requests; ID is the only tiebreak.
+    const a = req({ requestId: 'req-10', tier: 'bronze', createdAt: NOW });
+    const b = req({ requestId: 'req-11', tier: 'gold', createdAt: NOW - 100 * DAY });
     const result = rankGameRequests([b, a], game, config, 5, NOW);
     expect(result.ranked[0].requestId).toBe('req-10');
   });

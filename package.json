@@ -8,7 +8,11 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run --config vitest.review.config.ts",
+    "dev:review": "vite --config vite.review.config.ts --mode review",
+    "build:review": "tsc -b && vite build --config vite.review.config.ts --mode review",
+    "preview:review": "vite preview --config vite.review.config.ts --mode review",
+    "typecheck": "tsc -b"
   },
   "dependencies": {
     "@microsoft/power-apps": "^1.2.5",

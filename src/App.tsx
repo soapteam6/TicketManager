@@ -13,6 +13,9 @@ import WaitlistPage from './pages/WaitlistPage';
 import NotificationsPage from './pages/NotificationsPage';
 import ScoringConfigPage from './pages/ScoringConfigPage';
 import IntegrationLogsPage from './pages/IntegrationLogsPage';
+import { ReviewApp } from './review/ReviewApp';
+import { UnavailablePlatformProvider } from './review/provider';
+const reviewProvider=new UnavailablePlatformProvider();
 
 export default function App() {
   return (
@@ -21,6 +24,7 @@ export default function App() {
         <Routes>
           <Route element={<Layout />}>
             <Route path="/" element={<DashboardPage />} />
+            <Route path="/review" element={<ReviewApp provider={reviewProvider} />} />
             <Route path="/teams" element={<TeamsPage />} />
             <Route path="/games" element={<GamesPage />} />
             <Route path="/games/:gameId" element={<GameDetailPage />} />
