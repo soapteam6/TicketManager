@@ -1,11 +1,19 @@
 {
   "workflowId": "c5df18a1-df8f-4f17-bac4-e04d99d6be79",
   "name": "Ticket Manager - AI Import",
-  "connectorId": "b811dfc7-70d1-f111-a05b-6045bd069cda",
-  "connectorApi": "/providers/Microsoft.PowerApps/apis/shared_new-5fticket-20manager-20claude-5fc74f477b4ef26772",
-  "claudeConnectionId": "b65497886cbd4ec6bfdf0aa6b2cb58db",
   "jobTable": "cr9cd_schedulesearch",
   "jobEntitySet": "cr9cd_schedulesearchs",
   "model": "claude-sonnet-4-6",
-  "solution": "AISTicketManager"
+  "solution": "AISTicketManager",
+  "credentialSource": "textEnvironmentVariable",
+  "credentialEnvironmentVariable": "cr9cd_TicketManagerAnthropicApiKey",
+  "credentialDefinitionId": "eab11407-e54e-49bb-8cec-0dac873d0fe6",
+  "retiredClaudeResources": {
+    "connectorId": "b811dfc7-70d1-f111-a05b-6045bd069cda",
+    "connectionId": "b65497886cbd4ec6bfdf0aa6b2cb58db",
+    "reference": "cr9cd_ticketscheduleclaude",
+    "connectionDeleted": true,
+    "connectorDeleted": true,
+    "referenceDeleted": true
+  }
 }

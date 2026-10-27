@@ -1,0 +1,9 @@
+{
+  "schemaName": "cr9cd_TicketManagerAnthropicApiKey",
+  "definitionId": "eab11407-e54e-49bb-8cec-0dac873d0fe6",
+  "storage": "text",
+  "credentialSource": "textEnvironmentVariable",
+  "currentValueConfigured": true,
+  "currentValueIncludedInSolution": false,
+  "literalDefaultConfigured": false
+}

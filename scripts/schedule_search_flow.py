@@ -10,7 +10,7 @@ MODEL = "claude-sonnet-4-6"
 KEY_SCHEMA = "cr9cd_TicketManagerAnthropicApiKey"
 
 
-def definition(entity_set, connector_api, credential_mode="connection"):
+def definition(entity_set, connector_api="", credential_mode="textEnvironmentVariable"):
     if credential_mode not in ["connection", "secretEnvironmentVariable", "textEnvironmentVariable"]:
         raise ValueError("Unsupported Claude credential source.")
     dv = {"apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "dataverse", "operationId": "UpdateOnlyRecord"}

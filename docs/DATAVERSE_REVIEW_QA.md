@@ -49,10 +49,11 @@ changing connections or authentication.
 
 The complete development solution is now **AISTicketManager** ([solution and
 deployment notes](../solutions/README.md)). It includes the existing code app,
-16 complete custom table definitions, the three app roles plus the legacy Ticket
+17 complete custom table definitions, the three app roles plus the legacy Ticket
 Manager User role definition, assembly and Custom
-API. Managed and unmanaged exports passed content inspection with zero missing
-dependencies. The redundant **AISTicketReviewQA** unmanaged solution container
+API. Managed and unmanaged exports pass content and credential inspection. The
+ENV-backed flow declares the built-in Microsoft EnvironmentVariables prerequisite.
+The redundant **AISTicketReviewQA** unmanaged solution container
 has been exported for recovery and removed. All 29 component entries were
 verified as covered by the main solution, preserving component definitions and
 workspace revision 14. Setup/packaging now share a single solution configuration
@@ -114,8 +115,12 @@ transactional CSV validation then creates private inventory. CSV input remains
 available as a fallback.
 
 All new components belong to `AISTicketManager`: the 17th custom table, the flow,
-custom Claude connector and two connection references. The key is encrypted in
-the server connection and absent from the client/repository/flow definition.
+Dataverse connection reference and `cr9cd_TicketManagerAnthropicApiKey` ENV
+definition. On 2026-10-27 the explicitly approved Text current value replaced
+the old Claude connection, connector and reference, which were retired. The key
+lookup and Claude HTTP call both mask inputs/outputs. The key is absent from the
+client/repository/flow definition and exports; authorized Dataverse admins can
+read the current value. A live ENV-backed search passed without inventory writes.
 Only public search text, season date bounds and home-only selection go to the
 model. The original Claude flows and individual role associations were untouched.
 

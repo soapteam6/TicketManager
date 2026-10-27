@@ -107,7 +107,8 @@ The single **AIS Ticket Manager** authoring solution contains the existing app,
 User role definition, signed plug-in and Custom API. The old unmanaged QA
 container was backed up and retired after all 29 component entries were verified
 as covered. Future setup runs target the main solution.
-Managed/unmanaged exports passed inspection with zero missing dependencies.
+Managed/unmanaged exports pass content/credential inspection and declare only
+the built-in Microsoft EnvironmentVariables prerequisite for runtime key lookup.
 See [solution artifacts, commands and deployment boundaries](../solutions/README.md).
 The exports contain the current published Allocation desk and User access UI,
 including group role administration. The hosted package is verified against the
@@ -146,10 +147,14 @@ that same local timezone. Instants remain stored/transmitted as UTC; existing
 inventory timestamps are not rewritten. **CSV import** retains its explicit UTC
 input contract and remains available beside AI Import.
 
-The new **Ticket Manager - AI Import** Power Automate flow, its custom
-Claude connector, two connection references and search-job table are included
-in **AIS Ticket Manager**. The API key lives in an encrypted server connection;
-it is absent from the browser, source and flow definition. Only the search
+The **Ticket Manager - AI Import** Power Automate flow, Dataverse connection
+reference, search-job table and `cr9cd_TicketManagerAnthropicApiKey` environment
+variable are included in **AIS Ticket Manager**. The key is an environment-specific
+Text current value, explicitly approved on 2026-10-27; authorized Dataverse
+administrators can read it. Both the runtime key lookup and Claude HTTP call
+hide inputs/outputs. The literal key is absent from the browser, source, flow
+definition and solution exports. The obsolete Claude connection/connector were
+removed after a successful ENV-backed live test. Only the search
 phrase, season bounds and home-game choice go to Claude; contacts, requests,
 roles and ticket inventory are not sent.
 
@@ -159,6 +164,12 @@ with 18 tool-returned source links. No inventory was imported and the workspace
 was unchanged. These checks validate the flow and parser; reviewers still need
 to check schedule completeness and source accuracy before importing. See
 [test evidence](../solutions/schedule-search-test.json).
+
+The 2026-10-27 ENV-backed credential test returned one verified-source VGK game,
+with zero inventory imports and unchanged workspace revision 19. The solution
+exports contain the variable definition without a default/current key value.
+See [credential deployment](../solutions/claude-environment.json) and
+[live test](../solutions/claude-environment-test.json).
 
 The plain-language VGK next-season test resolved **Vegas Golden Knights,
 2027–28** using the server-pinned date 2026-10-26, and returned an unpublished

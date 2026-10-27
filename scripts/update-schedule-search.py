@@ -37,7 +37,7 @@ def main():
         values = d.call("GET", "environmentvariablevalues", params={"$select": "environmentvariablevalueid", "$filter": f"_environmentvariabledefinitionid_value eq {definition_id}"})["value"]
         if len(values) != 1:
             raise RuntimeError("Configure exactly one environment-specific current value before switching the flow.")
-    client["properties"]["definition"] = definition(config["jobEntitySet"], config["connectorApi"], credential_mode)
+    client["properties"]["definition"] = definition(config["jobEntitySet"], config.get("connectorApi", ""), credential_mode)
     if credential_mode != "connection":
         client["properties"]["connectionReferences"].pop("claude", None)
     print(f"Verified emikes@ais-now.com; {ORG}; update only {FLOW_ID} with the AI Import prompt/date context.")

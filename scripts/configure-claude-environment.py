@@ -1,28 +1,41 @@
 """Prepare the solution-owned Claude environment variable in AIS Development.
 
 Read-only by default. --storage text explicitly selects Dataverse-readable Text
-storage; --apply migrates the existing credential in memory to a CURRENT value,
-never a default. Secret storage creates only a Secret definition: its Key Vault
+storage; --apply creates the definition, preserving any configured current value.
+An explicit --copy-existing-ais-key can copy the approved legacy key in memory to
+a CURRENT value, never a default. Secret storage creates only a definition: its Key Vault
 reference must be configured before switching the live flow. Does not update the
 flow or alter the existing source credential/connection.
 """
 import argparse
-import importlib.util
 import json
 from pathlib import Path
 import uuid
 
 from dataverse_api import Dataverse, ORG
 from schedule_search_flow import KEY_SCHEMA
+from pac_service_auth import source_get
 from ticket_solution import SOLUTION
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def legacy_key():
+    rows = source_get("environmentvariabledefinitions", {"$select": "defaultvalue", "$filter": "schemaname eq 'ais_TerritoryMapAnthropicApiKey'", "$expand": "environmentvariabledefinition_environmentvariablevalue($select=value)"})["value"]
+    if len(rows) != 1:
+        raise RuntimeError("The approved legacy credential source is missing or ambiguous.")
+    values = rows[0].get("environmentvariabledefinition_environmentvariablevalue", [])
+    key = next((v.get("value") for v in values if v.get("value")), None) or rows[0].get("defaultvalue")
+    if not key or not key.startswith("sk-ant-"):
+        raise RuntimeError("The legacy credential is unavailable; no value was printed.")
+    return key
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--storage", required=True, choices=["text", "secret"])
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--copy-existing-ais-key", action="store_true", help="Explicit one-time copy from the previously approved AIS credential source; normal setup never reads it.")
     args = parser.parse_args()
     kind = 100000000 if args.storage == "text" else 100000005
     d = Dataverse()
@@ -55,11 +68,8 @@ def main():
     values = d.call("GET", "environmentvariablevalues", params={"$select": "environmentvariablevalueid", "$filter": f"_environmentvariabledefinitionid_value eq {definition_id}"})["value"]
     if len(values) > 1:
         raise RuntimeError("Multiple current values exist. Resolve the ambiguity before changing the credential.")
-    if args.storage == "text" and not values:
-        spec = importlib.util.spec_from_file_location("schedule_setup", ROOT / "scripts/setup-schedule-search.py")
-        setup = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(setup)
-        key = setup.anthropic_key()
+    if args.storage == "text" and not values and args.copy_existing_ais_key:
+        key = legacy_key()
         value_id = str(uuid.uuid4())
         # Deliberately outside AISTicketManager. The definition is portable; the
         # current credential is environment-specific and excluded from the ZIP.
@@ -80,7 +90,7 @@ def main():
         "currentValueConfigured": bool(values), "currentValueIncludedInSolution": False, "literalDefaultConfigured": False}
     (ROOT / "solutions/claude-environment.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(record, indent=2))
-    print("Live flow unchanged. Configure Key Vault first for Secret storage; then select the credential source and update the flow.")
+    print("Live flow unchanged. Configure a current value before activation; Secret storage additionally requires a Key Vault reference.")
 
 
 if __name__ == "__main__":

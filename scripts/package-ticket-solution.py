@@ -63,11 +63,11 @@ def plan(d):
     search_config = ROOT / "solutions/schedule-search.json"
     if search_config.exists():
         search = json.loads(search_config.read_text(encoding="utf-8"))
-        components.extend([
-            {"name": "Schedule search background flow", "id": search["workflowId"], "type": 29},
-            {"name": "Ticket Manager Claude connector", "id": search["connectorId"], "type": 372},
-        ])
-        for name in ["cr9cd_ticketscheduledataverse", "cr9cd_ticketscheduleclaude"]:
+        legacy = search.get("credentialSource", "connection") == "connection"
+        components.append({"name": "Schedule search background flow", "id": search["workflowId"], "type": 29})
+        if legacy:
+            components.append({"name": "Ticket Manager Claude connector", "id": search["connectorId"], "type": 372})
+        for name in ["cr9cd_ticketscheduledataverse"] + (["cr9cd_ticketscheduleclaude"] if legacy else []):
             rows = find(d, "connectionreferences", "connectionreferenceid", f"connectionreferencelogicalname eq '{name}'")
             if len(rows) != 1:
                 raise RuntimeError(f"Expected one schedule-search connection reference: {name}")
@@ -89,7 +89,8 @@ def inspect_schedule_search(archive, roots):
     if len(flows) != 1:
         raise RuntimeError("Export is missing the schedule-search flow.")
     flow = json.loads(archive.read(flows[0]))
-    if flow["properties"]["definition"] != definition(search["jobEntitySet"], search["connectorApi"], search.get("credentialSource", "connection")):
+    legacy = search.get("credentialSource", "connection") == "connection"
+    if flow["properties"]["definition"] != definition(search["jobEntitySet"], search.get("connectorApi", ""), search.get("credentialSource", "connection")):
         raise RuntimeError("Exported schedule-search flow differs from its source definition.")
     if search.get("credentialSource", "connection") != "connection":
         work = flow["properties"]["definition"]["actions"]["Find_schedule"]["actions"]
@@ -104,29 +105,32 @@ def inspect_schedule_search(archive, roots):
         env = ET.fromstring(archive.read(env_files[0]))
         if env.findtext("defaultvalue") or any("environmentvariablevalue" in n.lower() and search["credentialEnvironmentVariable"].lower() in n.lower() for n in archive.namelist() if n not in env_files):
             raise RuntimeError("Credential defaults/current values must not be packaged.")
-    connectors = [r for r in roots if r.attrib.get("type") == "372" and r.attrib.get("id", "").strip("{}").lower() == search["connectorId"]]
-    if len(connectors) != 1:
-        raise RuntimeError("Export is missing the custom Claude connector.")
-    prefix = "Connector/" + connectors[0].attrib["schemaName"]
-    swagger = json.loads(archive.read(prefix + "_openapidefinition.json"))
-    routes = {swagger.get("basePath", "").rstrip("/") + p for p in swagger["paths"]}
-    if swagger["host"] != "api.anthropic.com" or "/v1/messages" not in routes:
-        raise RuntimeError("Unexpected schedule-search connector endpoint.")
-    parameters = json.loads(archive.read(prefix + "_connectionparameters.json"))
-    if parameters.get("api_key", {}).get("type") != "securestring" or "value" in parameters["api_key"]:
-        raise RuntimeError("Expected a credential-free encrypted connection parameter definition.")
     customizations = ET.fromstring(archive.read("customizations.xml"))
     refs = {r.attrib["connectionreferencelogicalname"]: r for r in customizations.iter("connectionreference")}
-    for name in ["cr9cd_ticketscheduledataverse", "cr9cd_ticketscheduleclaude"]:
+    for name in ["cr9cd_ticketscheduledataverse"] + (["cr9cd_ticketscheduleclaude"] if legacy else []):
         if name not in refs or refs[name].find("connectionid") is not None:
             raise RuntimeError("Missing connection reference or environment-specific connection exported.")
-    if refs["cr9cd_ticketscheduleclaude"].findtext("customconnectorid/connectorid") != search["connectorId"]:
-        raise RuntimeError("The exported reference lacks its native custom-connector relationship.")
+    if legacy:
+        connectors = [r for r in roots if r.attrib.get("type") == "372" and r.attrib.get("id", "").strip("{}").lower() == search["connectorId"]]
+        if len(connectors) != 1:
+            raise RuntimeError("Export is missing the custom Claude connector.")
+        prefix = "Connector/" + connectors[0].attrib["schemaName"]
+        swagger = json.loads(archive.read(prefix + "_openapidefinition.json"))
+        routes = {swagger.get("basePath", "").rstrip("/") + p for p in swagger["paths"]}
+        if swagger["host"] != "api.anthropic.com" or "/v1/messages" not in routes:
+            raise RuntimeError("Unexpected schedule-search connector endpoint.")
+        parameters = json.loads(archive.read(prefix + "_connectionparameters.json"))
+        if parameters.get("api_key", {}).get("type") != "securestring" or "value" in parameters["api_key"]:
+            raise RuntimeError("Expected a credential-free encrypted connection parameter definition.")
+        if refs["cr9cd_ticketscheduleclaude"].findtext("customconnectorid/connectorid") != search["connectorId"]:
+            raise RuntimeError("The exported reference lacks its native custom-connector relationship.")
+    elif "cr9cd_ticketscheduleclaude" in refs:
+        raise RuntimeError("The retired Claude connection reference is still in the export.")
     if any(re.search(rb"sk-ant-[A-Za-z0-9_-]{20,}", archive.read(n)) for n in archive.namelist() if not n.endswith("/")):
         raise RuntimeError("An API-key pattern was detected in the solution export; contents withheld.")
-    return {"flowDefinitionMatchesSource": True, "customConnectorIncluded": True,
-            "nativeConnectorReferenceBound": True, "apiKeyPatternsDetected": False,
-            "liveConnectionsExported": False}
+    return {"flowDefinitionMatchesSource": True, "credentialSource": search.get("credentialSource", "connection"),
+            "customConnectorRequired": legacy, "keyActionsMasked": not legacy,
+            "apiKeyPatternsDetected": False, "currentCredentialValueExported": False, "liveConnectionsExported": False}
 
 
 def inspect_zip(path):
@@ -198,8 +202,7 @@ def main():
         unchanged = 0
         for component in components:
             current = included.get((component["type"], component["id"]))
-            behavior = 1 if component["type"] == 380 else 0
-            if current and current["rootcomponentbehavior"] == behavior:
+            if current and current["rootcomponentbehavior"] == 0:
                 unchanged += 1
                 continue
             d.call("POST", "AddSolutionComponent", {

@@ -1,0 +1,17 @@
+{
+  "authenticatedAs": "emikes@ais-now.com",
+  "jobId": "07cb4fae-55b9-4d48-88ae-2c1437eda63e",
+  "query": "Find only the Vegas Golden Knights home game against Chicago Blackhawks on September 29 2026. Return just that one published game with its source and local start time.",
+  "status": "complete",
+  "team": "Vegas Golden Knights",
+  "season": "2026-27",
+  "timezone": "America/Los_Angeles",
+  "existingSeasonRequired": false,
+  "gamesFound": 1,
+  "gamesReadyForReview": 1,
+  "gamesWithUnconfirmedTimes": 0,
+  "toolReturnedSources": 18,
+  "warnings": 1,
+  "workspaceUnchanged": true,
+  "inventoryImported": 0
+}

@@ -26,5 +26,5 @@ const record = {
   workspaceUnchanged: check.workspaceUnchanged, inventoryImported: check.inventoryImported,
   ...(stem === 'ai-import-live' && { notes: found.warnings }),
 };
-await writeFile(stem === 'ai-import-live' ? 'solutions/ai-import-test.json' : 'solutions/schedule-search-test.json', JSON.stringify(record, null, 2) + '\n');
+await writeFile(stem === 'ai-import-live' ? 'solutions/ai-import-test.json' : stem === 'claude-env-live' ? 'solutions/claude-environment-test.json' : 'solutions/schedule-search-test.json', JSON.stringify(record, null, 2) + '\n');
 console.log(JSON.stringify(record, null, 2));

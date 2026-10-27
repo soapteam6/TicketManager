@@ -11,9 +11,12 @@ workspace), the three active app security roles plus the legacy Ticket Manager
 User role definition, the signed `TicketReview`
 plug-in assembly, the `cr9cd_TicketReview` Custom API and its Payload/Result
 contract, the existing AIS Ticket Concierge code app, and the schedule-search
-flow, custom Claude connector and two connection references. Dependencies were
-included by Dataverse. Both managed and unmanaged exports reported **zero missing
-dependencies** and passed local content inspection. The unmanaged export was
+flow, Dataverse connection reference and Claude environment-variable definition.
+Both managed and unmanaged exports pass content and credential inspection. The
+current exports declare the built-in Microsoft **EnvironmentVariables** platform
+solution as a prerequisite for the runtime key lookup; it is already installed
+in AIS Development. No custom Ticket Manager component is missing. The earlier
+unmanaged export was
 also successfully unpacked with PAC. Import into a separate environment has not
 been tested.
 
@@ -180,9 +183,11 @@ team and season can be created with the selected games in a single inventory
 transaction; no setup records are created by search itself.
 
 The solution includes `cr9cd_schedulesearch`, **Ticket Manager - AI Import**,
-the **Ticket Manager Claude** custom connector and the
-`cr9cd_ticketscheduledataverse` / `cr9cd_ticketscheduleclaude` connection
-references. [schedule-search.json](schedule-search.json) records the non-secret
+`cr9cd_ticketscheduledataverse` and the environment-variable definition
+`cr9cd_TicketManagerAnthropicApiKey`. The old **Ticket Manager Claude** custom
+connector, encrypted connection and Claude connection reference were removed
+after the ENV-backed live test passed.
+[schedule-search.json](schedule-search.json) records the non-secret
 environment bindings. Definition sources are in `flows/schedule-search/` and
 `scripts/schedule_search_flow.py`; provisioning is pinned to AIS Development.
 
@@ -192,21 +197,17 @@ continuation is capped at three requests / eight minutes. The backend limits
 each coordinator to two recently pending jobs. Search errors and incomplete
 responses create no inventory. Only an explicit reviewed import writes games.
 
-The Anthropic credential was reused in memory from the existing AIS configuration
-and placed in Microsoft's encrypted connection store. It was not written to this
-repository, the app or flow definition. Existing Claude flows were not changed.
-Exports include connector metadata and connection references, **not credentials
-or live connections**. Another environment needs its own deliberate connection
-binding and activation. Current setup refuses to overwrite an active flow.
-The Claude connection reference must also bind its native `CustomConnectorId`;
-the runtime API address alone works for searches but prevents solution export.
-The setup and export checks enforce this relationship.
-
-Microsoft documents a connector-registration limitation on a first deployment:
-the custom connector must exist before importing its connection references and
-flows. Plan a connector-first import stage for a fresh environment while keeping
-AIS Ticket Manager as the authoring solution. A clean-environment deployment has
-not been tested. See [Microsoft's custom connector solution guidance](https://learn.microsoft.com/en-us/connectors/custom-connectors/customconnectorssolutions).
+The key was moved into an environment-specific **Text current value** on
+2026-10-27 after explicit approval of Dataverse-administrator visibility. Its
+definition belongs to this solution; its current value does not. No literal
+default is configured. Both the Dataverse key lookup and Claude HTTP action have
+secure inputs and outputs. No key is passed to model messages or saved results.
+Exports carry the definition and flow, **not the key or live connections**.
+Another environment needs a current value, Dataverse connection binding and
+flow activation. Existing external Claude configurations/flows were not changed.
+Normal setup no longer reads external credentials or creates a Claude connection.
+There is no custom-connector registration stage for the new HTTP-based flow.
+A clean-environment deployment has not been tested.
 
 ```powershell
 # Read-only setup plan; announce environment changes before applying:
@@ -232,29 +233,32 @@ records the result. Raw tool responses stay in ignored local artifacts.
 
 ## Verification
 
-### Prepared credential migration (not activated)
+### Active solution-owned Claude credential
 
-The existing Claude action already masks inputs/outputs and contains no literal
-API key. A migration is prepared for `cr9cd_TicketManagerAnthropicApiKey` in this
-solution, with a masked runtime key lookup and masked HTTPS call to Anthropic.
-It has not replaced the live encrypted-connection credential yet.
+Open **AIS Ticket Manager → Environment variables → Ticket Manager Anthropic
+API key** to maintain the current value. Never enter the literal key as a default
+or add its value record to the solution. Rotation is read by the next search at
+runtime. The user explicitly approved Text storage; authorized Dataverse admins
+can read it. A future Secret-type migration would require a Key Vault reference.
 
-A true **Secret** environment variable requires an Azure Key Vault reference.
-No configured reference was found and the current emikes PAC login cannot obtain
-Azure access silently. No Azure CLI or interactive sign-in was attempted.
-The alternative is a **Text** current value with masked flow history and excluded
-exports; authorized Dataverse administrators can still read that value. The
-storage choice is awaiting user input. Never put the literal key in a default.
+[claude-environment.json](claude-environment.json) records the definition ID and
+storage policy; [claude-environment-test.json](claude-environment-test.json)
+records the successful one-game live test, zero inventory imports and unchanged
+workspace. No Azure CLI or interactive sign-in was used. The obsolete connection
+was verified as owned by emikes and unused by other active flows before removal.
 
-`scripts/configure-claude-environment.py --storage text|secret` shows the selected
-plan; `--apply` must follow an announcement of the exact environment changes.
-Secret mode creates only the definition until its Key Vault reference is supplied.
-After a current value is configured, `scripts/update-schedule-search.py
---credential-source textEnvironmentVariable|secretEnvironmentVariable --apply`
-switches the existing flow while retaining its ID and Dataverse connection.
-Six offline checks in `scripts/test-schedule-flow-security.py` cover masked key
-reads/calls, key exclusion from messages/results and rejection of unknown modes.
-The exporter rejects API-key material in memory before writing a ZIP.
+`scripts/configure-claude-environment.py --storage text` shows the plan;
+`--apply` creates the definition and preserves an existing current value.
+For a fresh environment, enter its current value in the maker portal. The
+optional `--copy-existing-ais-key` is only an explicit one-time legacy migration,
+not a runtime/bootstrap dependency. After configuration,
+`scripts/update-schedule-search.py --credential-source textEnvironmentVariable
+--apply` switches a stopped/restarted existing flow without changing its ID.
+Normal initial setup uses `scripts/setup-schedule-search.py --apply --enable`.
+Six offline checks in `scripts/test-schedule-flow-security.py` cover masked reads
+and calls, exclusion from model messages/results and rejection of unknown modes.
+The exporter rejects API-key material in memory before writing any ZIP and checks
+that credential defaults/current values are absent from both packages.
 
 On 2026-10-26: production build and changed-source lint passed; **86 frontend
 tests** and **36 offline C# security tests** passed. Synthetic browser checks
