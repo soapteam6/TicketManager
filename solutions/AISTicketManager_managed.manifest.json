@@ -1,6 +1,6 @@
 {
   "file": "AISTicketManager_managed.zip",
-  "bytes": 301402,
+  "bytes": 300583,
   "rootComponents": [
     {
       "type": "1",
@@ -122,15 +122,11 @@
       "type": "300",
       "schemaName": "cr9cd_aisticketconcierge_af330",
       "behavior": "0"
-    },
-    {
-      "type": "372",
-      "id": "{b811dfc7-70d1-f111-a05b-6045bd069cda}",
-      "schemaName": "new_ticket-20manager-20claude",
-      "behavior": "0"
     }
   ],
-  "missingDependencies": [],
+  "missingDependencies": [
+    "<MissingDependency>\n        <Required type=\"1\" schemaName=\"environmentvariabledefinition\" displayName=\"Environment Variable Definition\" solution=\"EnvironmentVariables (1.0.2406.4)\">\n          <package appName=\"EnvironmentVariables\" version=\"1.0.2406.4\">EnvironmentVariablesSolutionAnchor (1.0.2406.4)</package>\n        </Required>\n        <Dependent type=\"29\" displayName=\"Ticket Manager - AI Import\" id=\"{c5df18a1-df8f-4f17-bac4-e04d99d6be79}\" />\n      </MissingDependency>\n    "
+  ],
   "files": [
     "customizations.xml",
     "solution.xml",
@@ -140,19 +136,19 @@
     "CanvasApps/cr9cd_aisticketconcierge_af330_CodeAppPackages/assets/index-BG7TAp9e.css",
     "CanvasApps/cr9cd_aisticketconcierge_af330_CodeAppPackages/assets/index-Vbm9qPmo.js",
     "CanvasApps/cr9cd_aisticketconcierge_af330_CodeAppPackages/vite.svg",
-    "Connector/new_ticket-20manager-20claude_openapidefinition.json",
-    "Connector/new_ticket-20manager-20claude_connectionparameters.json",
-    "Connector/new_ticket-20manager-20claude_policytemplateinstances.json",
     "customapis/cr9cd_TicketReview/customapirequestparameters/Payload/customapirequestparameter.xml",
     "customapis/cr9cd_TicketReview/customapiresponseproperties/Result/customapiresponseproperty.xml",
     "customapis/cr9cd_TicketReview/customapi.xml",
+    "environmentvariabledefinitions/cr9cd_TicketManagerAnthropicApiKey/environmentvariabledefinition.xml",
     "[Content_Types].xml"
   ],
   "scheduleSearch": {
     "flowDefinitionMatchesSource": true,
-    "customConnectorIncluded": true,
-    "nativeConnectorReferenceBound": true,
+    "credentialSource": "textEnvironmentVariable",
+    "customConnectorRequired": false,
+    "keyActionsMasked": true,
     "apiKeyPatternsDetected": false,
+    "currentCredentialValueExported": false,
     "liveConnectionsExported": false
   }
 }
