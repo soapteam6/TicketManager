@@ -59,6 +59,10 @@ manual selection. All 93 unit tests, the production build and lint on changed
 source files pass. Repository-wide lint still has 17 existing errors in unrelated
 legacy/generated files.
 
+The copy-error update was published to AIS Development on 2026-10-29 as
+`emikes@ais-now.com`. Both managed and unmanaged solution exports match the
+production app build byte for byte; current credential values remain excluded.
+
 The repeated Ticket management/page breadcrumb has been removed, reclaiming its
 vertical space for the active workspace.
 The top bar also omits the environment label and connection-status dot. The
