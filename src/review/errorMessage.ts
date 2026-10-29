@@ -22,8 +22,10 @@ export function reviewErrorMessage(error: unknown): string {
     }
     const record = value as Record<string, unknown>;
     for (const key of ['innererror', 'innerError', 'error', 'body', 'response', 'data', 'details', 'message', 'Message', 'description']) {
-      const message = read(record[key], depth + 1);
-      if (message) return message;
+      try {
+        const message = read(record[key], depth + 1);
+        if (message) return message;
+      } catch { /* A broken SDK getter must not hide the remaining error. */ }
     }
   }
   const message = (read(error) ?? fallback).slice(0, 2000);

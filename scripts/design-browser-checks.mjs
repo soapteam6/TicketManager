@@ -153,6 +153,36 @@ try {
     await set('select[name="outcome"]', 'attended');
     await click('Save attendance');
     await page.wait(`document.querySelector('aside[role="alert"]')?.textContent.includes('after the event')`);
+    await page.evaluate(`(() => {
+      window.originalClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+      window.originalExecCommand = document.execCommand;
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => { window.copiedError = text; } } });
+    })()`);
+    await click('Copy error', 'document.querySelector(\'aside[role="alert"]\')');
+    await page.wait(`document.querySelector('aside[role="alert"] button')?.textContent==='Copied'`);
+    const copiedError = JSON.parse(await page.evaluate('window.copiedError'));
+    assert.equal(copiedError.action, 'Save change: attendance');
+    assert.equal(copiedError.error.code, 'invalid');
+    assert(copiedError.error.stack && copiedError.occurredAt);
+    assert(await page.evaluate(`!document.querySelector('textarea[aria-label="Error details to copy"]') && !document.querySelector('aside[role="alert"]').textContent.includes('occurredAt')`), 'Copying expanded technical details on screen');
+    await page.evaluate(`(() => {
+      navigator.clipboard.writeText = async () => { throw new Error('Clipboard blocked by host'); };
+      document.execCommand = command => { if(command!=='copy') throw new Error('Unexpected command'); window.legacyCopiedError = document.activeElement.value; return true; };
+      document.querySelector('aside[role="alert"] button').focus();
+    })()`);
+    await click('Copied', 'document.querySelector(\'aside[role="alert"]\')');
+    await page.wait(`window.legacyCopiedError`);
+    await page.wait(`document.querySelector('aside[role="alert"] button')?.textContent==='Copied'`);
+    assert.equal(await page.evaluate('window.legacyCopiedError'), JSON.stringify(copiedError, null, 2));
+    assert(await page.evaluate(`document.activeElement.textContent==='Copied'`), 'Legacy copy lost keyboard focus');
+    await page.evaluate(`document.execCommand = () => false`);
+    await click('Copied', 'document.querySelector(\'aside[role="alert"]\')');
+    await page.wait(`document.querySelector('textarea[aria-label="Error details to copy"]')`);
+    assert(await page.evaluate(`(() => { const input=document.querySelector('textarea[aria-label="Error details to copy"]'); return input===document.activeElement && input.selectionEnd===input.value.length && input.selectionStart===0 && input.value===window.copiedError; })()`), 'Blocked clipboard did not offer selected manual-copy details');
+    await page.evaluate(`(() => {
+      if(window.originalClipboard) Object.defineProperty(navigator, 'clipboard', window.originalClipboard); else delete navigator.clipboard;
+      document.execCommand = window.originalExecCommand;
+    })()`);
     await screenshot('validation');
     await page.evaluate(`document.querySelector('[aria-label="Dismiss save error"]').click()`);
     await nav('Contact register');
@@ -169,6 +199,24 @@ try {
       assert(await page.evaluate(`!document.querySelector('select[name="searchSeason"]') && !document.querySelector('input[name="searchTickets"]')`), 'AI Import requires setup before the request');
       await screenshot('ai-import-prompt');
       await set('textarea[name="scheduleQuery"]', 'I got tickets for next season. Find their home schedule.');
+      await page.evaluate(`(async () => {
+        const { demoProvider } = await import('/src/review/demo.ts');
+        const original = demoProvider.startScheduleSearch;
+        demoProvider.startScheduleSearch = async function(...args) {
+          demoProvider.startScheduleSearch = original;
+          if(!args.length) throw new Error('Missing search request');
+          throw new Error('Synthetic search is unavailable.', { cause: { code: 'SearchUnavailable', requestId: 'synthetic-search-request' } });
+        };
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => { window.aiCopiedError = text; } } });
+      })()`);
+      await click('Prepare import', 'document.querySelector(".work-schedule-finder form")');
+      await page.wait(`document.querySelector('.work-schedule-finder [role="alert"]')?.textContent==='Synthetic search is unavailable.'`);
+      await click('Copy error', 'document.querySelector(".work-schedule-finder form")');
+      await page.wait(`window.aiCopiedError`);
+      const aiError = JSON.parse(await page.evaluate('window.aiCopiedError'));
+      assert.equal(aiError.action, 'Start AI Import');
+      assert.equal(aiError.error.cause.requestId, 'synthetic-search-request');
+      assert(!JSON.stringify(aiError).includes('I got tickets'));
       await click('Prepare import', 'document.querySelector(".work-schedule-finder form")');
       await page.wait(`document.querySelector('input[name="importTeamName"]')`);
       assert(await page.evaluate(`[...document.querySelectorAll('button')].find(b=>b.textContent==='Create season & import').disabled`), 'Unknown ticket quantity allowed import');
@@ -209,6 +257,11 @@ try {
       await click('Import selected games');
       await page.wait(`document.querySelector('.work-found-schedule tbody tr').textContent.includes('Already in inventory')`);
       await click('CSV import');
+      await set('textarea[name="scheduleCsv"]', 'wrong,columns\nexample,invalid');
+      await click('Validate & preview');
+      await page.wait(`document.querySelector('.work-import-errors[role="alert"] button')`);
+      await click('Copy error', 'document.querySelector(".work-import-errors")');
+      await page.wait(`window.aiCopiedError.includes('Validate CSV')`);
       await click('Load example');
       await click('Validate & preview');
       await page.wait(`document.querySelectorAll('.work-import-preview tbody tr').length===2`);
@@ -312,9 +365,51 @@ try {
       }
     }
     assert(await page.evaluate(`!document.querySelector('.work-feedback, .work-table-footer, .work-app-footer, .design-switcher')`), 'Routine feedback or removed layout chrome is still rendered');
+    // Exercise the real startup component with a connector module stubbed before
+    // import. No SDK authentication, live connection or Dataverse call is made.
+    await page.call('Fetch.enable', { patterns: [{ urlPattern: '*src/generated/services/MicrosoftDataverseService.ts*' }] });
+    page.on('Fetch.requestPaused', event => {
+      void page.call('Fetch.fulfillRequest', {
+        requestId: event.requestId, responseCode: 200,
+        responseHeaders: [{ name: 'Content-Type', value: 'text/javascript' }],
+        body: Buffer.from(`export const MicrosoftDataverseService = { PerformUnboundActionWithOrganization: async (_org, _api, input) => {
+          if(JSON.parse(input.Payload).operation!=='snapshot') throw new Error('Only synthetic snapshot reads are allowed');
+          window.startupReadCount = (window.startupReadCount || 0) + 1;
+          return { success: false, error: { code: 'ConnectionAuthorizationFailed', message: 'Connector request failed', response: { status: 401,
+            data: { error: { code: 'AADSTS50173', message: 'Authentication required: grant expired.' }, snapshot: 'private synthetic inventory' },
+            headers: { 'x-ms-request-id': 'startup-request-' + window.startupReadCount, Authorization: 'Bearer synthetic-secret' } } } };
+        } };`).toString('base64'),
+      });
+    });
+    await page.evaluate(`(async () => {
+      const { default: React } = await import('/node_modules/.vite/deps/react.js');
+      const { default: { createRoot } } = await import('/node_modules/.vite/deps/react-dom_client.js');
+      const { PlatformReview } = await import('/src/review/PlatformReview.tsx');
+      document.getElementById('root').hidden = true;
+      const host = document.createElement('div'); host.id = 'startup-error-check'; document.body.append(host);
+      window.startupRoot = createRoot(host); window.startupRoot.render(React.createElement(PlatformReview));
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => { window.startupCopiedError = text; } } });
+    })()`);
+    await page.wait(`document.querySelector('#startup-error-check h1')?.textContent==='Unable to load the workspace'`);
+    assert(await page.evaluate(`document.querySelector('#startup-error-check [role="alert"]').textContent==='Your session needs attention. Sign in to Power Apps and try again.'`));
+    await click('Copy error', 'document.querySelector(\'#startup-error-check\')');
+    await page.wait(`window.startupCopiedError`);
+    const startupError = JSON.parse(await page.evaluate('window.startupCopiedError'));
+    assert.equal(startupError.action, 'Load workspace');
+    assert.equal(startupError.error.cause.response.status, 401);
+    assert.equal(startupError.error.cause.response.data.error.code, 'AADSTS50173');
+    assert.equal(startupError.error.cause.response.headers['x-ms-request-id'], 'startup-request-1');
+    assert(!JSON.stringify(startupError).match(/synthetic-secret|private synthetic inventory|"Authorization"/));
+    assert(await page.evaluate(`!document.querySelector('#startup-error-check').textContent.includes('AADSTS50173')`));
+    await screenshot('startup-error');
+    await click('Try again', 'document.querySelector(\'#startup-error-check\')');
+    await page.wait(`window.startupReadCount===2 && document.querySelector('#startup-error-check h1')`);
+    await click('Copy error', 'document.querySelector(\'#startup-error-check\')');
+    await page.wait(`window.startupCopiedError.includes('startup-request-2')`);
+    await page.evaluate(`window.startupRoot.unmount(); document.getElementById('startup-error-check').remove(); document.getElementById('root').hidden = false;`);
     assert.deepEqual(errors, [], `${design}: page errors`);
     assert.deepEqual(external, [], `${design}: external requests`);
-    results.push({ design, status: 'PASS', checks: ['no automatic initial selection', 'detail pane dismissal', 'no routine save banners', 'search', 'whole-row and keyboard selection', 'private inventory creation', 'interest', 'requester email', 'allocation', 'right-side allocation details', 'visible rejection reason', 'contact history', ...(design === 'desk' ? ['team and season creation', 'web schedule preview and selected import', 'TBD game excluded', 'CSV fallback', 'iPad schedule search', 'independent detail scrolling'] : []), 'admin-only user access', 'role grant and reversal', 'group role assignment', 'connecting a directory group', 'requester navigation', 'iPad landscape', 'iPad portrait', 'bounded page scroll'], pageErrors: 0, externalRequests: 0 });
+    results.push({ design, status: 'PASS', checks: ['no automatic initial selection', 'detail pane dismissal', 'no routine save banners', 'search', 'whole-row and keyboard selection', 'private inventory creation', 'interest', 'requester email', 'allocation', 'right-side allocation details', 'visible rejection reason', 'copy error diagnostics', 'legacy clipboard fallback', 'manual copy when clipboard is blocked', 'startup error diagnostics preserve connector status and request ID', 'startup retry refreshes copied error', 'contact history', ...(design === 'desk' ? ['team and season creation', 'web schedule preview and selected import', 'TBD game excluded', 'CSV fallback', 'iPad schedule search', 'independent detail scrolling'] : []), 'admin-only user access', 'role grant and reversal', 'group role assignment', 'connecting a directory group', 'requester navigation', 'iPad landscape', 'iPad portrait', 'bounded page scroll'], pageErrors: 0, externalRequests: 0 });
     page.close();
     await browser.call('Target.closeTarget', { targetId });
   }

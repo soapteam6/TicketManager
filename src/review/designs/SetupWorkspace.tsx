@@ -6,6 +6,8 @@ import { Button, Field, FormError, Select, TextArea, TextInput } from '../ui';
 import { EmptyRows, Glyph, Status } from './parts';
 import { rowSelection } from './rowSelection';
 import { ScheduleFinder } from './ScheduleFinder';
+import { CopyErrorButton } from '../CopyErrorButton';
+import { createErrorReport, type ErrorReport } from '../errorReport';
 
 const example = 'date,time,title,tickets,kind\n2027-01-10,03:00,Example home game,4,game\n2027-01-15,02:00,Example performance,2,event';
 type Section = 'teams' | 'seasons' | 'import';
@@ -20,7 +22,8 @@ export function SetupWorkspace() {
   const [seasonDraft, setSeasonDraft] = useState({ teamId: '', label: '', start: '', end: '' });
   const [csv, setCsv] = useState('');
   const [preview, setPreview] = useState<SchedulePreview | null>(null);
-  const [previewError, setPreviewError] = useState('');
+  const [previewError, setPreviewError] = useState<ErrorReport | null>(null);
+  const [previewIssues, setPreviewIssues] = useState<ErrorReport | null>(null);
   const [importSeason, setImportSeason] = useState('');
   const [importMode, setImportMode] = useState<'find' | 'csv'>('find');
   const team = snapshot.teams.find(t => t.id === teamId);
@@ -65,17 +68,24 @@ export function SetupWorkspace() {
       </div>}
       {section === 'import' && <div className="work-import-container"><div className="work-subtoolbar"><h3>Import</h3><div className="work-access-sections" role="group" aria-label="Import source"><button aria-pressed={importMode === 'find'} onClick={() => setImportMode('find')}>AI Import</button><button aria-pressed={importMode === 'csv'} onClick={() => setImportMode('csv')}>CSV import</button></div></div>
       {importMode === 'find' ? <ScheduleFinder key={importSeason} initialSeasonId={importSeason} /> : <div className="work-import-section">
-        <form className="work-import-editor" onSubmit={e => { e.preventDefault(); setPreviewError(''); try { setPreview(provider.previewSchedule(persona, csv)); } catch (err) { setPreviewError(err instanceof Error ? err.message : 'Unable to preview this CSV.'); } }}>
-          <div className="work-subtoolbar"><h3>Import source</h3><button type="button" className="work-text-button" onClick={() => { setCsv(example); setPreview(null); setPreviewError(''); }}>Load example</button></div>
+        <form className="work-import-editor" onSubmit={e => {
+          e.preventDefault(); setPreviewError(null); setPreviewIssues(null); setPreview(null);
+          try {
+            const result = provider.previewSchedule(persona, csv);
+            setPreview(result);
+            if (result.errors.length) setPreviewIssues(createErrorReport({ details: result.errors }, 'Validate CSV', 'Correct the CSV before importing'));
+          } catch (err) { setPreviewError(createErrorReport(err, 'Preview CSV', err instanceof Error ? err.message : 'Unable to preview this CSV.')); }
+        }}>
+          <div className="work-subtoolbar"><h3>Import source</h3><button type="button" className="work-text-button" onClick={() => { setCsv(example); setPreview(null); setPreviewError(null); }}>Load example</button></div>
           <Field label="Sports season" required><Select name="importSeason" value={selectedSeason} onChange={e => { setImportSeason(e.target.value); setPreview(null); }} required>{!snapshot.seasons.length && <option value="">Create a season first</option>}{snapshot.seasons.map(s => <option key={s.id} value={s.id}>{snapshot.teams.find(t => t.id === s.teamId)?.name} · {s.label}</option>)}</Select></Field>
-          <Field label="Schedule CSV" hint="Columns: date,time,title,tickets,kind. Times are UTC."><TextArea name="scheduleCsv" spellCheck={false} value={csv} onChange={e => { setCsv(e.target.value); setPreview(null); setPreviewError(''); }} placeholder={'date,time,title,tickets,kind\n2027-01-10,03:00,Home game,4,game'} rows={12} required /></Field>
+          <Field label="Schedule CSV" hint="Columns: date,time,title,tickets,kind. Times are UTC."><TextArea name="scheduleCsv" spellCheck={false} value={csv} onChange={e => { setCsv(e.target.value); setPreview(null); setPreviewError(null); }} placeholder={'date,time,title,tickets,kind\n2027-01-10,03:00,Home game,4,game'} rows={12} required /></Field>
           <p className="work-help">Use YYYY-MM-DD dates and 24-hour HH:mm times. Dated events are imported without a season. Game rows use the selected sports season.</p>
-          {previewError && <p role="alert" className="text-sm text-rose-800">{previewError}</p>}
+          {previewError && <div className="space-y-2"><p role="alert" className="text-sm text-rose-800">{previewError.message}</p><CopyErrorButton details={previewError.details} /></div>}
           <Button type="submit" variant="secondary" disabled={busy || !csv.trim()}>Validate & preview</Button>
         </form>
         <section className="work-import-preview" aria-label="Schedule preview"><div className="work-subtoolbar"><h3>Import preview</h3>{preview && <Status value={preview.errors.length ? 'inactive' : 'active'}>{preview.errors.length ? 'Needs correction' : 'Ready to import'}</Status>}</div>
           <div className="work-table-scroll">{!preview ? <div className="work-import-empty"><Glyph name="inventory" size={28} /><h3>Validate the schedule first</h3><p>Paste a CSV on the left. Its rows will appear here for review before any inventory is created.</p></div> : <>
-            {preview.errors.length > 0 && <div className="work-import-errors" role="alert"><strong>Correct the CSV before importing</strong>{preview.errors.map((error, index) => <p key={index}>{error}</p>)}</div>}
+            {preview.errors.length > 0 && <div className="work-import-errors" role="alert"><strong>Correct the CSV before importing</strong>{preview.errors.map((error, index) => <p key={index}>{error}</p>)}{previewIssues && <CopyErrorButton details={previewIssues.details} />}</div>}
             <table className="work-table"><thead><tr><th>Event</th><th>Date</th><th className="numeric">Tickets</th><th>Type</th><th>Visibility</th></tr></thead><tbody>{preview.rows.map((row, index) => <tr key={index}><td>{row.title}</td><td className="nowrap">{dateTime(row.gameDate)}</td><td className="numeric">{row.tickets}</td><td>{row.kind}</td><td><Status value="private" /></td></tr>)}</tbody></table>
           </>}</div>
           <div className="work-import-commit"><div><strong>{preview ? `${preview.rows.length} events · ${preview.rows.reduce((sum, row) => sum + row.tickets, 0)} tickets` : 'No inventory will be created until you import.'}</strong><p>Imported events are private. No messages are sent.</p></div><Button disabled={busy || !selectedSeason || !preview || !preview.rows.length || preview.errors.length > 0} onClick={async () => { if (await run({ type: 'importSchedule', csv, seasonId: selectedSeason })) { setPreview(null); setCsv(''); } }}>Import private inventory</Button></div>

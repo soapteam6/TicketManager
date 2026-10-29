@@ -2,6 +2,8 @@
 import { useReview } from '../context';
 import { isCalendarDate, isoToLocalDateTimeInput, localDateTimeInputToIso, timeZoneLabel } from '../dates';
 import { reviewErrorMessage } from '../errorMessage';
+import { createErrorReport, type ErrorReport } from '../errorReport';
+import { CopyErrorButton } from '../CopyErrorButton';
 import { discoveredGameIssues, discoveredGamesCsv, parseScheduleDiscovery, type DiscoveredGame, type ScheduleDiscovery } from '../scheduleDiscovery';
 import type { ScheduleSearchJob } from '../types';
 import { Button, Field, Select, TextArea, TextInput } from '../ui';
@@ -22,7 +24,7 @@ export function ScheduleFinder({ initialSeasonId = '' }: { initialSeasonId?: str
   const [discovery, setDiscovery] = useState<ScheduleDiscovery>();
   const [starting, setStarting] = useState(false);
   const [imported, setImported] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<ErrorReport | null>(null);
   const searching = starting || !!jobId && (!job || ['queued', 'searching'].includes(job.status));
   const available = !!snapshot.scheduleSearchAvailable && !!provider.startScheduleSearch && !!provider.getScheduleSearch;
   const season = snapshot.seasons.find(s => s.id === seasonId);
@@ -40,18 +42,18 @@ export function ScheduleFinder({ initialSeasonId = '' }: { initialSeasonId?: str
           const found = parseScheduleDiscovery(result.rawResult, result.request);
           const team = provider.snapshot(persona).teams.find(t => t.name.toLowerCase() === found.team.toLowerCase());
           const existing = provider.snapshot(persona).seasons.find(s => s.teamId === team?.id && s.label === found.season);
-          setDiscovery(found); setQuery(result.request.query); setHomeOnly(result.request.homeOnly); setError('');
+          setDiscovery(found); setQuery(result.request.query); setHomeOnly(result.request.homeOnly); setError(null);
           setSeasonId(result.request.seasonId || existing?.id || '');
           setDraft({ teamId: team?.id ?? '', teamName: found.team, label: found.season, startDate: found.seasonStart, endDate: found.seasonEnd });
           if (result.request.ticketsPerEvent > 0) setTickets(String(result.request.ticketsPerEvent));
-        } else if (result.status === 'failed') setError(result.error || 'AI Import could not complete. Try a more specific request.');
+        } else if (result.status === 'failed') setError(createErrorReport(result.error || 'AI Import could not complete. Try a more specific request.', `AI Import result: ${jobId}`));
         else if (['queued', 'searching'].includes(result.status)) timer = setTimeout(poll, 2500);
         else throw new Error('The search returned an unexpected status.');
         failures = 0;
       } catch (err) {
         if (!active) return;
         if (++failures < 3) timer = setTimeout(poll, 2500);
-        else { setError(reviewErrorMessage(err)); setJobId(''); }
+        else { setError(createErrorReport(err, `Check AI Import: ${jobId}`)); setJobId(''); }
       }
     }
     void poll();
@@ -79,12 +81,12 @@ export function ScheduleFinder({ initialSeasonId = '' }: { initialSeasonId?: str
   return <div className={`work-import-section work-schedule-finder ${discovery ? 'has-result' : 'is-prompt'}`}>
     <form className="work-import-editor" onSubmit={async e => {
       e.preventDefault(); if (!available || !provider.startScheduleSearch) return;
-      setStarting(true); setError(''); setJobId(''); setJob(undefined); setDiscovery(undefined); setImported(false);
+      setStarting(true); setError(null); setJobId(''); setJob(undefined); setDiscovery(undefined); setImported(false);
       try {
         const result = await provider.startScheduleSearch(persona, { query: query.trim(), seasonId: initialSeasonId, ticketsPerEvent: ticketsValid ? Number(tickets) : 0, homeOnly }, crypto.randomUUID());
         try { sessionStorage.setItem(storageKey, result.id); } catch { /* Search still works without browser storage. */ }
         setJob(result); setJobId(result.id);
-      } catch (err) { setError(reviewErrorMessage(err)); }
+      } catch (err) { setError(createErrorReport(err, 'Start AI Import')); }
       finally { setStarting(false); }
     }}>
       <div className="work-subtoolbar"><h3>What would you like to import?</h3></div>
@@ -93,7 +95,7 @@ export function ScheduleFinder({ initialSeasonId = '' }: { initialSeasonId?: str
       {initialSeason && <p className="work-help">For {snapshot.teams.find(t => t.id === initialSeason.teamId)?.name} · {initialSeason.label}</p>}
       <details className="work-ai-options"><summary>Search options</summary><label className="work-search-home"><input name="homeOnly" type="checkbox" disabled={searching || busy} checked={homeOnly} onChange={e => setHomeOnly(e.target.checked)} />Home games only</label></details>
       {!available && <p className="work-help">AI Import is unavailable. CSV import is available.</p>}
-      {error && <p className="work-import-error-message" role="alert">{error}</p>}
+      {error && <div className="space-y-2"><p className="work-import-error-message" role="alert">{error.message}</p><CopyErrorButton details={error.details} /></div>}
       <Button type="submit" disabled={busy || searching || !available || !query.trim()}>{searching ? 'Preparing import…' : 'Prepare import'}</Button>
       {searching && <p className="work-help" role="status">Checking public sources. You can leave this screen and return while the search runs.</p>}
     </form>

@@ -43,6 +43,22 @@ redirect to the main workspace. The isolated synthetic preview uses this same UI
 
 Lists start without an automatically selected record. Close buttons clear the selection and return the space to the list. Routine successful saves do not display banners; errors remain explicit.
 
+Errors offer **Copy error** without expanding the visible message. Startup,
+refresh, save, AI Import and CSV validation failures copy a JSON report with the
+failed action, occurrence time, browser/timezone, original error/cause and
+available status codes and request/correlation IDs. Reports omit request payloads,
+workspace data and credential headers; recognized credentials in error text and
+URL query/fragment values are redacted. If the host blocks clipboard access, a
+selected, read-only text area lets the user copy manually. Copying makes no server
+request and does not retry a failed change.
+
+The copy diagnostics checks pass in the isolated desktop/iPad browser harness,
+including a simulated startup authentication failure, fresh diagnostics after
+retry, AI Import failure, CSV validation, clipboard fallback and blocked-clipboard
+manual selection. All 93 unit tests, the production build and lint on changed
+source files pass. Repository-wide lint still has 17 existing errors in unrelated
+legacy/generated files.
+
 The repeated Ticket management/page breadcrumb has been removed, reclaiming its
 vertical space for the active workspace.
 The top bar also omits the environment label and connection-status dot. The

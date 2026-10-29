@@ -1,8 +1,10 @@
 import { Button } from './ui';
+import { CopyErrorButton } from './CopyErrorButton';
 
-export function SaveErrorNotice({ title, message, onDismiss }: {
+export function SaveErrorNotice({ title, message, details, onDismiss }: {
   title: string;
   message: string;
+  details: string;
   onDismiss: () => void;
 }) {
   return <aside role="alert" aria-atomic="true"
@@ -11,6 +13,7 @@ export function SaveErrorNotice({ title, message, onDismiss }: {
       <div className="space-y-2 min-w-0">
         <h2 className="font-semibold text-rose-900">{title}</h2>
         <p className="text-sm text-rose-900 whitespace-pre-wrap break-words">{message}</p>
+        <CopyErrorButton details={details} />
       </div>
       <Button type="button" variant="secondary" size="sm" onClick={onDismiss} aria-label="Dismiss save error">Dismiss</Button>
     </div>
