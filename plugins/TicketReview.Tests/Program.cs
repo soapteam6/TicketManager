@@ -167,6 +167,7 @@ internal static class Program
         passed += DirectoryTests.Run();
         passed += InventoryTests.Run();
         passed += InterestTests.Run();
+        passed += FileAllocationTests.Run();
         Console.WriteLine(passed + " security tests passed; no network access.");
     }
     private static JObject GroupCommand(Entity team, string role, params string[] expected) => new JObject {

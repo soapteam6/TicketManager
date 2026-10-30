@@ -38,6 +38,24 @@ internal static class SearchTests
                 Denied(() => Call(service, Actor("requester"), input), "Coordinator");
                 Assert(service.Writes == 0, "Requester caused a write");
             },
+            ["file-only preparation stores owned Notes and metadata without echoing file contents"] = () => {
+                var service = new Fake(); var input = Input(Guid.NewGuid(), "");
+                input["request"]["files"] = new JArray(new JObject { ["name"] = "Tracker.xlsx", ["mediaType"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ["size"] = 6, ["data"] = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("sample")) });
+                var result = Call(service, Actor(), input);
+                Assert(service.Jobs.Count == 1 && service.Notes.Count == 1 && service.Writes == 2, "File and job not saved together");
+                Assert(!result.ToString().Contains("c2FtcGxl") && !service.Jobs[0].GetAttributeValue<string>("cr9cd_input").Contains("c2FtcGxl"), "File contents leaked into metadata");
+                Assert(service.Notes[0].GetAttributeValue<EntityReference>("objectid").Id == service.Jobs[0].Id && (string)result["request"]["files"][0]["sha256"] != "", "File ownership/hash missing");
+                Call(service, Actor(), input); Assert(service.Writes == 2, "Repeated job created duplicate attachments");
+                input["request"]["files"][0]["data"] = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("change"));
+                Denied(() => Call(service, Actor(), input), "already used"); Assert(service.Writes == 2, "Changed file overwrote prior job");
+            },
+            ["invalid file names encoding and size fail before a job is created"] = () => {
+                foreach (var patch in new[] { new JObject { ["name"] = "bad\\name.xlsx" }, new JObject { ["data"] = "not base64!" }, new JObject { ["size"] = 7 }, new JObject { ["mediaType"] = "text/plain\\nheader" } }) {
+                    var service = new Fake(); var input = Input(Guid.NewGuid()); var file = new JObject { ["name"] = "Tracker.xlsx", ["mediaType"] = "application/octet-stream", ["size"] = 6, ["data"] = "c2FtcGxl" }; file.Merge(patch); input["request"]["files"] = new JArray(file);
+                    try { Call(service, Actor(), input); throw new Exception("Invalid upload accepted"); } catch (InvalidPluginExecutionException) { }
+                    Assert(service.Writes == 0, "Invalid upload wrote data");
+                }
+            },
             ["search creation writes only a job owned by the authenticated caller"] = () => {
                 var service = new Fake(); var result = Call(service, Actor(), Input(Guid.NewGuid()));
                 Assert((string)result["status"] == "queued" && service.Writes == 1, "Job was not queued");
@@ -78,6 +96,16 @@ internal static class SearchTests
                 job["createdon"] = DateTime.UtcNow.AddMinutes(-11);
                 Assert((string)Call(service, Actor(), input)["status"] == "failed", "Expired search not reported");
                 Assert(service.Writes == 1 && job.GetAttributeValue<string>("cr9cd_status") == "queued", "Polling changed native state");
+            },
+            ["file preparation can outlast web searches without extending its bounded lifetime"] = () => {
+                var service = new Fake(); var input = Input(Guid.NewGuid(), "");
+                input["request"]["files"] = new JArray(new JObject { ["name"] = "Tracker.txt", ["mediaType"] = "text/plain", ["size"] = 6, ["data"] = "c2FtcGxl" });
+                Call(service, Actor(), input); input["operation"] = "scheduleSearchGet";
+                var job = service.Jobs.Single(); job["createdon"] = DateTime.UtcNow.AddMinutes(-11);
+                Assert((string)Call(service, Actor(), input)["status"] == "queued", "File analysis expired at the web-only limit");
+                job["createdon"] = DateTime.UtcNow.AddHours(-4).AddMinutes(-1);
+                Assert((string)Call(service, Actor(), input)["status"] == "failed", "File analysis never expires");
+                Assert(service.Writes == 2 && job.GetAttributeValue<string>("cr9cd_status") == "queued", "Polling wrote data");
             },
             ["plain language and relative seasons do not require an existing season"] = () => {
                 var service = new Fake(); var input = Input(Guid.NewGuid(), "I got VGK tickets for next season.\nFind their home schedule.");
@@ -120,7 +148,7 @@ internal static class SearchTests
     private sealed class Fake : IOrganizationService
     {
         public bool Enabled = true; public string SeasonScope = "ais-ticket-review-v1"; public int Writes;
-        public List<Entity> Jobs = new List<Entity>();
+        public List<Entity> Jobs = new List<Entity>(); public List<Entity> Notes = new List<Entity>();
         public Entity Retrieve(string name, Guid id, ColumnSet columns)
         {
             Assert(name == "cr9cd_season" && id == Season, "Unexpected native read");
@@ -142,7 +170,11 @@ internal static class SearchTests
             }
             return new EntityCollection(rows.Take(q.TopCount ?? Int32.MaxValue).ToList());
         }
-        public Guid Create(Entity row) { Assert(row.LogicalName == "cr9cd_schedulesearch", "Search wrote inventory/workspace state"); row["createdon"] = DateTime.UtcNow; Jobs.Add(row); Writes++; return row.Id; }
+        public Guid Create(Entity row) {
+            if (row.LogicalName == "annotation") { Assert(Jobs.Any(job => job.Id == row.GetAttributeValue<EntityReference>("objectid").Id), "File attached outside its job"); Notes.Add(row); }
+            else { Assert(row.LogicalName == "cr9cd_schedulesearch", "Search wrote inventory/workspace state"); row["createdon"] = DateTime.UtcNow; Jobs.Add(row); }
+            Writes++; return row.Id;
+        }
         public void Update(Entity row) => throw new Exception("Search must not update native inventory or workspace");
         public void Delete(string name, Guid id) => throw new NotSupportedException();
         public OrganizationResponse Execute(OrganizationRequest request) => throw new NotSupportedException();

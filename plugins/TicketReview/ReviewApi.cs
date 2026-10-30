@@ -235,16 +235,17 @@ namespace Ais.TicketReview
                         Check(!Rows(s, "seasons").Any(x => (bool?)x["removed"] != true && Str(x, "teamId") == importTeamId && String.Equals(Str(x, "label"), Str(draft, "label").Trim(), StringComparison.OrdinalIgnoreCase)), "A season with that label already exists for this team. Select it from the list.");
                         importSeasonId = Str(Apply(service, s, actor, new JObject { ["type"] = "createSeason", ["teamId"] = importTeamId, ["label"] = draft["label"], ["startDate"] = draft["startDate"], ["endDate"] = draft["endDate"] }, now), "id");
                     }
-                    FindLive(s, "seasons", importSeasonId);
                     var lines = Str(c, "csv").Split('\n').Select(x => x.TrimEnd('\r')).Where(x => !String.IsNullOrWhiteSpace(x) && !x.StartsWith("#")).ToList();
                     if (lines.Count > 0 && lines[0].StartsWith("date,", StringComparison.OrdinalIgnoreCase)) lines.RemoveAt(0);
                     Check(lines.Count > 0 && lines.Count <= 100, "Import 1 to 100 rows per transaction.");
+                    var importedGameIds = new List<string>();
                     foreach (var line in lines) {
                         var cells = Csv(line); Check(cells.Count == 5, "Each CSV row must contain exactly five columns.");
                         Check(Regex.IsMatch(cells[0], @"^\d{4}-\d{2}-\d{2}$") && Regex.IsMatch(cells[1], @"^\d{2}:\d{2}$"), "Use YYYY-MM-DD and HH:mm UTC.");
                         Check(Int32.TryParse(cells[3], out var tickets), "Ticket quantity must be an integer.");
-                        AddInventory(s, new JObject { ["gameDate"] = cells[0] + "T" + cells[1] + ":00Z", ["title"] = cells[2], ["tickets"] = tickets, ["kind"] = cells[4], ["seasonId"] = importSeasonId });
-                    } break;
+                        importedGameIds.Add(AddInventory(s, new JObject { ["gameDate"] = cells[0] + "T" + cells[1] + ":00Z", ["title"] = cells[2], ["tickets"] = tickets, ["kind"] = cells[4], ["seasonId"] = importSeasonId }));
+                    }
+                    ImportPriorAllocations(s, c, importedGameIds, actor, now); break;
                 case "release":
                     var action = Str(c, "action"); Check(new[] {"private", "released", "scheduled"}.Contains(action), "Choose a visibility action.");
                     if (action == "scheduled") Instant(Str(c, "at"));
@@ -401,7 +402,7 @@ namespace Ais.TicketReview
                 if (!visible && !admin && !Rows(s, "requests").Any(r => Str(r, "gameId") == Str(g, "id") && OwnInterest(r, actor))) continue;
                 var row = (JObject)g.DeepClone(); row["status"] = InventoryStatus(g, now); var id = Str(g, "id"); var requests = Rows(s, "requests").Where(r => Str(r, "gameId") == id && Active(r) && (visible || admin || OwnInterest(r, actor))).ToList();
                 row["released"] = Released(g, now); row["availableTickets"] = (bool?)g["removed"] == true ? 0 : Rows(s, "seats").Count(x => Str(x, "gameId") == id && Str(x, "status") == "available");
-                row["requestCount"] = requests.Count; row["requestingPeople"] = requests.Select(r => !String.IsNullOrEmpty(Str(r, "requesterDirectoryId")) ? Str(r, "requesterDirectoryId") : identities.TryGetValue(Str(r, "requesterId"), out var identity) && identity.GetAttributeValue<Guid>("azureactivedirectoryobjectid") != Guid.Empty ? identity.GetAttributeValue<Guid>("azureactivedirectoryobjectid").ToString() : Str(r, "requesterId")).Distinct(StringComparer.OrdinalIgnoreCase).Count(); row["requestedTickets"] = requests.Sum(r => (int)r["quantity"]);
+                row["requestCount"] = requests.Count; row["requestingPeople"] = requests.Select(r => !String.IsNullOrEmpty(Str(r, "requesterDirectoryId")) ? Str(r, "requesterDirectoryId") : identities.TryGetValue(Str(r, "requesterId"), out var identity) && identity.GetAttributeValue<Guid>("azureactivedirectoryobjectid") != Guid.Empty ? identity.GetAttributeValue<Guid>("azureactivedirectoryobjectid").ToString() : Str(r, "requesterId")).Where(key => key != Guid.Empty.ToString()).Distinct(StringComparer.OrdinalIgnoreCase).Count(); row["requestedTickets"] = requests.Sum(r => (int)r["quantity"]);
                 var season = Rows(s, "seasons").FirstOrDefault(x => Str(x, "id") == Str(g, "seasonId"));
                 row["seasonLabel"] = season?["label"];
                 row["seasonStartDate"] = season?["startDate"];

@@ -44,7 +44,7 @@ def main():
     if not args.apply:
         print("Read-only plan; use --apply after announcing the flow update.")
         return
-    since = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+    since = (datetime.now(timezone.utc) - timedelta(hours=4)).isoformat()
     pending = d.call("GET", config["jobEntitySet"], params={"$select": "cr9cd_schedulesearchid", "$top": 1,
         "$filter": f"(cr9cd_status eq 'queued' or cr9cd_status eq 'searching') and createdon ge {since}"})["value"]
     if pending:

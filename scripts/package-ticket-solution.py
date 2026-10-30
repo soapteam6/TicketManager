@@ -81,7 +81,7 @@ def inspect_schedule_search(archive, roots):
     config = ROOT / "solutions/schedule-search.json"
     if not config.exists():
         return None
-    from schedule_search_flow import definition
+    from schedule_search_flow import definition, assert_protected_actions
     search = json.loads(config.read_text(encoding="utf-8"))
     if not any(r.attrib.get("schemaName") == search["jobTable"] and r.attrib.get("type") == "1" and r.attrib.get("behavior") == "0" for r in roots):
         raise RuntimeError("Export is missing the full schedule-search table.")
@@ -93,10 +93,7 @@ def inspect_schedule_search(archive, roots):
     if flow["properties"]["definition"] != definition(search["jobEntitySet"], search.get("connectorApi", ""), search.get("credentialSource", "connection")):
         raise RuntimeError("Exported schedule-search flow differs from its source definition.")
     if search.get("credentialSource", "connection") != "connection":
-        work = flow["properties"]["definition"]["actions"]["Find_schedule"]["actions"]
-        for action in [work["Get_Claude_key"], work["Research"]["actions"]["Claude_messages"]]:
-            if set(action.get("runtimeConfiguration", {}).get("secureData", {}).get("properties", [])) != {"inputs", "outputs"}:
-                raise RuntimeError("A key-bearing action is missing secure inputs/outputs.")
+        assert_protected_actions(flow["properties"]["definition"])
         if "claude" in flow["properties"]["connectionReferences"]:
             raise RuntimeError("The migrated flow still depends on its old credential connection.")
         env_files = [n for n in archive.namelist() if search["credentialEnvironmentVariable"] in n and n.endswith("environmentvariabledefinition.xml")]

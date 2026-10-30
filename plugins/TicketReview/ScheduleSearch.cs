@@ -31,7 +31,11 @@ namespace Ais.TicketReview
                 Check(ScheduleSearchAvailable(service), "Schedule search is not configured yet. Use CSV import for now.");
                 var request = input["request"] as JObject;
                 Check(request != null, "Enter a schedule to find.");
-                var text = Text(request, "query", 2000);
+                var original = existing == null ? null : Parse(existing.GetAttributeValue<string>("cr9cd_input"));
+                var files = ImportFileMetadata(request, original);
+                var text = Str(request, "query").Trim();
+                Check(text.Length <= 2000 && (text.Length > 0 || files.Count > 0), "Describe what to import or attach a file.");
+                if (text.Length == 0) text = "Prepare an import from the uploaded files.";
                 Check(!text.Any(ch => Char.IsControl(ch) && ch != '\r' && ch != '\n' && ch != '\t'), "Remove unsupported control characters from the request.");
                 var seasonId = Guid.Empty;
                 var season = new JObject();
@@ -49,7 +53,11 @@ namespace Ais.TicketReview
                     ["from"] = season["startDate"], ["through"] = season["endDate"],
                     ["ticketsPerEvent"] = tickets, ["homeOnly"] = request["homeOnly"].DeepClone()
                 };
-                var original = existing == null ? null : Parse(existing.GetAttributeValue<string>("cr9cd_input"));
+                if (!String.IsNullOrEmpty(Str(request, "timeZone"))) {
+                    Check(Str(request, "timeZone").Length <= 100 && System.Text.RegularExpressions.Regex.IsMatch(Str(request, "timeZone"), @"^(UTC|[A-Za-z_]+(/[A-Za-z0-9_+.\-]+)+)$"), "Choose a valid timezone.");
+                    payload["timeZone"] = Str(request, "timeZone");
+                }
+                if (files.Count > 0) payload["files"] = files;
                 if (existing == null) payload["today"] = DateTime.UtcNow.ToString("yyyy-MM-dd");
                 else if (original["today"] != null) payload["today"] = original["today"];
                 if (existing != null) {
@@ -59,19 +67,21 @@ namespace Ais.TicketReview
                     var active = new QueryExpression(SearchTable) { ColumnSet = new ColumnSet(false), TopCount = 2 };
                     active.Criteria.AddCondition("cr9cd_requestedby", ConditionOperator.Equal, Str(actor, "id"));
                     active.Criteria.AddCondition("cr9cd_status", ConditionOperator.In, "queued", "searching");
-                    active.Criteria.AddCondition("createdon", ConditionOperator.OnOrAfter, DateTime.UtcNow.AddMinutes(-10));
+                    active.Criteria.AddCondition("createdon", ConditionOperator.OnOrAfter, DateTime.UtcNow.AddHours(-4));
                     Check(service.RetrieveMultiple(active).Entities.Count < 2, "Wait for one of your current schedule searches to finish.");
                     existing = new Entity(SearchTable, id) {
                         ["cr9cd_name"] = text.Substring(0, Math.Min(300, text.Length)).Replace('\r', ' ').Replace('\n', ' '), ["cr9cd_requestedby"] = Str(actor, "id"),
                         ["cr9cd_status"] = "queued", ["cr9cd_input"] = payload.ToString(Formatting.None)
                     };
                     service.Create(existing);
+                    SaveImportFiles(service, id, request, files);
                 }
             }
             Check(existing != null && existing.GetAttributeValue<string>("cr9cd_requestedby") == Str(actor, "id"), "Search not found.");
             var status = existing.GetAttributeValue<string>("cr9cd_status");
             var created = existing.GetAttributeValue<DateTime>("createdon");
-            var expired = (status == "queued" || status == "searching") && created != default(DateTime) && created < DateTime.UtcNow.AddMinutes(-10);
+            var lifetimeMinutes = (Parse(existing.GetAttributeValue<string>("cr9cd_input"))["files"] as JArray)?.Count > 0 ? 240 : 10;
+            var expired = (status == "queued" || status == "searching") && created != default(DateTime) && created < DateTime.UtcNow.AddMinutes(-lifetimeMinutes);
             return new JObject {
                 ["id"] = id.ToString(), ["status"] = expired ? "failed" : status,
                 ["request"] = Parse(existing.GetAttributeValue<string>("cr9cd_input")),

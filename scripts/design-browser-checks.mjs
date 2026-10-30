@@ -2,11 +2,17 @@
 // Start Chrome with --remote-debugging-port=9224 and npm run dev:review first.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import ExcelJS from 'exceljs';
 
 const base = process.env.REVIEW_URL || 'http://127.0.0.1:5173';
 assert(['localhost', '127.0.0.1'].includes(new URL(base).hostname));
 const artifacts = 'design-artifacts.local';
 await mkdir(artifacts, { recursive: true });
+const importBook = new ExcelJS.Workbook(), importSheet = importBook.addWorksheet('Tickets');
+importSheet.addRows([['Game Date', 'Opponent', 'Recipient', 'Status'], ['2027-09-11', 'Discovered demo opponent', '', ''], ['', '', 'Gary', 'Available']]);
+const importFilePath = resolve(artifacts, 'ai-import-fixture.xlsx');
+await importBook.xlsx.writeFile(importFilePath);
 
 class CDP {
   id = 0;
@@ -533,6 +539,34 @@ try {
     }
     assert(await page.evaluate(`!document.querySelector('.work-feedback, .work-table-footer, .work-app-footer, .design-switcher')`), 'Routine feedback or removed layout chrome is still rendered');
     await nav('Setup & import');
+    await page.evaluate(`document.querySelector('button[aria-label="AI Import"]').click()`);
+    await click('AI Import', 'document.querySelector(".work-access-sections")');
+    await set('textarea[name="scheduleQuery"]', '');
+    const dom = await page.call('DOM.getDocument');
+    const fileInput = await page.call('DOM.querySelector', { nodeId: dom.root.nodeId, selector: 'input[aria-label="Attach import files"]' });
+    await page.call('DOM.setFileInputFiles', { nodeId: fileInput.nodeId, files: [importFilePath] });
+    await page.wait(`document.querySelector('[aria-label="Attached import files"]')?.textContent.includes('ai-import-fixture.xlsx')`);
+    assert(await page.evaluate(`!document.querySelector('textarea[name="scheduleQuery"]').required && document.querySelector('textarea[name="scheduleQuery"]').value===''`), 'File-only import still required text');
+    await click('Prepare import', 'document.querySelector(".work-schedule-finder form")');
+    await page.wait(`document.querySelector('.work-found-schedule tbody')?.textContent.includes('Review ticket statuses')`);
+    await click('Review 2 tickets');
+    await page.wait(`document.querySelector('[aria-label="Imported ticket 1"]')`);
+    assert(await page.evaluate(`document.querySelector('[aria-label="Imported ticket 1"] select').value===''`), 'AI guessed the ambiguous recipient/status');
+    await set('[aria-label="Imported ticket 1"] select', 'allocated');
+    await click('Choose recipient');
+    await set('input[aria-label="Search import recipients"]', 'employee@example.invalid');
+    await page.evaluate(`document.querySelector('[aria-label="Import recipient results"] button').click()`);
+    await click('Done reviewing');
+    await page.wait(`!document.querySelector('[role="dialog"]')`);
+    await page.evaluate(`document.querySelector('.work-found-schedule tbody input[type="checkbox"]').click()`);
+    await screenshot('file-import-review');
+    await click('Create season & import');
+    await page.wait(`!document.querySelector('[aria-label="Found schedule"]') && !document.querySelector('[aria-label="Attached import files"]')`);
+    await nav('Allocations');
+    await set('input[placeholder="Search recipient, email or event"]', 'employee@example.invalid');
+    await page.wait(`document.querySelector('.work-allocation-split tbody')?.textContent.includes('Discovered demo opponent')`);
+    await screenshot('imported-prior-allocation');
+    await nav('Setup & import');
     await page.evaluate(`document.querySelector('button[aria-label="Teams"]').click()`);
     await page.evaluate(`[...document.querySelectorAll('.work-setup-register tbody tr')].find(r=>r.textContent.includes('Synthetic Comets')).click()`);
     await click('Delete team');
@@ -629,7 +663,7 @@ try {
     await page.evaluate(`window.expirationRoot.unmount(); document.getElementById('expiration-check').remove(); document.getElementById('root').hidden=false; delete window.expirationProvider;`);
     assert.deepEqual(errors, [], `${design}: page errors`);
     assert.deepEqual(external, [], `${design}: external requests`);
-    results.push({ design, status: 'PASS', checks: ['no automatic initial selection', 'detail pane dismissal', 'no routine save banners', 'search', 'whole-row and keyboard selection', 'private inventory creation', 'interest', 'single self beneficiary follows requesting person', 'bounded saved contact selection', 'CRM search and recipient allocation', 'requester email', 'allocation', 'right-side allocation details', 'visible rejection reason', 'copy error diagnostics', 'legacy clipboard fallback', 'manual copy when clipboard is blocked', 'startup error diagnostics preserve connector status and request ID', 'startup retry refreshes copied error', 'contact history', ...(design === 'desk' ? ['team and season creation', 'web schedule preview and selected import', 'TBD game excluded', 'CSV fallback', 'iPad schedule search', 'independent detail scrolling'] : []), 'admin-only user access', 'role grant and reversal', 'group role assignment', 'connecting a directory group', 'requester navigation', 'iPad landscape', 'iPad portrait', 'bounded page scroll', 'requester inactive/history controls hidden', 'live event expiration closes interest', 'completed event history', 'attendance controls disabled before event day', 'same-day attendance before event start', 'team and season deletion with descendant counts', 'active allocations require explicit cancellation', 'successful AI import clears prompt preview and resumable job', 'failed AI import retains form for retry', 'individual game deletion', 'allocated team deletion preserves named history'], pageErrors: 0, externalRequests: 0 });
+    results.push({ design, status: 'PASS', checks: ['no automatic initial selection', 'detail pane dismissal', 'no routine save banners', 'search', 'whole-row and keyboard selection', 'private inventory creation', 'interest', 'single self beneficiary follows requesting person', 'bounded saved contact selection', 'CRM search and recipient allocation', 'requester email', 'allocation', 'right-side allocation details', 'visible rejection reason', 'copy error diagnostics', 'legacy clipboard fallback', 'manual copy when clipboard is blocked', 'startup error diagnostics preserve connector status and request ID', 'startup retry refreshes copied error', 'contact history', ...(design === 'desk' ? ['team and season creation', 'web schedule preview and selected import', 'TBD game excluded', 'CSV fallback', 'iPad schedule search', 'independent detail scrolling'] : []), 'admin-only user access', 'role grant and reversal', 'group role assignment', 'connecting a directory group', 'requester navigation', 'iPad landscape', 'iPad portrait', 'bounded page scroll', 'requester inactive/history controls hidden', 'live event expiration closes interest', 'completed event history', 'attendance controls disabled before event day', 'same-day attendance before event start', 'team and season deletion with descendant counts', 'active allocations require explicit cancellation', 'successful AI import clears prompt preview and resumable job', 'failed AI import retains form for retry', 'individual game deletion', 'allocated team deletion preserves named history', 'file-only AI import', 'ambiguous recipient requires human mapping', 'reviewed allocation import and reset'], pageErrors: 0, externalRequests: 0 });
     page.close();
     await browser.call('Target.closeTarget', { targetId });
   }

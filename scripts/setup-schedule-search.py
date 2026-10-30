@@ -70,10 +70,13 @@ def main():
     if args.enable and len(values) != 1:
         raise RuntimeError("Configure exactly one current value before enabling the flow.")
     if not d.call("GET", "EntityDefinitions", params={"$select": "MetadataId", "$filter": f"LogicalName eq '{TABLE}'"})["value"]:
-        create("EntityDefinitions", {"SchemaName": TABLE, "DisplayName": label("Schedule Search"), "DisplayCollectionName": label("Schedule Searches"), "OwnershipType": "OrganizationOwned", "HasActivities": False, "HasNotes": False, "IsActivity": False,
+        create("EntityDefinitions", {"SchemaName": TABLE, "DisplayName": label("Schedule Search"), "DisplayCollectionName": label("Schedule Searches"), "OwnershipType": "OrganizationOwned", "HasActivities": False, "HasNotes": True, "IsActivity": False,
             "Attributes": [column("cr9cd_name", primary=True), column("cr9cd_requestedby", 36), column("cr9cd_status", 30), column("cr9cd_input", 10000, memo=True), column("cr9cd_result", 1048576, memo=True), column("cr9cd_error", 2000)]})
         d.call("POST", "PublishXml", {"ParameterXml": f"<importexportxml><entities><entity>{TABLE}</entity></entities></importexportxml>"})
-    metadata = d.call("GET", f"EntityDefinitions(LogicalName='{TABLE}')", params={"$select": "EntitySetName"})
+    metadata = d.call("GET", f"EntityDefinitions(LogicalName='{TABLE}')", params={"$select": "EntitySetName,HasNotes"})
+    if not metadata["HasNotes"]:
+        d.call("PUT", f"EntityDefinitions(LogicalName='{TABLE}')", {"@odata.type": "Microsoft.Dynamics.CRM.EntityMetadata", "HasNotes": True}, headers={"MSCRM.MergeLabels": "true"})
+        d.call("POST", "PublishXml", {"ParameterXml": f"<importexportxml><entities><entity>{TABLE}</entity></entities></importexportxml>"})
     all_connections = Connections().call("GET", "connections?%24expand=api").get("value", [])
     connections = [x for x in all_connections if x.get("properties", {}).get("apiId", "").endswith("/shared_commondataserviceforapps") and x.get("properties", {}).get("createdBy", {}).get("email", "").lower() == "emikes@ais-now.com" and any(v.get("status") == "Connected" for v in x.get("properties", {}).get("statuses", []))]
     if len(connections) != 1:

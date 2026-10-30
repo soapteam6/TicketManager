@@ -15,16 +15,18 @@ const compiled = await build({ entryPoints: ['src/review/scheduleDiscovery.ts'],
 const { parseScheduleDiscovery, discoveredGameIssues } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].contents).toString('base64')}`);
 const found = parseScheduleDiscovery(result.rawResult, result.request);
 const ready = found.games.filter(g => g.selected && !discoveredGameIssues(g, [], result.request.homeOnly).length);
-assert(found.sources.length > 0 && (ready.length > 0 || found.games.length === 0 && found.warnings.length > 0), 'No source-backed schedule or explained empty result');
+const files = result.request.files ?? [];
+assert(found.sources.length > 0 && (ready.length > 0 || files.length > 0 && found.games.length > 0 || found.games.length === 0 && found.warnings.length > 0), 'No source-backed schedule or explained empty result');
 const record = {
-  authenticatedAs: 'emikes@ais-now.com', jobId: result.id, query: result.request.query,
+  authenticatedAs: 'emikes@ais-now.com', jobId: result.id, ...(!files.length && { query: result.request.query }),
   status: result.status, team: found.team, season: found.season, timezone: found.timezone,
   existingSeasonRequired: !!result.request.seasonId,
   gamesFound: found.games.length, gamesReadyForReview: ready.length,
   gamesWithUnconfirmedTimes: found.games.filter(g => !g.startAt).length,
   toolReturnedSources: found.sources.length, warnings: found.warnings.length,
   workspaceUnchanged: check.workspaceUnchanged, inventoryImported: check.inventoryImported,
+  ...(files.length > 0 && { uploadedFiles: files.length, sourceFileCount: found.sources.filter(s => s.fileName).length, totalTickets: found.games.reduce((n, g) => n + g.tickets, 0), gamesRequiringTicketReview: found.games.filter(g => g.ticketRows?.some(t => !t.resolution || t.resolution !== 'available' && !t.contactId && !t.crmContact)).length, sourceTicketRows: found.games.reduce((n, g) => n + (g.ticketRows?.length ?? 0), 0), unresolvedTicketStatuses: found.games.flatMap(g => g.ticketRows ?? []).filter(t => !t.resolution).length, priorAllocationsWithNoIdentityGuessed: found.games.flatMap(g => g.ticketRows ?? []).filter(t => t.resolution && t.resolution !== 'available' && !t.contactId && !t.crmContact).length }),
   ...(stem === 'ai-import-live' && { notes: found.warnings }),
 };
-await writeFile(stem === 'ai-import-live' ? 'solutions/ai-import-test.json' : stem === 'claude-env-live' ? 'solutions/claude-environment-test.json' : 'solutions/schedule-search-test.json', JSON.stringify(record, null, 2) + '\n');
+await writeFile(files.length ? 'solutions/ai-file-import-test.json' : stem === 'ai-import-live' ? 'solutions/ai-import-test.json' : stem === 'claude-env-live' ? 'solutions/claude-environment-test.json' : 'solutions/schedule-search-test.json', JSON.stringify(record, null, 2) + '\n');
 console.log(JSON.stringify(record, null, 2));

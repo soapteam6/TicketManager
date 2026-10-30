@@ -28,7 +28,7 @@ describe('schedule discovery result validation', () => {
     const game = parseScheduleDiscovery(response({ sourceUrl: 'https://invented.example/schedule' }), request).games[0];
     expect(game.sourceVerified).toBe(false);
     expect(game.selected).toBe(false);
-    expect(discoveredGameIssues(game, [], true)).toContain('Source was not verified by web search');
+    expect(discoveredGameIssues(game, [], true)).toContain('Source was not verified by web search or an uploaded file');
   });
   it('rejects an answer with no native web search results', () => {
     const raw = response(); raw.content = raw.content.filter(c => c.type === 'text');

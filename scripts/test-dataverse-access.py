@@ -54,7 +54,8 @@ def main():
         legacy_search = search.get("credentialSource", "connection") == "connection"
         for kind, component_id in [(29, search["workflowId"])] + ([(372, search["connectorId"])] if legacy_search else []):
             assert any(c["componenttype"] == kind and c["objectid"] == component_id for c in members), "Schedule flow or connector missing from solution"
-        metadata = d.call("GET", "EntityDefinitions(LogicalName='cr9cd_schedulesearch')", params={"$select": "MetadataId"})
+        metadata = d.call("GET", "EntityDefinitions(LogicalName='cr9cd_schedulesearch')", params={"$select": "MetadataId,HasNotes"})
+        assert metadata["HasNotes"] is True, "AI Import file attachments are unavailable"
         assert any(c["componenttype"] == 1 and c["objectid"] == metadata["MetadataId"] and c["rootcomponentbehavior"] == 0 for c in members), "Search table missing from solution"
         refs = d.call("GET", "connectionreferences", params={"$select": "connectionreferenceid", "$filter": "connectionreferencelogicalname eq 'cr9cd_ticketscheduledataverse' or connectionreferencelogicalname eq 'cr9cd_ticketscheduleclaude'"})["value"]
         assert len(refs) == (2 if legacy_search else 1) and all(any(c["componenttype"] == 10083 and c["objectid"] == r["connectionreferenceid"] for c in members) for r in refs), "Search connection references missing"
@@ -65,11 +66,12 @@ def main():
             assert any(c["componenttype"] == 380 and c["objectid"] == search["credentialDefinitionId"] for c in members), "Claude ENV definition missing"
             assert not any(c["componenttype"] == 381 for c in members), "Credential current values must not belong to the solution"
             flow = d.call("GET", f"workflows({search['workflowId']})", params={"$select": "clientdata"})
-            work = json.loads(flow["clientdata"])["properties"]["definition"]["actions"]["Find_schedule"]["actions"]
-            for action in [work["Get_Claude_key"], work["Research"]["actions"]["Claude_messages"]]:
-                assert set(action["runtimeConfiguration"]["secureData"]["properties"]) == {"inputs", "outputs"}, "Key action is not masked"
-            call = work["Research"]["actions"]["Claude_messages"]
-            assert call["type"] == "Http" and call["inputs"]["headers"]["x-api-key"].startswith("@"), "Claude call is not reading its key dynamically"
+            from schedule_search_flow import assert_protected_actions, walk_actions
+            deployed_definition = json.loads(flow["clientdata"])["properties"]["definition"]
+            assert_protected_actions(deployed_definition)
+            for _, call in walk_actions(deployed_definition):
+                if call["type"] == "Http":
+                    assert call["inputs"]["headers"]["x-api-key"].startswith("@"), "Claude call is not reading its key dynamically"
             env = d.call("GET", f"environmentvariabledefinitions({search['credentialDefinitionId']})", params={"$select": "type,defaultvalue"})
             assert env["type"] == 100000000 and not env.get("defaultvalue"), "Expected the approved Text current value without a default"
             retired = search.get("retiredClaudeResources", {})

@@ -93,6 +93,7 @@ export interface Interest {
   id: RequestId;
   gameId: GameId;
   requesterId: string;
+  source?: 'file_import';
   requesterDirectoryId?: string;
   requesterContactId?: string;
   requesterName?: string;
@@ -239,11 +240,15 @@ export interface ScheduleSearchRequest {
   seasonId: string;
   ticketsPerEvent: number;
   homeOnly: boolean;
+  timeZone?: string;
+  files?: ImportFileUpload[];
 }
+export interface ImportFileUpload { name: string; mediaType: string; data: string; size: number }
+export interface ImportFileSource { name: string; mediaType: string; size: number; annotationId: string; sha256: string }
 export interface ScheduleSearchJob {
   id: string;
   status: 'queued' | 'searching' | 'complete' | 'failed';
-  request: ScheduleSearchRequest & { from?: string; through?: string; seasonLabel?: string; today?: string };
+  request: Omit<ScheduleSearchRequest, 'files'> & { files?: ImportFileSource[]; from?: string; through?: string; seasonLabel?: string; today?: string };
   rawResult?: unknown;
   error?: string;
 }
@@ -291,7 +296,7 @@ export type ReviewCommand =
   | { type: 'removeInventory'; gameId: GameId; cancelAllocations?: boolean }
   | { type: 'removeTeam'; teamId: string; cancelAllocations?: boolean }
   | { type: 'removeSeason'; seasonId: string; cancelAllocations?: boolean }
-  | { type: 'importSchedule'; csv: string; seasonId: string; newSeason?: { teamId: string; teamName: string; label: string; startDate: string; endDate: string; defaultTickets: number } }
+  | { type: 'importSchedule'; csv: string; seasonId: string; importedAllocations?: ImportedAllocation[]; newSeason?: { teamId: string; teamName: string; label: string; startDate: string; endDate: string; defaultTickets: number } }
   | ReleaseCommand
   | {
       type: 'interest';
@@ -339,6 +344,10 @@ export interface CrmAccount { id: string; name: string; ownerName: string | null
 export interface CrmPerson { id: string; fullName: string; email?: string; phone?: string; title?: string }
 export interface CrmBeneficiary {
   contactId: string; accountId: string; accountName: string; name: string; email: string; phone: string;
+}
+export interface ImportedAllocation {
+  rowIndex: number; ticketNumber: number; status: 'allocated' | 'transferred';
+  contactId?: string; crmContact?: CrmBeneficiary; sourceFile: string; sourceLocation: string; sourceNote: string;
 }
 export interface CrmDirectory {
   searchAccounts(query: string): Promise<CrmAccount[]>;

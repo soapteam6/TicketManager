@@ -17,6 +17,7 @@ import type {
   CommandResult,
   Contact,
   DirectorySource,
+  ImportFileSource,
   Inventory,
   Persona,
   PersonaKey,
@@ -179,7 +180,7 @@ export class MockReviewProvider implements ReviewProvider {
           (s) => s.gameId === g.id && s.status === 'available',
         ).length,
         requestCount: demand.length,
-        requestingPeople: new Set(demand.map(r => r.requesterDirectoryId ?? Object.values(PERSONAS).find(p => p.id === r.requesterId)?.directoryId ?? r.requesterId)).size,
+        requestingPeople: new Set(demand.map(r => r.requesterDirectoryId ?? Object.values(PERSONAS).find(p => p.id === r.requesterId)?.directoryId ?? r.requesterId).filter(id => id !== '00000000-0000-0000-0000-000000000000')).size,
         requestedTickets: demand.reduce((sum, r) => sum + r.quantity, 0),
         seasonLabel: state.seasons.find((s) => s.id === g.seasonId)?.label,
         seasonStartDate: state.seasons.find(s => s.id === g.seasonId)?.startDate,
@@ -276,13 +277,24 @@ export class MockReviewProvider implements ReviewProvider {
     const actor = coordinator(this.actor(key));
     const season = this.state.seasons.find(s => s.id === request.seasonId && !s.removed);
     if (request.seasonId && !season) invalid('Choose a season.');
-    text(request.query, 'an import request', 2000); integer(request.ticketsPerEvent, 0, 1000, 'Tickets');
+    if (!request.query.trim() && !request.files?.length) invalid('Describe what to import or attach a file');
+    if (request.query.length > 2000) invalid('Use up to 2000 characters');
+    integer(request.ticketsPerEvent, 0, 1000, 'Tickets');
     const existing = this.scheduleJobs.get(jobId);
     if (existing) {
       if (existing.owner !== actor.id) throw new ReviewError('forbidden', 'Search not found.');
       return structuredClone(existing.job);
     }
-    const job: ScheduleSearchJob = { id: jobId, status: 'queued', request: { ...request, from: season?.startDate, through: season?.endDate, seasonLabel: season?.label } };
+    const uploaded: ImportFileSource[] = [];
+    if ((request.files?.length ?? 0) > 5 || (request.files ?? []).reduce((sum, f) => sum + f.size, 0) > 4 * 1024 * 1024) invalid('Choose up to 5 files, 4 MB total');
+    for (const [index, file] of (request.files ?? []).entries()) {
+      const bytes = Uint8Array.from(atob(file.data), c => c.charCodeAt(0));
+      if (!bytes.length || bytes.length !== file.size) invalid('The uploaded file could not be read');
+      const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(b => b.toString(16).padStart(2, '0')).join('');
+      uploaded.push({ name: file.name, mediaType: file.mediaType, size: file.size, annotationId: GUID(30, index + 1), sha256: hash });
+    }
+    const { files: _files, ...plainRequest } = request; void _files;
+    const job: ScheduleSearchJob = { id: jobId, status: 'queued', request: { ...plainRequest, query: request.query.trim() || 'Prepare an import from the uploaded files.', ...(uploaded.length && { files: uploaded }), from: season?.startDate, through: season?.endDate, seasonLabel: season?.label } };
     this.scheduleJobs.set(jobId, { owner: actor.id, job });
     return structuredClone(job);
   }
@@ -295,11 +307,11 @@ export class MockReviewProvider implements ReviewProvider {
       const date = new Date(`${job.request.from || '2027-09-01'}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + 10);
       const day = date.toISOString().slice(0, 10), sourceUrl = 'https://schedule.example.invalid/official';
       job.status = 'complete';
-      job.rawResult = { stop_reason: 'end_turn', content: [
+      job.rawResult = { stop_reason: 'end_turn', uploads: job.request.files?.map((f, index) => ({ ...f, fileId: `file_demo_${index}` })), content: [
         { type: 'server_tool_use', name: 'web_search' },
         { type: 'web_search_tool_result', content: [{ type: 'web_search_result', url: sourceUrl, title: 'Synthetic schedule source' }] },
           { type: 'text', text: JSON.stringify({ team: 'Demo schedule search', season: job.request.seasonLabel || '2027–28', seasonStart: job.request.from || '2027-09-01', seasonEnd: job.request.through || '2028-04-30', timezone: 'UTC', warnings: ['Synthetic preview only. No web search or external service was called.'], games: [
-          { title: 'Discovered demo opponent', localDate: day, localTime: '12:00', startAt: date.toISOString(), home: true, venue: 'Demo stadium', sourceUrl },
+          { ...(job.request.files?.length && { sourceFile: job.request.files[0].name, sourceLocation: 'Tickets, row 2', tickets: 2, alreadyAllocated: true, ticketRows: [{ ticketNumber: 1, rawName: 'Gary', status: 'available', sourceLocation: 'Tickets row 3', note: 'Recipient name conflicts with Available' }, { ticketNumber: 2, rawName: '', status: 'available', sourceLocation: 'Tickets row 4' }] }), title: 'Discovered demo opponent', localDate: day, localTime: '12:00', startAt: date.toISOString(), home: true, venue: 'Demo stadium', sourceUrl },
           { title: 'Demo time TBD', localDate: day, localTime: null, startAt: null, home: true, sourceUrl },
         ] }) }
       ] };
@@ -497,15 +509,39 @@ export class MockReviewProvider implements ReviewProvider {
           if (next.seasons.some(s => !s.removed && s.teamId === targetTeam && s.label.toLowerCase() === d.label.trim().toLowerCase())) invalid('A season with that label already exists for this team. Select it from the list.');
           targetSeason = this.id(); next.seasons.push({ id: targetSeason, teamId: targetTeam, label: d.label.trim(), startDate: d.startDate, endDate: d.endDate });
         }
-        if (!next.seasons.some((s) => s.id === targetSeason && !s.removed))
-          invalid('Choose a season for sports imports');
         const preview = previewScheduleCsv(command.csv);
         if (preview.errors.length) invalid(preview.errors.join(' '));
-        for (const row of preview.rows)
-          this.addInventory(next, {
-            ...row,
-            seasonId: row.kind === 'game' ? targetSeason : undefined,
-          });
+        const importedGames = preview.rows.map(row => this.addInventory(next, { ...row, seasonId: row.kind === 'game' ? targetSeason : undefined }));
+        const prior = command.importedAllocations ?? [];
+        if (prior.length > 1000) invalid('Import at most 1000 prior ticket allocations');
+        const used = new Set<string>();
+        const grouped = new Map<string, { requestId: string; quantity: number }>();
+        for (const row of prior) {
+          integer(row.rowIndex, 0, importedGames.length - 1, 'Imported row');
+          const gameId = importedGames[row.rowIndex], game = next.games.find(g => g.id === gameId)!;
+          integer(row.ticketNumber, 1, game.totalTickets, 'Ticket number');
+          if (used.has(`${gameId}:${row.ticketNumber}`)) invalid('Each imported ticket can have only one recipient');
+          used.add(`${gameId}:${row.ticketNumber}`);
+          if (!['allocated', 'transferred'].includes(row.status) || !!row.contactId === !!row.crmContact) invalid('Select one real recipient and confirm ticket status');
+          let contact = row.contactId ? next.contacts.find(c => c.id === row.contactId) : undefined;
+          if (row.crmContact) {
+            contact = prepareCrmPeople(next.contacts, [row.crmContact], () => this.id())[0];
+            if (!next.contacts.some(c => c.id === contact!.id)) next.contacts.push(contact);
+          }
+          if (!contact || !eligible(contact)) invalid('Select an active recipient for imported allocations');
+          text(row.sourceFile, 'source filename', 160); text(row.sourceLocation, 'source sheet/row', 200); text(row.sourceNote, 'source note');
+          const seat = next.seats.find(s => s.gameId === gameId && s.label === `Ticket ${row.ticketNumber}`)!;
+          if (seat.status !== 'available') invalid('An imported ticket is already allocated');
+          const groupKey = `${gameId}:${contact.id}`;
+          let group = grouped.get(groupKey);
+          if (!group) {
+            group = { requestId: this.id(), quantity: 0 }; grouped.set(groupKey, group);
+            next.requests.push({ id: group.requestId, gameId, requesterId: '00000000-0000-0000-0000-000000000000', requesterName: 'Imported allocation', requesterEmail: '', recordedBy: actor.id, source: 'file_import', purpose: contact.type, contactIds: [contact.id], quantity: 0, rationale: `Prior allocation imported from ${row.sourceFile}. Original requester not identified.`, opportunity: '', status: 'fulfilled', createdAt: at });
+          }
+          group.quantity++; next.requests.find(r => r.id === group!.requestId)!.quantity = group.quantity;
+          seat.status = row.status === 'transferred' ? 'transferred' : 'assigned';
+          next.allocations.push(Object.assign({ id: this.id(), requestId: group.requestId, gameId, seatId: seat.id, contactId: contact.id, status: row.status === 'transferred' ? 'transferred' as const : 'approved' as const, decision: `Imported prior allocation: ${row.sourceFile} / ${row.sourceLocation}`, decidedBy: actor.id, transferReference: row.status === 'transferred' ? `Recorded as transferred in source: ${row.sourceLocation}` : '', outcome: 'unknown' as const, evidence: '' }, { importedAt: at, sourceFile: row.sourceFile, sourceLocation: row.sourceLocation, sourceNote: row.sourceNote }));
+        }
         result = {
           message: `Imported ${preview.rows.length} private inventory items. Nothing published or announced.`,
         };

@@ -223,24 +223,39 @@ production build; requester sign-in acceptance remains pending.
 
 ## AI Import
 
-As a coordinator, open **Setup & import → AI Import** and describe what you
-need, for example: “I got VGK tickets for next season. Find their home schedule
-so I can give the tickets out to people.” Select **Prepare import**. No team,
-season or ticket quantity is required before asking. The AI resolves team
-abbreviations and relative season wording using today's date and public sources.
-An unpublished schedule produces an explained empty result rather than invented
-games. Other ticket work can continue while the search runs.
+As a coordinator, open **Setup & import > AI Import**. Type a request,
+attach files, or both. Choose up to **5 files, 4 MB total**; original bytes
+are preserved in Notes attached to your preparation job. Excel, CSV, documents,
+PDFs and images do not require a template. Unsupported/encrypted content must
+produce a warning rather than a silent partial import. For example, request
+VGK home games for next season, or attach a purchased-ticket tracker.
+Select **Prepare import**. No team, season or quantity is required first.
+Unpublished schedules produce an explained empty result. Other ticket work can
+continue while preparation runs.
 
 After results arrive, review the resolved team/season and choose an existing
 season or the proposed new destination. Enter the number of tickets the company
-owns per game; the AI never assumes venue capacity is company inventory. New
+owns per game, or review the quantities extracted from your uploaded tracker;
+the AI never assumes venue capacity is company inventory. New
 team/season names and dates can be corrected here. **Create season & import**
 saves the new destination and selected private games in one transaction. An
 invalid row rolls back the complete command. Existing-season imports use
-**Import selected games**. Nothing is allocated, released or sent to people by
-the AI, even if the request describes that future intent.
+**Import selected games**. Uploaded trackers can also propose existing allocations.
+Use **Review tickets** to confirm status and choose actual employees/saved contacts
+or CRM customer contacts. Vague labels never select identities automatically.
+A named ticket marked Available, missing recipients, contradictory quantities,
+or incomplete ticket positions block that game until reviewed. Unresolved games
+are visibly excluded from the selected import. Selecting Available explicitly
+can dismiss source allocation evidence after human review.
 
-Results appear as an editable preview with source links. Inspect the dates,
+Selected inventory and reviewed prior allocations save in one transaction.
+Imported allocation history records the reviewing actor and source file/location;
+the original requester stays unidentified and attendance stays Unknown. No ticket
+transfer, message or release occurs. The complete prompt, files and preview clear
+only after a successful import. A failed save retains the review.
+
+Results appear as an editable preview with verified source links or uploaded file
+names and sheet/row references. Inspect the dates,
 opponents and warnings; select the rows to keep, then **Import selected games**.
 Search itself creates no inventory. Imported games start private. Unconfirmed
 times, unverified sources, out-of-season dates and existing inventory duplicates
@@ -258,12 +273,26 @@ The **Ticket Manager - AI Import** Power Automate flow, Dataverse connection
 reference, search-job table and `cr9cd_TicketManagerAnthropicApiKey` environment
 variable are included in **AIS Ticket Manager**. The key is an environment-specific
 Text current value, explicitly approved on 2026-10-27; authorized Dataverse
-administrators can read it. Both the runtime key lookup and Claude HTTP call
-hide inputs/outputs. The literal key is absent from the browser, source, flow
+administrators can read it. The key lookup, file reads/uploads, private prompts,
+batch requests/results and private result saves hide inputs/outputs. The trigger
+output is masked. Flow variables for file imports contain only opaque attachment,
+file and batch references, never file bytes, recipient details or model responses. The literal key is absent from the browser, source, flow
 definition and solution exports. The obsolete Claude connection/connector were
-removed after a successful ENV-backed live test. Only the search
-phrase, season bounds and home-game choice go to Claude; contacts, requests,
-roles and ticket inventory are not sent.
+removed after a successful ENV-backed live test. Claude receives the typed request,
+its date/timezone context and any files deliberately attached to that job. The app
+does not send the workspace contact register, access roles, requests or existing
+inventory. Private recipient details must not enter public web searches.
+
+File analysis uses one-request Claude message batches, polled every 30 seconds,
+to avoid Power Automate's 120-second synchronous HTTP limit. Up to three server-tool
+continuations are supported, each limited to one hour; file jobs expire in the
+app after four hours. Ordinary web-only searches retain their existing ten-minute
+lifetime. Files may take several minutes and continue when the user leaves Setup.
+Only files/batches created by the current job are cleaned up in Claude; completed
+batch results and uploaded copies are deleted, unfinished batches are cancelled
+before cleanup. Native job Notes retain the submitted original for provenance.
+If service cancellation itself fails, cleanup can fail and needs operator review;
+there is no claim of guaranteed deletion after a service outage.
 
 Live verification as `emikes@ais-now.com` searched Las Vegas Aviators home games
 in September 2026: **9 games found, 8 ready for review, 1 time TBD excluded**,
