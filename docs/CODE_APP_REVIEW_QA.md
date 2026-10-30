@@ -294,6 +294,18 @@ before cleanup. Native job Notes retain the submitted original for provenance.
 If service cancellation itself fails, cleanup can fail and needs operator review;
 there is no claim of guaranteed deletion after a service outage.
 
+The 2026-10-30 live file test used the supplied VGK 2026-27 tracker with its
+arbitrary layout, misplaced names, cached formulas and struck-through header.
+Claude returned **44 games and 176 tickets**. All 44 source dates and local times
+matched independently; there were no extra/missing dates or guessed identity
+fields. **31 games** were ready for review; **13 games / 52 ticket rows** required
+recipient/status review, including **28 uncertain statuses** and **16 prior
+allocations with no identity selected**. No inventory was imported and the
+workspace stayed unchanged. The flow saved the private result, deleted its
+completed batch and deleted the temporary Claude upload successfully.
+Only aggregate evidence is tracked in [file import verification](../solutions/ai-file-import-test.json);
+the workbook and raw responses remain outside source control.
+
 Live verification as `emikes@ais-now.com` searched Las Vegas Aviators home games
 in September 2026: **9 games found, 8 ready for review, 1 time TBD excluded**,
 with 18 tool-returned source links. No inventory was imported and the workspace
