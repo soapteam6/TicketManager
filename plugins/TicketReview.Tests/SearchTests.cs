@@ -107,6 +107,18 @@ internal static class SearchTests
                 Assert((string)Call(service, Actor(), input)["status"] == "failed", "File analysis never expires");
                 Assert(service.Writes == 2 && job.GetAttributeValue<string>("cr9cd_status") == "queued", "Polling wrote data");
             },
+            ["progress exposes only validated stage counts and times for the owning caller"] = () => {
+                var service = new Fake(); var input = Input(Guid.NewGuid()); Call(service, Actor(), input);
+                var job = service.Jobs.Single(); input["operation"] = "scheduleSearchGet";
+                job["cr9cd_status"] = "searching";
+                job["cr9cd_result"] = new JObject { ["progress"] = new JObject { ["stage"] = "researching", ["filesDone"] = 999, ["round"] = 999, ["updatedAt"] = DateTimeOffset.UtcNow.ToString("o"), ["privateContent"] = "must-not-escape" } }.ToString();
+                var result = Call(service, Actor(), input);
+                Assert((string)result["progress"]["stage"] == "researching" && (int)result["progress"]["filesDone"] == 0 && (int)result["progress"]["round"] == 3, "Unsafe progress values");
+                Assert(!result.ToString().Contains("must-not-escape") && result["rawResult"].Type == JTokenType.Null && result["startedAt"].Type == JTokenType.String, "Private response escaped through progress");
+                job["cr9cd_result"] = "{\"progress\":{\"stage\":\"not-a-stage\"}}";
+                Assert(Call(service, Actor(), input)["progress"].Type == JTokenType.Null, "Unknown stage exposed");
+                Assert(service.Writes == 1, "Polling progress wrote data");
+            },
             ["plain language and relative seasons do not require an existing season"] = () => {
                 var service = new Fake(); var input = Input(Guid.NewGuid(), "I got VGK tickets for next season.\nFind their home schedule.");
                 input["request"]["seasonId"] = "";

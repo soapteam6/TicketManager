@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import ExcelJS from 'exceljs';
 import { readImportFiles } from './importFiles';
-import { discoveredAllocations, discoveredGameIssues, parseScheduleDiscovery } from './scheduleDiscovery';
+import { discoveredGameIssues, parseScheduleDiscovery } from './scheduleDiscovery';
 import { MockReviewProvider } from './provider';
 import { GUID } from './fixtures';
 
@@ -52,21 +52,19 @@ describe('uploaded source and recipient review', () => {
     const raw = result(); raw.uploads = [];
     expect(() => parseScheduleDiscovery(raw, request)).toThrow('uploaded files');
   });
-  it('keeps a vague named/Available ticket unresolved and never guesses a person ID', () => {
+  it('imports owned inventory without requiring historical recipient or status matching', () => {
     const game = parseScheduleDiscovery(result({ alreadyAllocated: true, ticketRows: [
-      { ticketNumber: 1, rawName: 'Gary', status: 'available', sourceLocation: 'Tickets A3', note: 'Name conflicts with Available' },
-      { ticketNumber: 2, rawName: '', status: 'available', sourceLocation: 'Tickets F4' },
+      { ticketNumber: 1, rawName: 'Gary', status: 'available', sourceLocation: 'Tickets A3' },
+      { ticketNumber: 2, rawName: 'Unknown holder', status: 'allocated', sourceLocation: 'Tickets F4' },
     ] }), request).games[0];
-    expect(game.ticketRows![0]).toMatchObject({ rawName: 'Gary', resolution: '' });
-    expect(game.ticketRows![0].contactId).toBeUndefined();
-    expect(discoveredGameIssues(game, [], true)).toContain('Review ticket statuses and select real recipients');
-    game.ticketRows![0] = { ...game.ticketRows![0], resolution: 'allocated', contactId: GUID(4, 5), contactName: 'Demo Employee' };
+    expect(game).toMatchObject({ selected: true, tickets: 2 });
+    expect(game).not.toHaveProperty('ticketRows');
     expect(discoveredGameIssues(game, [], true)).toEqual([]);
-    expect(discoveredAllocations([game])).toEqual([expect.objectContaining({ rowIndex: 0, ticketNumber: 1, contactId: GUID(4, 5), sourceFile: source.name, sourceNote: expect.stringContaining('Gary') })]);
   });
-  it('does not accept a ticket list that exceeds or duplicates the actual inventory positions', () => {
-    const game = parseScheduleDiscovery(result({ ticketRows: [{ ticketNumber: 1, status: 'available' }, { ticketNumber: 1, status: 'available' }] }), request).games[0];
-    expect(discoveredGameIssues(game, [], true)).toContain('Ticket entries must match the inventory quantity');
+  it('uses owned quantities independently of inconsistent old attendee rows', () => {
+    const game = parseScheduleDiscovery(result({ tickets: 4, ticketRows: [{ ticketNumber: 1, status: 'allocated' }, { ticketNumber: 1, status: 'available' }] }), request).games[0];
+    expect(game.tickets).toBe(4);
+    expect(discoveredGameIssues(game, [], true)).toEqual([]);
   });
 });
 describe('reviewed prior-allocation import', () => {

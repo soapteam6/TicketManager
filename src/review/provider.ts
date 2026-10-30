@@ -294,7 +294,7 @@ export class MockReviewProvider implements ReviewProvider {
       uploaded.push({ name: file.name, mediaType: file.mediaType, size: file.size, annotationId: GUID(30, index + 1), sha256: hash });
     }
     const { files: _files, ...plainRequest } = request; void _files;
-    const job: ScheduleSearchJob = { id: jobId, status: 'queued', request: { ...plainRequest, query: request.query.trim() || 'Prepare an import from the uploaded files.', ...(uploaded.length && { files: uploaded }), from: season?.startDate, through: season?.endDate, seasonLabel: season?.label } };
+    const job: ScheduleSearchJob = { id: jobId, status: 'queued', startedAt: new Date().toISOString(), request: { ...plainRequest, query: request.query.trim() || 'Prepare an import from the uploaded files.', ...(uploaded.length && { files: uploaded }), from: season?.startDate, through: season?.endDate, seasonLabel: season?.label } };
     this.scheduleJobs.set(jobId, { owner: actor.id, job });
     return structuredClone(job);
   }

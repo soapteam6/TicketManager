@@ -82,8 +82,19 @@ namespace Ais.TicketReview
             var created = existing.GetAttributeValue<DateTime>("createdon");
             var lifetimeMinutes = (Parse(existing.GetAttributeValue<string>("cr9cd_input"))["files"] as JArray)?.Count > 0 ? 240 : 10;
             var expired = (status == "queued" || status == "searching") && created != default(DateTime) && created < DateTime.UtcNow.AddMinutes(-lifetimeMinutes);
+            var progress = Parse(existing.GetAttributeValue<string>("cr9cd_result") ?? "{}")["progress"] as JObject;
+            var stage = Str(progress ?? new JObject(), "stage");
+            var totalFiles = (Parse(existing.GetAttributeValue<string>("cr9cd_input"))["files"] as JArray)?.Count ?? 0;
+            var safeProgress = progress != null && new[] { "starting", "uploading", "analyzing", "researching", "finalizing" }.Contains(stage)
+                ? new JObject { ["stage"] = stage,
+                    ["filesDone"] = Math.Max(0, Math.Min(totalFiles, Int32.TryParse(Str(progress, "filesDone"), out var filesDone) ? filesDone : 0)), ["totalFiles"] = totalFiles,
+                    ["round"] = Math.Max(0, Math.Min(3, Int32.TryParse(Str(progress, "round"), out var round) ? round : 0)),
+                    ["updatedAt"] = DateTimeOffset.TryParse(Str(progress, "updatedAt"), out var updated) ? updated.ToUniversalTime().ToString("o") : null }
+                : null;
             return new JObject {
                 ["id"] = id.ToString(), ["status"] = expired ? "failed" : status,
+                ["startedAt"] = created == default(DateTime) ? null : created.ToUniversalTime().ToString("o"),
+                ["progress"] = !expired && (status == "queued" || status == "searching") ? safeProgress : null,
                 ["request"] = Parse(existing.GetAttributeValue<string>("cr9cd_input")),
                 ["rawResult"] = status == "complete" ? Parse(existing.GetAttributeValue<string>("cr9cd_result")) : null,
                 ["error"] = expired ? "This search took too long. Try a narrower team/date query." : existing.GetAttributeValue<string>("cr9cd_error")

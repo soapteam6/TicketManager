@@ -1,5 +1,5 @@
 import { isCalendarDate, localDateTimeInputToIso, parseIsoTimestamp } from './dates';
-import type { CrmBeneficiary, ImportedAllocation, InventoryView, ScheduleSearchJob } from './types';
+import type { InventoryView, ScheduleSearchJob } from './types';
 
 export interface ScheduleSource { url: string; title: string; fileName?: string }
 export interface DiscoveredGame {
@@ -19,13 +19,6 @@ export interface DiscoveredGame {
   sourceLocation?: string;
   kind?: 'game' | 'event';
   ticketsKnown?: boolean;
-  alreadyAllocated?: boolean;
-  allocationNote?: string;
-  ticketRows?: ImportTicketRow[];
-}
-export interface ImportTicketRow {
-  ticketNumber: number; rawName: string; company: string; email: string; phone: string; sourceLocation: string; note: string;
-  sourceStatus: string; resolution: '' | 'available' | 'allocated' | 'transferred'; contactId?: string; contactName?: string; crmContact?: CrmBeneficiary;
 }
 export interface ScheduleDiscovery {
   team: string;
@@ -135,20 +128,10 @@ export function parseScheduleDiscovery(raw: unknown, request: ScheduleSearchJob[
     const fileTickets = uploaded.has(sourceFile) && Number.isInteger(row.tickets) && Number(row.tickets) >= 0 && Number(row.tickets) <= 1000;
     const tickets = fileTickets ? Number(row.tickets) : request.ticketsPerEvent;
     const kind = row.kind === 'event' ? 'event' : 'game';
-    const alreadyAllocated = row.alreadyAllocated === true;
-    const ticketRows = uploaded.has(sourceFile) && Array.isArray(row.ticketRows) ? row.ticketRows.slice(0, 1000).map((value, index): ImportTicketRow => {
-      const ticket = object(value) ?? {};
-      const rawName = text(ticket.rawName, 200), sourceStatus = text(ticket.status, 50).toLowerCase();
-      const company = text(ticket.company, 200), email = text(ticket.email, 320), phone = text(ticket.phone, 100);
-      const named = !!(rawName || company || email || phone);
-      const resolution = sourceStatus === 'transferred' ? 'transferred' : sourceStatus === 'allocated' ? 'allocated' : sourceStatus === 'available' && !named ? 'available' : '';
-      return { ticketNumber: Number.isInteger(ticket.ticketNumber) ? Number(ticket.ticketNumber) : index + 1, rawName, company, email, phone, sourceStatus,
-        sourceLocation: text(ticket.sourceLocation, 200), note: text(ticket.note, 1000), resolution };
-    }) : undefined;
     return { id: String(index), title, startAt: timing.startAt, localDate: text(row.localDate, 10), timezone: text(row.timezone, 100) || timezone, venue: text(row.venue, 200), home,
       sourceUrl, sourceVerified, sourceFile, sourceLocation: text(row.sourceLocation, 200), kind, ticketsKnown: fileTickets || request.ticketsPerEvent > 0,
-      ticketRows, alreadyAllocated, allocationNote: text(row.allocationNote, 1000), timeIssue: timing.issue, tickets,
-      selected: !!title && sourceVerified && !!timing.startAt && (kind === 'event' || !request.homeOnly || home === true || uploaded.has(sourceFile) && home !== false) && !alreadyAllocated };
+      timeIssue: timing.issue, tickets,
+      selected: !!title && sourceVerified && !!timing.startAt && (kind === 'event' || !request.homeOnly || home === true || uploaded.has(sourceFile) && home !== false) };
   });
   if (corrected) warnings.push('UTC times were calculated from source local dates, times and timezones rather than the AI’s conversion.');
   return { team: text(parsed.team), season: text(parsed.season), timezone,
@@ -160,21 +143,13 @@ export function discoveredGameIssues(game: DiscoveredGame, catalog: InventoryVie
   if (!game.sourceVerified) issues.push('Source was not verified by web search or an uploaded file');
   if (!game.startAt || parseIsoTimestamp(game.startAt) === null) issues.push(game.timeIssue || 'Enter the confirmed start time');
   if (homeOnly && game.kind !== 'event' && game.home !== true && (!game.sourceFile || game.home === false)) issues.push('Not confirmed as a home game');
-  if (game.alreadyAllocated && !game.ticketRows?.length) issues.push('Review existing allocations: ticket details were not extracted');
-  if (game.ticketRows?.length) {
-    if (game.ticketRows.length !== game.tickets || new Set(game.ticketRows.map(t => t.ticketNumber)).size !== game.ticketRows.length || game.ticketRows.some(t => t.ticketNumber < 1 || t.ticketNumber > game.tickets)) issues.push('Ticket entries must match the inventory quantity');
-    if (game.ticketRows.some(t => !t.resolution || t.resolution !== 'available' && !t.contactId && !t.crmContact)) issues.push('Review ticket statuses and select real recipients');
-    if (game.ticketRows.some(t => t.resolution && t.resolution !== 'available' && !(t.sourceLocation || game.sourceLocation))) issues.push('Confirm the source sheet/row for allocated tickets');
-  }
   if (game.sourceFile && !game.ticketsKnown) issues.push('Confirm the ticket quantity');
   if (!Number.isInteger(game.tickets) || game.tickets < 0 || game.tickets > 1000) issues.push('Use 0–1000 tickets');
-  if (catalog.some(g => g.title.trim().toLowerCase() === game.title.trim().toLowerCase() && Date.parse(g.gameDate) === Date.parse(game.startAt))) issues.push('Already in inventory');
+  if (discoveredGameExists(game, catalog)) issues.push('Already in inventory');
   return issues;
 }
-export function discoveredAllocations(games: DiscoveredGame[]): ImportedAllocation[] {
-  return games.flatMap((game, rowIndex) => (game.ticketRows ?? []).filter(t => t.resolution === 'allocated' || t.resolution === 'transferred').map(t => ({ rowIndex, ticketNumber: t.ticketNumber,
-    status: t.resolution as 'allocated' | 'transferred', contactId: t.contactId, crmContact: t.crmContact, sourceFile: game.sourceFile ?? '', sourceLocation: t.sourceLocation || game.sourceLocation || '',
-    sourceNote: ([t.rawName, t.company, t.email, t.phone, t.sourceStatus, t.note].filter(Boolean).join(' · ') || `Recipient selected during import review: ${t.contactName || 'Confirmed recipient'}`).slice(0, 1000) })));
+export function discoveredGameExists(game: DiscoveredGame, catalog: InventoryView[]): boolean {
+  return catalog.some(g => g.title.trim().toLowerCase() === game.title.trim().toLowerCase() && Date.parse(g.gameDate) === Date.parse(game.startAt));
 }
 export function discoveredGamesCsv(games: DiscoveredGame[]): string {
   const quote = (value: string) => `"${value.replaceAll('"', '""')}"`;

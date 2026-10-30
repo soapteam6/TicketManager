@@ -378,6 +378,18 @@
 .work-ai-options { font-size:12px; }
 .work-ai-options summary { cursor:pointer; color:var(--work-muted); }
 .work-ai-options .work-search-home { margin-top:12px; }
+.work-ai-progress { flex-shrink:0; border:1px solid var(--work-border); border-radius:5px; padding:16px; background:#f7fafb; }
+.work-ai-inputs { display:flex; flex-direction:column; gap:18px; }
+.work-ai-inputs[hidden] { display:none; }
+.work-ai-progress-heading { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; font-size:13px; }
+.work-ai-progress-heading [role=timer] { color:var(--work-muted); font-size:11px; font-variant-numeric:tabular-nums; }
+.work-ai-progress ol { list-style:none; display:flex; flex-wrap:wrap; gap:12px; margin:16px 0; padding:0; }
+.work-ai-progress li { display:flex; align-items:center; gap:6px; color:var(--work-muted); font-size:11px; }
+.work-ai-progress li>span { width:20px; height:20px; border:1px solid var(--work-border); border-radius:50%; display:inline-flex; align-items:center; justify-content:center; }
+.work-ai-progress li.is-current { color:var(--work-accent); font-weight:600; }
+.work-ai-progress li.is-current>span,.work-ai-progress li.is-done>span { background:var(--work-accent); color:white; border-color:var(--work-accent); }
+.work-ai-progress p { font-size:12px; line-height:1.6; }
+.work-ai-progress small { display:block; margin-top:8px; color:var(--work-muted); font-size:11px; line-height:1.6; }
 .work-ai-target { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; padding:16px 18px 20px; border-bottom:1px solid var(--work-border); }
 .work-ai-target legend { padding-top:16px; font-size:12px; font-weight:600; }
 

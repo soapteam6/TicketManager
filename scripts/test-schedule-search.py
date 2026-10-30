@@ -51,8 +51,17 @@ def main():
     else:
         result = api({"operation": "scheduleSearchGet", "jobId": job_id})
     last = ""
+    last_progress = None
+    progress_history = []
     deadline = time.monotonic() + args.wait_seconds
     while True:
+        progress = result.get("progress")
+        if progress:
+            safe = {key: progress.get(key) for key in ["stage", "filesDone", "totalFiles", "round"]}
+            if safe != last_progress:
+                print("Progress: " + json.dumps(safe), flush=True)
+                progress_history.append(safe)
+                last_progress = safe
         if result["status"] != last:
             print("Search status: " + result["status"], flush=True)
             last = result["status"]
@@ -65,7 +74,7 @@ def main():
     artifact.write_text(json.dumps(result, indent=2), encoding="utf-8")
     after = d.call("GET", "cr9cd_reviewworkspaces(f18b973a-2936-44e5-aa55-271d7424aef3)", params={"$select": "cr9cd_data,cr9cd_revision,cr9cd_lock"})
     check = {"jobId": job_id, "status": result["status"], "workspaceUnchanged": before == after,
-             "inventoryImported": 0, "artifact": str(artifact)}
+             "inventoryImported": 0, "progressObserved": progress_history, "artifact": str(artifact)}
     artifact.with_name(args.artifact_stem + "-check.json").write_text(json.dumps(check, indent=2), encoding="utf-8")
     print(json.dumps(check, indent=2))
     if result["status"] != "complete":

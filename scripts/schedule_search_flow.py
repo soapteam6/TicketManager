@@ -20,6 +20,16 @@ def definition(entity_set, connector_api="", credential_mode="textEnvironmentVar
         return {"type": "OpenApiConnection", "runAfter": after or {}, "inputs": {"host": dv,
                 "parameters": {"entityName": entity_set, "recordId": "@triggerBody()?['cr9cd_schedulesearchid']", **{"item/" + k: v for k, v in fields.items()}}}}
 
+    file_count = "length(coalesce(json(triggerBody()?['cr9cd_input'])?['files'], json('[]')))"
+
+    def report(stage, done="0", round=0, after=None):
+        # Progress contains only stage codes, counts and timestamps. It never
+        # contains file names, prompts, model content or credentials.
+        value = "setProperty(setProperty(setProperty(setProperty(setProperty(json('{}'), 'stage', '" + stage + "'), 'filesDone', " + done + "), 'totalFiles', " + file_count + "), 'round', " + str(round) + "), 'updatedAt', utcNow())"
+        action = update({"cr9cd_result": "@string(setProperty(json('{}'), 'progress', " + value + "))"}, after)
+        action["runtimeConfiguration"] = {"secureData": {"properties": ["inputs", "outputs"]}}
+        return action
+
     def initialize(name, kind, value, after=None):
         return {"type": "InitializeVariable", "runAfter": after or {}, "inputs": {"variables": [{"name": name, "type": kind, "value": value}]}}
 
@@ -74,7 +84,8 @@ def definition(entity_set, connector_api="", credential_mode="textEnvironmentVar
     # original content required by Anthropic's server-tool protocol.
     clean = "@if(equals(items('Collect_blocks')?['type'], 'web_fetch_tool_result'), setProperty(setProperty(json('{}'), 'type', 'web_fetch_tool_result'), 'content', removeProperty(items('Collect_blocks')?['content'], 'content')), items('Collect_blocks'))"
     loop = {"type": "Until", "runAfter": {"Mark_searching": ["Succeeded"]}, "expression": "@not(equals(variables('stopReason'), 'pause_turn'))", "limit": {"count": 3, "timeout": "PT8M"}, "actions": {
-        "Claude_messages": claude,
+        "Report_research": report("researching"),
+        "Claude_messages": {**claude, "runAfter": {"Report_research": ["Succeeded"]}},
         "Collect_blocks": {"type": "Foreach", "runAfter": {"Claude_messages": ["Succeeded"]}, "foreach": "@body('Claude_messages')?['content']", "runtimeConfiguration": {"concurrency": {"repetitions": 1}}, "actions": {
             "Collect_block": {"type": "AppendToArrayVariable", "inputs": {"name": "content", "value": clean}, "runAfter": {}}
         }},
@@ -89,6 +100,11 @@ def definition(entity_set, connector_api="", credential_mode="textEnvironmentVar
             "Save_result": update({"cr9cd_status": "complete", "cr9cd_result": "@string(setProperty(setProperty(setProperty(json('{}'), 'content', variables('content')), 'stop_reason', variables('stopReason')), 'uploads', variables('uploadedFiles')))", "cr9cd_error": ""})
         }, "else": {"actions": {"Save_incomplete": update({"cr9cd_status": "failed", "cr9cd_error": "The schedule search did not finish. Try a narrower team/date query."})}}}
     }}
+    work["actions"]["Mark_searching"].update(report("starting"))
+    work["actions"]["Mark_searching"]["inputs"]["parameters"]["item/cr9cd_status"] = "searching"
+    public_save = work["actions"]["Check_completed"]["actions"]
+    public_save["Report_web_preview"] = report("finalizing")
+    public_save["Save_result"]["runAfter"] = {"Report_web_preview": ["Succeeded"]}
     if key_action:
         work["actions"]["Get_Claude_key"] = key_action
         file_host = {"apiId": dv["apiId"], "connectionName": "dataverse", "operationId": "GetItem"}
@@ -96,7 +112,8 @@ def definition(entity_set, connector_api="", credential_mode="textEnvironmentVar
         file = "json(triggerBody()?['cr9cd_input'])?['files'][items('Upload_files')]"
         work["actions"]["Upload_files"] = {"type": "Foreach", "runAfter": {"Get_Claude_key": ["Succeeded"]},
             "foreach": "@range(0, length(coalesce(json(triggerBody()?['cr9cd_input'])?['files'], json('[]'))))", "runtimeConfiguration": {"concurrency": {"repetitions": 1}}, "actions": {
-                "Read_upload": {"type": "OpenApiConnection", "runAfter": {}, "runtimeConfiguration": secure, "inputs": {"host": file_host,
+                "Report_upload_start": report("uploading", "items('Upload_files')"),
+                "Read_upload": {"type": "OpenApiConnection", "runAfter": {"Report_upload_start": ["Succeeded"]}, "runtimeConfiguration": secure, "inputs": {"host": file_host,
                     "parameters": {"entityName": "annotations", "recordId": "@" + file + "?['annotationId']", "$select": "documentbody,filename,mimetype"}}},
                 "Claude_upload": {"type": "Http", "runAfter": {"Read_upload": ["Succeeded"]}, "runtimeConfiguration": secure, "inputs": {
                     "method": "POST", "uri": "https://api.anthropic.com/v1/files", "headers": headers, "retryPolicy": {"type": "none"},
@@ -108,6 +125,7 @@ def definition(entity_set, connector_api="", credential_mode="textEnvironmentVar
                 "Attach_upload": {"type": "AppendToArrayVariable", "runAfter": {"Remember_upload": ["Succeeded"]},
                     "inputs": {"name": "userContent", "value": "@if(equals(body('Read_upload')?['mimetype'], 'application/pdf'), setProperty(json('{\"type\":\"document\"}'), 'source', setProperty(json('{\"type\":\"file\"}'), 'file_id', body('Claude_upload')?['id'])), if(contains(createArray('image/png','image/jpeg','image/gif','image/webp'), body('Read_upload')?['mimetype']), setProperty(json('{\"type\":\"image\"}'), 'source', setProperty(json('{\"type\":\"file\"}'), 'file_id', body('Claude_upload')?['id'])), setProperty(json('{\"type\":\"container_upload\"}'), 'file_id', body('Claude_upload')?['id'])))"}}
             }}
+        work["actions"]["Upload_files"]["actions"]["Report_upload_done"] = report("uploading", "add(items('Upload_files'), 1)", after={"Attach_upload": ["Succeeded"]})
         public_research = work["actions"].pop("Research")
         public_check = work["actions"].pop("Check_completed")
         public_research["runAfter"] = {}
@@ -131,11 +149,13 @@ def definition(entity_set, connector_api="", credential_mode="textEnvironmentVar
                     inputs["body"] = body
                 return {"type": "Http", "runAfter": after or {}, "runtimeConfiguration": secure, "inputs": inputs}
             calls[index] = {"type": "Scope", "runAfter": {}, "actions": {
-                submit: http("POST", "https://api.anthropic.com/v1/messages/batches", body={"requests": [{"custom_id": "@triggerBody()?['cr9cd_schedulesearchid']", "params": params}]}),
+                "Report_analysis_" + str(index): report("analyzing", file_count, index),
+                submit: http("POST", "https://api.anthropic.com/v1/messages/batches", {"Report_analysis_" + str(index): ["Succeeded"]}, body={"requests": [{"custom_id": "@triggerBody()?['cr9cd_schedulesearchid']", "params": params}]}),
                 remember: {"type": "AppendToArrayVariable", "runAfter": {submit: ["Succeeded"]}, "inputs": {"name": "batchIds", "value": "@body('" + submit + "')?['id']"}},
                 wait: {"type": "Until", "runAfter": {remember: ["Succeeded"]}, "expression": "@equals(body('" + status + "')?['processing_status'], 'ended')", "limit": {"count": 120, "timeout": "PT1H"}, "operationOptions": "FailWhenLimitsReached", "actions": {
                     "Delay_private_" + str(index): {"type": "Wait", "runAfter": {}, "inputs": {"interval": {"count": 30, "unit": "Second"}}},
-                    status: http("GET", batch_uri, {"Delay_private_" + str(index): ["Succeeded"]})
+                    status: http("GET", batch_uri, {"Delay_private_" + str(index): ["Succeeded"]}),
+                    "Report_waiting_" + str(index): report("analyzing", file_count, index, {status: ["Succeeded"]})
                 }},
                 result: http("GET", "@concat('https://api.anthropic.com/v1/messages/batches/', body('" + submit + "')?['id'], '/results')", {wait: ["Succeeded"]})
             }}
@@ -145,7 +165,8 @@ def definition(entity_set, connector_api="", credential_mode="textEnvironmentVar
         content = "union(json(trim(string(body('Private_Claude_1'))))?['result']?['message']?['content'], if(equals(actions('Private_Claude_2')?['status'], 'Succeeded'), json(trim(string(body('Private_Claude_2'))))?['result']?['message']?['content'], json('[]')), if(equals(actions('Private_Claude_3')?['status'], 'Succeeded'), json(trim(string(body('Private_Claude_3'))))?['result']?['message']?['content'], json('[]')))"
         save = update({"cr9cd_status": "complete", "cr9cd_result": "@string(setProperty(setProperty(setProperty(json('{}'), 'content', " + content + "), 'stop_reason', " + final_reason + "), 'uploads', variables('uploadedFiles')))", "cr9cd_error": ""})
         save["runtimeConfiguration"] = secure
-        private_check = {"type": "If", "runAfter": {"Private_pause_1": ["Succeeded"]}, "expression": {"equals": ["@" + final_reason, "end_turn"]}, "actions": {"Save_private_result": save}, "else": {"actions": {"Private_incomplete": update({"cr9cd_status": "failed", "cr9cd_error": "The file preparation did not finish. Try fewer files or a narrower request."})}}}
+        save["runAfter"] = {"Report_private_preview": ["Succeeded"]}
+        private_check = {"type": "If", "runAfter": {"Private_pause_1": ["Succeeded"]}, "expression": {"equals": ["@" + final_reason, "end_turn"]}, "actions": {"Report_private_preview": report("finalizing", file_count), "Save_private_result": save}, "else": {"actions": {"Private_incomplete": update({"cr9cd_status": "failed", "cr9cd_error": "The file preparation did not finish. Try fewer files or a narrower request."})}}}
         work["actions"]["Choose_import_path"] = {"type": "If", "runAfter": {"Upload_files": ["Succeeded"]}, "expression": {"greater": ["@length(variables('uploadedFiles'))", 0]},
             "actions": {"Private_round_1": calls[1], "Private_pause_1": pause1, "Check_private_complete": private_check}, "else": {"actions": {"Research": public_research, "Check_completed": public_check}}}
         # Cancel unfinished requests before removing their files. Completed batches

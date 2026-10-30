@@ -27,8 +27,9 @@ const record = {
   gamesWithUnconfirmedTimes: found.games.filter(g => !g.startAt).length,
   toolReturnedSources: found.sources.length, warnings: found.warnings.length,
   workspaceUnchanged: check.workspaceUnchanged, inventoryImported: check.inventoryImported,
-  ...(files.length > 0 && { uploadedFiles: files.length, sourceFileCount: found.sources.filter(s => s.fileName).length, totalTickets: found.games.reduce((n, g) => n + g.tickets, 0), gamesRequiringTicketReview: found.games.filter(g => g.ticketRows?.some(t => !t.resolution || t.resolution !== 'available' && !t.contactId && !t.crmContact)).length, sourceTicketRows: found.games.reduce((n, g) => n + (g.ticketRows?.length ?? 0), 0), unresolvedTicketStatuses: found.games.flatMap(g => g.ticketRows ?? []).filter(t => !t.resolution).length, priorAllocationsWithNoIdentityGuessed: found.games.flatMap(g => g.ticketRows ?? []).filter(t => t.resolution && t.resolution !== 'available' && !t.contactId && !t.crmContact).length }),
+  progressObserved: check.progressObserved ?? [],
+  ...(files.length > 0 && { uploadedFiles: files.length, sourceFileCount: found.sources.filter(s => s.fileName).length, totalTickets: found.games.reduce((n, g) => n + g.tickets, 0), attendeeBackfill: false }),
   ...(stem === 'ai-import-live' && { notes: found.warnings }),
 };
-await writeFile(files.length ? 'solutions/ai-file-import-test.json' : stem === 'ai-import-live' ? 'solutions/ai-import-test.json' : stem === 'claude-env-live' ? 'solutions/claude-environment-test.json' : 'solutions/schedule-search-test.json', JSON.stringify(record, null, 2) + '\n');
+await writeFile(stem === 'ai-inventory-workbook-live' ? 'solutions/ai-inventory-import-test.json' : files.length ? 'solutions/ai-file-import-test.json' : stem === 'ai-import-live' ? 'solutions/ai-import-test.json' : stem === 'claude-env-live' ? 'solutions/claude-environment-test.json' : 'solutions/schedule-search-test.json', JSON.stringify(record, null, 2) + '\n');
 console.log(JSON.stringify(record, null, 2));

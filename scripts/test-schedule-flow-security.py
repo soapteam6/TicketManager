@@ -2,7 +2,7 @@
 import json
 import unittest
 
-from schedule_search_flow import definition, KEY_SCHEMA, assert_protected_actions
+from schedule_search_flow import definition, KEY_SCHEMA, assert_protected_actions, walk_actions
 
 
 class FlowSecretTests(unittest.TestCase):
@@ -129,6 +129,20 @@ class FlowSecretTests(unittest.TestCase):
         flow["actions"]["Cleanup_private_batches"]["actions"]["Cleanup_batch_status"].pop("runtimeConfiguration")
         with self.assertRaisesRegex(RuntimeError, "Cleanup_batch_status"):
             assert_protected_actions(flow)
+
+    def test_progress_reports_only_masked_stage_counts_and_times(self):
+        flow = self.build("textEnvironmentVariable")
+        reports = [(name, action) for name, action in walk_actions(flow) if name.startswith("Report_")]
+        self.assertGreater(len(reports), 8)
+        for name, action in reports:
+            self.assertEqual(set(action["runtimeConfiguration"]["secureData"]["properties"]), {"inputs", "outputs"}, name)
+            params = action["inputs"]["parameters"]
+            self.assertEqual(set(params), {"entityName", "recordId", "item/cr9cd_result"})
+            value = params["item/cr9cd_result"]
+            for private in ["Get_Claude_key", "documentbody", "filename", "Private_Claude", "['query']"]:
+                self.assertNotIn(private, value)
+            for field in ["'stage'", "'filesDone'", "'totalFiles'", "'round'", "'updatedAt'"]:
+                self.assertIn(field, value)
 
     def test_unknown_credential_source_cannot_silently_fall_back(self):
         with self.assertRaises(ValueError):

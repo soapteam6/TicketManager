@@ -240,19 +240,26 @@ the AI never assumes venue capacity is company inventory. New
 team/season names and dates can be corrected here. **Create season & import**
 saves the new destination and selected private games in one transaction. An
 invalid row rolls back the complete command. Existing-season imports use
-**Import selected games**. Uploaded trackers can also propose existing allocations.
-Use **Review tickets** to confirm status and choose actual employees/saved contacts
-or CRM customer contacts. Vague labels never select identities automatically.
-A named ticket marked Available, missing recipients, contradictory quantities,
-or incomplete ticket positions block that game until reviewed. Unresolved games
-are visibly excluded from the selected import. Selecting Available explicitly
-can dismiss source allocation evidence after human review.
+**Import selected games**. Ticket-tracker imports now prepare games and owned
+quantities only. Recipient names, Available/Allocated labels, strikethroughs and
+cached summaries do not reduce the owned capacity or require person matching.
+Attendees, allocations, transfers and attendance are not backfilled. New inventory
+starts private, and existing matching games remain unchanged.
 
-Selected inventory and reviewed prior allocations save in one transaction.
-Imported allocation history records the reviewing actor and source file/location;
-the original requester stays unidentified and attendance stays Unknown. No ticket
-transfer, message or release occurs. The complete prompt, files and preview clear
-only after a successful import. A failed save retains the review.
+The preview reports total games found, games already in inventory, and selected
+new games. Existing games are shown as already present and excluded from the
+create command. A small new-game count does not mean those existing games were
+missing from the spreadsheet. Dates, source provenance and valid quantities still
+require review. The form clears after successful import; failed saves preserve
+its current review.
+
+During preparation, the progress panel replaces the input controls and shows
+actual request, upload, analysis and preview stages, file counts and elapsed time.
+The flow reports stage changes and an analysis heartbeat while polling Claude.
+It does not fabricate a percentage or completion time. Progress uses the existing
+job result field while pending, is visible only to the owning coordinator, and
+contains only validated stage codes, counts and timestamps. No new table/column
+is required, and progress never contains credentials or model content.
 
 Results appear as an editable preview with verified source links or uploaded file
 names and sheet/row references. Inspect the dates,
@@ -295,7 +302,7 @@ before cleanup. Native job Notes retain the submitted original for provenance.
 If service cancellation itself fails, cleanup can fail and needs operator review;
 there is no claim of guaranteed deletion after a service outage.
 
-The 2026-10-30 live file test used the supplied VGK 2026-27 tracker with its
+Before attendee backfill was removed, the 2026-10-30 live file test used the supplied VGK 2026-27 tracker with its
 arbitrary layout, misplaced names, cached formulas and struck-through header.
 Claude returned **44 games and 176 tickets**. All 44 source dates and local times
 matched independently; there were no extra/missing dates or guessed identity
@@ -327,8 +334,8 @@ inventory was imported and workspace revision 18 was unchanged. An earlier
 current-season substitution was rejected; UTC conversion is now calculated in
 the client from source local fields. See [AI Import evidence](../solutions/ai-import-test.json).
 
-Local regression coverage now includes **138 frontend tests, 84 backend
-security tests and 12 flow security checks**, plus desktop and iPad file-review
+Local regression coverage now includes **138 frontend tests, 85 backend
+security tests and 13 flow security checks**, plus desktop and iPad file-review
 and preview/import checks. Requester
 sign-in and human acceptance in the hosted app remain pending.
 

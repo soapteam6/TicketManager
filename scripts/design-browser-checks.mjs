@@ -561,25 +561,32 @@ try {
     await page.call('DOM.setFileInputFiles', { nodeId: fileInput.nodeId, files: [importFilePath] });
     await page.wait(`document.querySelector('[aria-label="Attached import files"]')?.textContent.includes('ai-import-fixture.xlsx')`);
     assert(await page.evaluate(`!document.querySelector('textarea[name="scheduleQuery"]').required && document.querySelector('textarea[name="scheduleQuery"]').value===''`), 'File-only import still required text');
+    await page.evaluate(`(async () => {
+      const source=await (await fetch('/src/review/SyntheticReview.tsx')).text();
+      const url=source.split('"').find(v=>v.startsWith('/src/review/demo.ts'));
+      const { demoProvider }=await import(url), original=demoProvider.getScheduleSearch;
+      window.importProgressPhase='uploading';
+      window.allocationCountBeforeFileImport=demoProvider.snapshot('coordinator').allocations.length;
+      demoProvider.getScheduleSearch=async function(...args) {
+        const result=await original.apply(this,args);
+        if (!window.importProgressPhase) { demoProvider.getScheduleSearch=original; return result; }
+        return {...result, status:'searching', progress:{stage:window.importProgressPhase,filesDone:window.importProgressPhase==='uploading'?0:1,totalFiles:1,round:1,updatedAt:new Date().toISOString()}};
+      };
+    })()`);
     await click('Prepare import', 'document.querySelector(".work-schedule-finder form")');
-    await page.wait(`document.querySelector('.work-found-schedule tbody')?.textContent.includes('Review ticket statuses')`);
-    await click('Review 2 tickets');
-    await page.wait(`document.querySelector('[aria-label="Imported ticket 1"]')`);
-    assert(await page.evaluate(`document.querySelector('[aria-label="Imported ticket 1"] select').value===''`), 'AI guessed the ambiguous recipient/status');
-    await set('[aria-label="Imported ticket 1"] select', 'allocated');
-    await click('Choose recipient');
-    await set('input[aria-label="Search import recipients"]', 'employee@example.invalid');
-    await page.evaluate(`document.querySelector('[aria-label="Import recipient results"] button').click()`);
-    await click('Done reviewing');
-    await page.wait(`!document.querySelector('[role="dialog"]')`);
-    await page.evaluate(`document.querySelector('.work-found-schedule tbody input[type="checkbox"]').click()`);
+    await page.wait(`document.querySelector('[aria-label="Import progress"]')?.textContent.includes('0 of 1 files sent')`);
+    await page.evaluate(`window.importProgressPhase='analyzing'`);
+    await page.wait(`document.querySelector('[aria-label="Import progress"]')?.textContent.includes('Analyzing your files')`);
+    await page.wait(`document.querySelector('[role="timer"]').textContent!=='0s elapsed'`);
+    assert(await page.evaluate(`!document.querySelector('[aria-label="Import progress"]').textContent.includes('%')`), 'Import showed an invented percentage');
+    await screenshot('file-import-progress');
+    await page.evaluate(`window.importProgressPhase=null`);
+    await page.wait(`document.querySelector('.work-found-schedule tbody')?.textContent.includes('Ready')`);
+    assert(await page.evaluate(`!document.querySelector('[aria-label="Imported ticket review"]') && document.querySelector('.work-found-schedule tbody input[type="checkbox"]').checked`), 'Historical attendees blocked inventory import');
     await screenshot('file-import-review');
     await click('Create season & import');
     await page.wait(`!document.querySelector('[aria-label="Found schedule"]') && !document.querySelector('[aria-label="Attached import files"]')`);
-    await nav('Allocations');
-    await set('input[placeholder="Search recipient, email or event"]', 'employee@example.invalid');
-    await page.wait(`document.querySelector('.work-allocation-split tbody')?.textContent.includes('Discovered demo opponent')`);
-    await screenshot('imported-prior-allocation');
+    assert(await page.evaluate(`(async()=>{const source=await(await fetch('/src/review/SyntheticReview.tsx')).text();const url=source.split('"').find(v=>v.startsWith('/src/review/demo.ts'));const {demoProvider}=await import(url);return demoProvider.snapshot('coordinator').allocations.length===window.allocationCountBeforeFileImport})()`), 'File import backfilled attendees');
     await nav('Setup & import');
     await page.evaluate(`document.querySelector('button[aria-label="Teams"]').click()`);
     await page.evaluate(`[...document.querySelectorAll('.work-setup-register tbody tr')].find(r=>r.textContent.includes('Synthetic Comets')).click()`);
@@ -677,7 +684,7 @@ try {
     await page.evaluate(`window.expirationRoot.unmount(); document.getElementById('expiration-check').remove(); document.getElementById('root').hidden=false; delete window.expirationProvider;`);
     assert.deepEqual(errors, [], `${design}: page errors`);
     assert.deepEqual(external, [], `${design}: external requests`);
-    results.push({ design, status: 'PASS', checks: ['no automatic initial selection', 'detail pane dismissal', 'no routine save banners', 'search', 'whole-row and keyboard selection', 'private inventory creation', 'interest', 'single self beneficiary follows requesting person', 'bounded saved contact selection', 'CRM search and recipient allocation', 'requester email', 'allocation', 'right-side allocation details', 'visible rejection reason', 'copy error diagnostics', 'legacy clipboard fallback', 'manual copy when clipboard is blocked', 'startup error diagnostics preserve connector status and request ID', 'startup retry refreshes copied error', 'contact history', ...(design === 'desk' ? ['team and season creation', 'web schedule preview and selected import', 'TBD game excluded', 'CSV fallback', 'iPad schedule search', 'independent detail scrolling'] : []), 'admin-only user access', 'role grant and reversal', 'group role assignment', 'connecting a directory group', 'requester navigation', 'iPad landscape', 'iPad portrait', 'bounded page scroll', 'requester inactive/history controls hidden', 'live event expiration closes interest', 'completed event history', 'attendance controls disabled before event day', 'same-day attendance before event start', 'team and season deletion with descendant counts', 'active allocations require explicit cancellation', 'successful AI import clears prompt and preview', 'failed AI import retains form for retry', 'AI Import ignores legacy saved jobs and opens fresh', 'individual game deletion', 'allocated team deletion preserves named history', 'file-only AI import', 'ambiguous recipient requires human mapping', 'reviewed allocation import and reset'], pageErrors: 0, externalRequests: 0 });
+    results.push({ design, status: 'PASS', checks: ['no automatic initial selection', 'detail pane dismissal', 'no routine save banners', 'search', 'whole-row and keyboard selection', 'private inventory creation', 'interest', 'single self beneficiary follows requesting person', 'bounded saved contact selection', 'CRM search and recipient allocation', 'requester email', 'allocation', 'right-side allocation details', 'visible rejection reason', 'copy error diagnostics', 'legacy clipboard fallback', 'manual copy when clipboard is blocked', 'startup error diagnostics preserve connector status and request ID', 'startup retry refreshes copied error', 'contact history', ...(design === 'desk' ? ['team and season creation', 'web schedule preview and selected import', 'TBD game excluded', 'CSV fallback', 'iPad schedule search', 'independent detail scrolling'] : []), 'admin-only user access', 'role grant and reversal', 'group role assignment', 'connecting a directory group', 'requester navigation', 'iPad landscape', 'iPad portrait', 'bounded page scroll', 'requester inactive/history controls hidden', 'live event expiration closes interest', 'completed event history', 'attendance controls disabled before event day', 'same-day attendance before event start', 'team and season deletion with descendant counts', 'active allocations require explicit cancellation', 'successful AI import clears prompt and preview', 'failed AI import retains form for retry', 'AI Import ignores legacy saved jobs and opens fresh', 'individual game deletion', 'allocated team deletion preserves named history', 'file-only AI import', 'file names and allocation labels do not block inventory', 'file import skips attendee backfill', 'actual upload and analysis stages with elapsed time'], pageErrors: 0, externalRequests: 0 });
     page.close();
     await browser.call('Target.closeTarget', { targetId });
   }

@@ -245,9 +245,15 @@ export interface ScheduleSearchRequest {
 }
 export interface ImportFileUpload { name: string; mediaType: string; data: string; size: number }
 export interface ImportFileSource { name: string; mediaType: string; size: number; annotationId: string; sha256: string }
+export interface ImportProgress {
+  stage: 'starting' | 'uploading' | 'analyzing' | 'researching' | 'finalizing';
+  filesDone: number; totalFiles: number; round: number; updatedAt?: string | null;
+}
 export interface ScheduleSearchJob {
   id: string;
   status: 'queued' | 'searching' | 'complete' | 'failed';
+  startedAt?: string | null;
+  progress?: ImportProgress | null;
   request: Omit<ScheduleSearchRequest, 'files'> & { files?: ImportFileSource[]; from?: string; through?: string; seasonLabel?: string; today?: string };
   rawResult?: unknown;
   error?: string;
