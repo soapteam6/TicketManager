@@ -1,0 +1,44 @@
+{
+  "authenticatedAs": "emikes@ais-now.com",
+  "jobId": "09478afb-d874-4d51-bf19-4786ac6c353d",
+  "status": "complete",
+  "team": "Vegas Golden Knights",
+  "season": "2026-27",
+  "timezone": "America/Los_Angeles",
+  "existingSeasonRequired": true,
+  "gamesFound": 44,
+  "gamesReadyForReview": 44,
+  "gamesWithUnconfirmedTimes": 0,
+  "toolReturnedSources": 1,
+  "warnings": 4,
+  "workspaceUnchanged": true,
+  "inventoryImported": 0,
+  "progressObserved": [
+    {
+      "stage": "analyzing",
+      "filesDone": 1,
+      "totalFiles": 1,
+      "round": 1
+    }
+  ],
+  "uploadedFiles": 1,
+  "sourceFileCount": 1,
+  "totalTickets": 176,
+  "attendeeBackfill": false,
+  "existingGames": 38,
+  "newGamesReady": 6,
+  "preseasonDatesIncluded": [
+    "2026-09-24",
+    "2026-09-26"
+  ],
+  "destinationSeasonRetained": true,
+  "destinationDateBoundsApplied": false,
+  "browserVerification": {
+    "actualSavedResponseGames": 44,
+    "actualExistingSeasonStart": "2026-09-29",
+    "selectedNewGames": 6,
+    "importCommandRows": 6,
+    "bothPreseasonGamesInCommand": true,
+    "externalRequests": 0
+  }
+}

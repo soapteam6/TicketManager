@@ -2,8 +2,8 @@
   "appId": "1323f8ca-47e5-402e-9657-45f8651af4dc",
   "environmentId": "946e5045-3200-eb26-9160-3fe967a6b21c",
   "solution": "AISTicketManager",
-  "sourceCommit": "810799f3c2fb59b6dd8d0cb1af083e074e18f317",
-  "verifiedAtUtc": "2026-10-30T20:35:09.387094+00:00",
+  "sourceCommit": "8d7adf273b9cbd974c8364354677eceb43f3d916",
+  "verifiedAtUtc": "2026-10-30T21:08:42.852514+00:00",
   "playUrl": "https://apps.powerapps.com/play/e/946e5045-3200-eb26-9160-3fe967a6b21c/app/1323f8ca-47e5-402e-9657-45f8651af4dc?tenantId=a22e51ee-6f67-49b3-b98c-0e3a97d49b8a",
   "appBuildFiles": [
     {
@@ -11,12 +11,12 @@
       "sha256": "949a214581eeb7b92ac38c98e197ab64b5a3f525d64247bbc4f69041f3fdbf44"
     },
     {
-      "path": "assets/index-D0cQ1Ps4.js",
-      "sha256": "49899e8509fa597bce2c22512352e5dc4d3374d1684d168112c3a085cd8cd91c"
+      "path": "assets/index-DmD9Xuds.js",
+      "sha256": "cd1a6cd5aa669844ae106a8c4e379b949cc1e8d7c780860472de82d3a7c7c6ab"
     },
     {
       "path": "index.html",
-      "sha256": "61f6a4739f03f3122537f92e50f314f42b2ca1a8092a48ad517e0c13f52b220f"
+      "sha256": "e3261c3357bf21462b43c6ee90c6adb880d3216b2c6fadedc4e2eb5a32093903"
     },
     {
       "path": "vite.svg",
@@ -26,12 +26,12 @@
   "solutionExports": [
     {
       "file": "AISTicketManager_unmanaged.zip",
-      "sha256": "f3d581be206fd07996884b61ec3f3a53ea0f0168261ec0ce8304ecf83e8610b9",
+      "sha256": "ac1fa56458813e0ee4a274b338bd3c3aba441a73bf5820fe507fcc5773009749",
       "appBuildFilesMatched": 4
     },
     {
       "file": "AISTicketManager_managed.zip",
-      "sha256": "d8372dbb7074494bcb2119fdb4786c5b0d113d5e0ddf8062e81d5c8476093752",
+      "sha256": "c1e0b00998985908489cab729bcbe4cace886b0f856a950ff89d78f4eacb58a1",
       "appBuildFilesMatched": 4
     }
   ]

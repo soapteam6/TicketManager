@@ -252,6 +252,9 @@ without inheriting its date bounds, so choosing a season before upload cannot
 truncate the tracker either. A regression using the user's actual 44-game
 response and existing September 29 season reproduces and fixes the former
 four-game count: both September preseason games reach the six-row import command.
+The live selected-season test also returned all 44 games / 176 tickets with
+no inherited date bounds, 38 existing games and 6 new games. No live import was
+executed. See [destination-season verification](../solutions/ai-season-import-test.json).
 
 The preview reports total games found, games already in inventory, and selected
 new games. Existing games are shown as already present and excluded from the
