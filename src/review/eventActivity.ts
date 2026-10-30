@@ -13,9 +13,9 @@ export function acceptsInterest(game: Pick<Inventory, 'status' | 'gameDate' | 'r
 export function withEventActivity(snapshot: ReviewSnapshot): ReviewSnapshot {
   const now = Date.parse(snapshot.serverNow ?? new Date().toISOString());
   const coordinator = snapshot.persona.role === 'coordinator';
-  return { ...snapshot, catalog: snapshot.catalog
-    .map(game => ({ ...game, status: eventStatus(game, now) }))
-    .filter(game => coordinator || acceptsInterest(game, now)) };
+  const catalog = snapshot.catalog.map(game => ({ ...game, status: eventStatus(game, now) }));
+  const historyCatalog = [...(snapshot.historyCatalog ?? []), ...catalog.filter(game => !coordinator && !acceptsInterest(game, now) && snapshot.requests.some(r => r.gameId === game.id))];
+  return { ...snapshot, catalog: catalog.filter(game => !game.removed && (coordinator || acceptsInterest(game, now))), historyCatalog };
 }
 
 export function advancingServerTime(serverNow: string, receivedAt: number, now: number): string {

@@ -47,13 +47,37 @@ describe('inventory hierarchy deletion', () => {
     await provider.execute('coordinator', { type: 'removeInventory', gameId: games[0].id });
     expect(provider.snapshot('coordinator').catalog.filter(g => g.seasonId === season.id).map(g => g.id)).toEqual([games[1].id]);
   });
-  it('blocks the entire deletion when any descendant has even cancelled history', async () => {
+  it('blocks the entire deletion until active allocations are explicitly confirmed for cancellation', async () => {
     const state = createFixtures(); state.requests[0].status = 'cancelled';
     const provider = new MockReviewProvider(now, undefined, state), before = provider.snapshot('coordinator');
     for (const command of [{ type: 'removeTeam' as const, teamId: GUID(2, 1) }, { type: 'removeSeason' as const, seasonId: GUID(3, 1) }]) {
-      await expect(provider.execute('coordinator', command)).rejects.toThrow('history');
+      await expect(provider.execute('coordinator', command)).rejects.toThrow('Confirm cancellation');
       expect(provider.snapshot('coordinator')).toEqual(before);
     }
+  });
+  it('deletes allocated inventory with explicit consent and retains searchable event and attendance history', async () => {
+    const provider = new MockReviewProvider(now), before = provider.snapshot('coordinator');
+    const originalAllocation = before.allocations![0];
+    await provider.execute('coordinator', { type: 'removeTeam', teamId: GUID(2, 1), cancelAllocations: true });
+    const after = provider.snapshot('coordinator');
+    expect(after.teams).toEqual([]);
+    expect(after.catalog).toHaveLength(1); // the independent event is unaffected
+    expect(after.historyCatalog!.find(g => g.id === originalAllocation.gameId)?.title).toBe('Past Demo Night');
+    expect(after.allocations!.find(a => a.id === originalAllocation.id)).toMatchObject({ ...originalAllocation, status: 'cancelled', statusBeforeDeletion: originalAllocation.status, cancellationReason: 'inventory_deleted' });
+    expect(after.attendanceHistory).toEqual(before.attendanceHistory);
+    expect(after.requests.every(r => r.status === 'cancelled')).toBe(true);
+    expect(after.historyCatalog!.every(g => g.availableTickets === 0)).toBe(true);
+    const rep = provider.snapshot('rep'), employee = provider.snapshot('employee');
+    expect(rep.historyCatalog!.map(g => g.id).sort()).toEqual([...new Set(rep.requests.map(r => r.gameId))].sort());
+    expect(employee.historyCatalog).toEqual([]);
+    await expect(provider.execute('coordinator', { type: 'allocate', requestId: before.requests[0].id, quantity: 1, reason: 'No reallocation after delete' })).rejects.toThrow();
+  });
+  it('allows deletion after allocations have already been cancelled', async () => {
+    const state = createFixtures(); state.allocations.forEach(a => { a.status = 'cancelled'; }); state.seats.forEach(s => { s.status = 'available'; });
+    const provider = new MockReviewProvider(now, undefined, state);
+    await provider.execute('coordinator', { type: 'removeTeam', teamId: GUID(2, 1) });
+    expect(provider.snapshot('coordinator').teams).toEqual([]);
+    expect(provider.snapshot('coordinator').allocations).toHaveLength(state.allocations.length);
   });
   it('denies employee and sales-rep deletion without changing anything', async () => {
     const { provider, team, season } = await imported(), before = provider.snapshot('coordinator');

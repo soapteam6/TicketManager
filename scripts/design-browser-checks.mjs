@@ -346,7 +346,9 @@ try {
       await click('Delete team'); await click('Confirm deletion');
       await page.wait(`!document.querySelector('.work-setup-register tbody').textContent.includes('Demo schedule search')`);
       await page.evaluate(`[...document.querySelectorAll('.work-setup-register tbody tr')].find(r=>r.textContent.includes('Synthetic Comets')).click()`);
-      assert(await page.evaluate(`document.querySelector('[aria-label="Delete team"] button').disabled && document.querySelector('[aria-label="Delete team"]').textContent.includes('history')`), 'History protection missing from team deletion');
+      await click('Delete team');
+      assert(await page.evaluate(`[...document.querySelectorAll('[aria-label="Delete team"] button')].find(b=>b.textContent==='Confirm deletion').disabled && !document.querySelector('input[name="cancelAllocations"]').checked`), 'Allocated inventory did not require cancellation confirmation');
+      await click('Keep team');
       await click('+ New team');
       await set('input[name="teamName"]', 'QA setup team');
       await set('input[name="defaultTickets"]', '2');
@@ -530,6 +532,24 @@ try {
       }
     }
     assert(await page.evaluate(`!document.querySelector('.work-feedback, .work-table-footer, .work-app-footer, .design-switcher')`), 'Routine feedback or removed layout chrome is still rendered');
+    await nav('Setup & import');
+    await page.evaluate(`document.querySelector('button[aria-label="Teams"]').click()`);
+    await page.evaluate(`[...document.querySelectorAll('.work-setup-register tbody tr')].find(r=>r.textContent.includes('Synthetic Comets')).click()`);
+    await click('Delete team');
+    assert(await page.evaluate(`[...document.querySelectorAll('[aria-label="Delete team"] button')].find(b=>b.textContent==='Confirm deletion').disabled`));
+    await page.evaluate(`document.querySelector('input[name="cancelAllocations"]').click()`);
+    await screenshot('delete-with-allocations');
+    await click('Confirm deletion');
+    await page.wait(`!document.querySelector('.work-setup-register tbody').textContent.includes('Synthetic Comets')`);
+    await nav('Allocations');
+    await set('select[aria-label="Allocation status"]', 'all');
+    await set('input[placeholder="Search recipient, email or event"]', 'Past Demo Night');
+    await page.wait(`document.querySelectorAll('.work-allocation-split tbody tr').length===1`);
+    assert(await page.evaluate(`document.querySelector('.work-allocation-split tbody tr').textContent.includes('cancelled')`), 'Historical allocation was lost or remained active');
+    await page.evaluate(`document.querySelector('.work-allocation-split tbody tr').click()`);
+    await page.wait(`document.querySelector('[aria-label="Allocation details"]')?.textContent.includes('Past Demo Night')`);
+    assert(await page.evaluate(`document.querySelector('[aria-label="Allocation details"]').textContent.includes('Sep 30, 2026')`), 'Deleted event lost its date');
+    await screenshot('deleted-event-history');
     // Exercise the real startup component with a connector module stubbed before
     // import. No SDK authentication, live connection or Dataverse call is made.
     await page.call('Fetch.enable', { patterns: [{ urlPattern: '*src/generated/services/MicrosoftDataverseService.ts*' }] });
@@ -609,7 +629,7 @@ try {
     await page.evaluate(`window.expirationRoot.unmount(); document.getElementById('expiration-check').remove(); document.getElementById('root').hidden=false; delete window.expirationProvider;`);
     assert.deepEqual(errors, [], `${design}: page errors`);
     assert.deepEqual(external, [], `${design}: external requests`);
-    results.push({ design, status: 'PASS', checks: ['no automatic initial selection', 'detail pane dismissal', 'no routine save banners', 'search', 'whole-row and keyboard selection', 'private inventory creation', 'interest', 'single self beneficiary follows requesting person', 'bounded saved contact selection', 'CRM search and recipient allocation', 'requester email', 'allocation', 'right-side allocation details', 'visible rejection reason', 'copy error diagnostics', 'legacy clipboard fallback', 'manual copy when clipboard is blocked', 'startup error diagnostics preserve connector status and request ID', 'startup retry refreshes copied error', 'contact history', ...(design === 'desk' ? ['team and season creation', 'web schedule preview and selected import', 'TBD game excluded', 'CSV fallback', 'iPad schedule search', 'independent detail scrolling'] : []), 'admin-only user access', 'role grant and reversal', 'group role assignment', 'connecting a directory group', 'requester navigation', 'iPad landscape', 'iPad portrait', 'bounded page scroll', 'requester inactive/history controls hidden', 'live event expiration closes interest', 'completed event history', 'attendance controls disabled before event day', 'same-day attendance before event start', 'team and season deletion with descendant counts', 'history blocks hierarchy deletion', 'successful AI import clears prompt preview and resumable job', 'failed AI import retains form for retry', 'individual game deletion'], pageErrors: 0, externalRequests: 0 });
+    results.push({ design, status: 'PASS', checks: ['no automatic initial selection', 'detail pane dismissal', 'no routine save banners', 'search', 'whole-row and keyboard selection', 'private inventory creation', 'interest', 'single self beneficiary follows requesting person', 'bounded saved contact selection', 'CRM search and recipient allocation', 'requester email', 'allocation', 'right-side allocation details', 'visible rejection reason', 'copy error diagnostics', 'legacy clipboard fallback', 'manual copy when clipboard is blocked', 'startup error diagnostics preserve connector status and request ID', 'startup retry refreshes copied error', 'contact history', ...(design === 'desk' ? ['team and season creation', 'web schedule preview and selected import', 'TBD game excluded', 'CSV fallback', 'iPad schedule search', 'independent detail scrolling'] : []), 'admin-only user access', 'role grant and reversal', 'group role assignment', 'connecting a directory group', 'requester navigation', 'iPad landscape', 'iPad portrait', 'bounded page scroll', 'requester inactive/history controls hidden', 'live event expiration closes interest', 'completed event history', 'attendance controls disabled before event day', 'same-day attendance before event start', 'team and season deletion with descendant counts', 'active allocations require explicit cancellation', 'successful AI import clears prompt preview and resumable job', 'failed AI import retains form for retry', 'individual game deletion', 'allocated team deletion preserves named history'], pageErrors: 0, externalRequests: 0 });
     page.close();
     await browser.call('Target.closeTarget', { targetId });
   }

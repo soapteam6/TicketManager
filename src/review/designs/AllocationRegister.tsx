@@ -1,3 +1,4 @@
+import { findEvent } from '../eventHistory';
 import { useState } from 'react';
 import { useReview } from '../context';
 import { personName } from '../personName';
@@ -12,7 +13,7 @@ export function AllocationRegister() {
   const [selectedId, setSelectedId] = useState<string>();
   const allocations = (snapshot.allocations ?? []).filter(a => {
     const contact = snapshot.contacts?.find(c => c.id === a.contactId);
-    const game = snapshot.catalog.find(g => g.id === a.gameId);
+    const game = findEvent(snapshot, a.gameId);
     return (status === 'all' || status === 'active' && a.status !== 'cancelled' || status === a.status) && `${contact?.name} ${contact?.email} ${game?.title}`.toLowerCase().includes(query.toLowerCase());
   });
   const selected = allocations.find(a => a.id === selectedId);
@@ -21,7 +22,7 @@ export function AllocationRegister() {
     <div className={`work-allocation-split ${selected ? 'has-explicit-focus' : ''}`}>
     <div className="work-table-scroll"><table className="work-table"><thead><tr><th>Recipient</th><th>Event</th><th>Transfer status</th><th>Attendance</th></tr></thead><tbody>{allocations.map(a => {
       const contact = snapshot.contacts?.find(c => c.id === a.contactId);
-      return <tr key={a.id} className={selected?.id === a.id ? 'is-selected' : ''} {...rowSelection(selected?.id === a.id, () => setSelectedId(a.id))}><td><button className="work-record-link" onClick={() => setSelectedId(a.id)}>{personName(contact?.name ?? 'Historical contact')}</button><small>{contact?.email}</small></td><td>{snapshot.catalog.find(g => g.id === a.gameId)?.title}</td><td><Status value={a.status} /></td><td><Status value={a.outcome} /></td></tr>;
+      return <tr key={a.id} className={selected?.id === a.id ? 'is-selected' : ''} {...rowSelection(selected?.id === a.id, () => setSelectedId(a.id))}><td><button className="work-record-link" onClick={() => setSelectedId(a.id)}>{personName(contact?.name ?? 'Historical contact')}</button><small>{contact?.email}</small></td><td>{findEvent(snapshot, a.gameId)?.title}</td><td><Status value={a.status} /></td><td><Status value={a.outcome} /></td></tr>;
     })}</tbody></table>{!allocations.length && <EmptyRows>No allocations match. Review a request to allocate tickets.</EmptyRows>}</div>
     {selected && <aside className="work-allocation-detail" aria-label="Allocation details"><div className="work-inspector-heading"><strong>Allocation details</strong><button className="work-icon-button" aria-label="Close allocation details" onClick={() => setSelectedId(undefined)}><Glyph name="close" size={16} /></button></div><FollowthroughPanel key={selected.id} assignmentId={selected.id} /></aside>}
     </div>

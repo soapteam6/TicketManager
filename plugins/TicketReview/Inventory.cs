@@ -48,12 +48,32 @@ namespace Ais.TicketReview
             game["seasonId"] = kind == "game" ? (JToken)seasonId : JValue.CreateNull(); game["totalTickets"] = count; game["status"] = status;
             if (status != "scheduled") { game["release"] = "private"; game["releaseAt"] = JValue.CreateNull(); }
         }
-        private static void RemoveInventory(JObject state, string gameId)
+        private static void RemoveInventory(JObject state, string gameId, JObject command = null, JObject actor = null, DateTimeOffset? now = null)
         {
             var game = Find(state, "games", gameId);
             Check((bool?)game["removed"] != true, "This event has been removed.");
-            Check(!Rows(state, "requests").Any(r => Str(r, "gameId") == gameId) && !Rows(state, "allocations").Any(a => Str(a, "gameId") == gameId), "Events with requests or allocations cannot be removed.");
-            game["removed"] = true; game["status"] = "cancelled"; game["release"] = "private"; game["releaseAt"] = JValue.CreateNull();
+            CloseDeletedInventory(state, new List<JObject> { game }, command, actor, now ?? DateTimeOffset.UtcNow);
+        }
+
+        private static void CloseDeletedInventory(JObject state, List<JObject> games, JObject command, JObject actor, DateTimeOffset now)
+        {
+            var ids = new HashSet<string>(games.Select(g => Str(g, "id")));
+            var allocations = Rows(state, "allocations").Where(a => ids.Contains(Str(a, "gameId")) && Active(a)).ToList();
+            Check(allocations.Count == 0 || (bool?)command?["cancelAllocations"] == true, "Confirm cancellation of the active allocations before deleting.");
+            var at = now.ToString("o"); var by = actor?["id"];
+            foreach (var allocation in allocations) {
+                allocation["statusBeforeDeletion"] = allocation["status"].DeepClone(); allocation["status"] = "cancelled";
+                allocation["cancelledAt"] = at; allocation["cancelledBy"] = by; allocation["cancellationReason"] = "inventory_deleted";
+                Find(state, "seats", Str(allocation, "seatId"))["status"] = "available";
+            }
+            foreach (var request in Rows(state, "requests").Where(r => ids.Contains(Str(r, "gameId")) && Str(r, "status") != "cancelled")) {
+                request["statusBeforeDeletion"] = request["status"].DeepClone(); request["status"] = "cancelled";
+                request["closedAt"] = at; request["closedBy"] = by; request["closureReason"] = "inventory_deleted";
+            }
+            foreach (var game in games.Where(g => (bool?)g["removed"] != true)) {
+                game["removed"] = true; game["status"] = "cancelled"; game["release"] = "private"; game["releaseAt"] = JValue.CreateNull();
+                game["removedAt"] = at; game["removedBy"] = by;
+            }
         }
 
         private static JObject FindLive(JObject state, string collection, string id)
@@ -64,18 +84,13 @@ namespace Ais.TicketReview
             return row;
         }
 
-        private static void RemoveInventoryGroup(JObject state, string collection, string id)
+        private static void RemoveInventoryGroup(JObject state, string collection, string id, JObject command = null, JObject actor = null, DateTimeOffset? now = null)
         {
             var target = FindLive(state, collection, id);
             var seasons = collection == "teams" ? Rows(state, "seasons").Where(s => Str(s, "teamId") == id).ToList() : new List<JObject> { target };
             var seasonIds = new HashSet<string>(seasons.Select(s => Str(s, "id")));
             var games = Rows(state, "games").Where(g => seasonIds.Contains(Str(g, "seasonId"))).ToList();
-            var ids = new HashSet<string>(games.Select(g => Str(g, "id")));
-            Check(!Rows(state, "requests").Any(r => ids.Contains(Str(r, "gameId"))) && !Rows(state, "allocations").Any(a => ids.Contains(Str(a, "gameId"))),
-                "Cannot delete: an affected game has request or allocation history.");
-            // Keep native rows and foreign keys intact; the entire hierarchy is
-            // hidden in one transaction only after every descendant is checked.
-            foreach (var game in games) { game["removed"] = true; game["status"] = "cancelled"; game["release"] = "private"; game["releaseAt"] = JValue.CreateNull(); }
+            CloseDeletedInventory(state, games, command, actor, now ?? DateTimeOffset.UtcNow);
             foreach (var season in seasons) season["removed"] = true;
             if (collection == "teams") target["removed"] = true;
         }

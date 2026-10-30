@@ -33,7 +33,7 @@ describe('inventory dashboards and setup', () => {
   });
   it('protects history and denies requester edits', async () => {
     const p = provider();
-    await expect(p.execute('coordinator', { type: 'removeInventory', gameId: GUID(5, 1) })).rejects.toThrow('requests or allocations');
+    await expect(p.execute('coordinator', { type: 'removeInventory', gameId: GUID(5, 4) })).rejects.toThrow('Confirm cancellation');
     await expect(p.execute('employee', { type: 'removeInventory', gameId: GUID(5, 3) })).rejects.toThrow();
     const before = p.snapshot('coordinator');
     await expect(p.execute('coordinator', { type: 'editInventory', gameId: GUID(5, 4), title: 'Past Demo Night', kind: 'game', seasonId: GUID(3, 1), gameDate: '2026-10-01T02:00:00Z', tickets: 0, status: 'completed' })).rejects.toThrow('allocation history');

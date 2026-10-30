@@ -218,6 +218,7 @@ export interface ReviewSnapshot {
   mode: 'mock' | 'dataverse' | 'platform-unavailable';
   persona: Persona;
   catalog: InventoryView[];
+  historyCatalog?: InventoryView[];
   requests: InterestView[];
   options: ContactOption[];
   teams: Team[];
@@ -287,9 +288,9 @@ export type ReviewCommand =
       seasonId?: string;
     }
   | { type: 'editInventory'; gameId: GameId; kind: Inventory['kind']; title: string; gameDate: string; tickets: number; seasonId?: string; status: Inventory['status'] }
-  | { type: 'removeInventory'; gameId: GameId }
-  | { type: 'removeTeam'; teamId: string }
-  | { type: 'removeSeason'; seasonId: string }
+  | { type: 'removeInventory'; gameId: GameId; cancelAllocations?: boolean }
+  | { type: 'removeTeam'; teamId: string; cancelAllocations?: boolean }
+  | { type: 'removeSeason'; seasonId: string; cancelAllocations?: boolean }
   | { type: 'importSchedule'; csv: string; seasonId: string; newSeason?: { teamId: string; teamName: string; label: string; startDate: string; endDate: string; defaultTickets: number } }
   | ReleaseCommand
   | {

@@ -1,3 +1,4 @@
+import { findEvent } from './eventHistory';
 import { useState } from 'react';
 import { Modal } from '../components/Modal';
 import { useReview } from './context';
@@ -277,7 +278,7 @@ export function PeoplePanel() {
             </Empty>
           )}
           {allocations.map((a) => {
-            const game = snapshot.catalog.find((g) => g.id === a.gameId),
+            const game = findEvent(snapshot, a.gameId),
               changes =
                 snapshot.attendanceHistory?.filter(
                   (h) => h.assignmentId === a.id,

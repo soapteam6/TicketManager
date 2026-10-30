@@ -8,7 +8,7 @@ using Newtonsoft.Json.Linq;
 internal static class InventoryTests
 {
     private static void Assert(bool value, string message) { if (!value) throw new Exception(message); }
-    private static object Call(string method, params object[] args) { try { return typeof(ReviewApi).GetMethod(method, BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, args); } catch (TargetInvocationException e) { throw e.InnerException; } }
+    private static object Call(string method, params object[] args) { try { var target = typeof(ReviewApi).GetMethod(method, BindingFlags.Static | BindingFlags.NonPublic); return target.Invoke(null, args.Concat(target.GetParameters().Skip(args.Length).Select(p => p.DefaultValue)).ToArray()); } catch (TargetInvocationException e) { throw e.InnerException; } }
     private static JObject State() {
         var state = new JObject();
         foreach (var key in new[] { "teams", "seasons", "games", "seats", "contacts", "requests", "allocations" }) state[key] = new JArray();
@@ -40,12 +40,25 @@ internal static class InventoryTests
                 Call("RemoveInventoryGroup", s, "seasons", (string)s["seasons"][0]["id"]);
                 Assert((bool?)s["teams"][0]["removed"] != true && (bool)s["seasons"][0]["removed"] && (bool?)s["games"][2]["removed"] != true, "Unrelated inventory removed");
             },
-            ["hierarchy deletion validates every descendant before marking anything removed"] = () => {
-                foreach (var collection in new[] { "teams", "seasons" }) foreach (var history in new[] { "requests", "allocations" }) {
-                    var s = DeletionState(); ((JArray)s[history]).Add(new JObject { ["id"] = Guid.NewGuid().ToString(), ["gameId"] = s["games"][1]["id"], ["status"] = "cancelled" });
-                    var before = s.ToString(); Denied(() => Call("RemoveInventoryGroup", s, collection, (string)s[collection][0]["id"]), "history");
+            ["active allocations on any descendant require explicit cancellation before anything changes"] = () => {
+                foreach (var collection in new[] { "teams", "seasons" }) {
+                    var s = DeletionState(); ((JArray)s["allocations"]).Add(new JObject { ["id"] = Guid.NewGuid().ToString(), ["gameId"] = s["games"][1]["id"], ["status"] = "approved" });
+                    var before = s.ToString(); Denied(() => Call("RemoveInventoryGroup", s, collection, (string)s[collection][0]["id"]), "Confirm cancellation");
                     Assert(s.ToString() == before, "Rejected deletion partially altered the hierarchy");
                 }
+            },
+            ["confirmed deletion cancels active allocations and requests while preserving transfer and attendance history"] = () => {
+                var s = DeletionState(); var contact = Guid.NewGuid().ToString(); ((JArray)s["contacts"]).Add(new JObject { ["id"] = contact }); s["attendanceHistory"] = new JArray(new JObject { ["evidence"] = "Original confirmation" });
+                for (var i = 0; i < 2; i++) {
+                    var request = Guid.NewGuid().ToString(); var seat = s["seats"][i == 0 ? 0 : 4]; seat["status"] = i == 0 ? "assigned" : "transferred";
+                    ((JArray)s["requests"]).Add(new JObject { ["id"] = request, ["gameId"] = s["games"][i]["id"], ["status"] = "fulfilled", ["quantity"] = 1, ["contactIds"] = new JArray(contact) });
+                    ((JArray)s["allocations"]).Add(new JObject { ["id"] = Guid.NewGuid().ToString(), ["requestId"] = request, ["gameId"] = s["games"][i]["id"], ["seatId"] = seat["id"], ["contactId"] = contact, ["status"] = i == 0 ? "approved" : "transferred", ["outcome"] = "attended", ["evidence"] = "Original confirmation", ["transferReference"] = "Original provider reference" });
+                }
+                var history = s["attendanceHistory"].ToString(); var actor = new JObject { ["id"] = Guid.NewGuid().ToString() }; var now = DateTimeOffset.Parse("2030-01-01T00:00:00Z");
+                Call("RemoveInventoryGroup", s, "teams", (string)s["teams"][0]["id"], new JObject { ["cancelAllocations"] = true }, actor, now); Call("Validate", s, now);
+                Assert(((JArray)s["allocations"]).All(a => (string)a["status"] == "cancelled" && (string)a["cancelledBy"] == (string)actor["id"] && (string)a["outcome"] == "attended" && (string)a["transferReference"] == "Original provider reference"), "Allocation provenance or history lost");
+                Assert((string)s["allocations"][1]["statusBeforeDeletion"] == "transferred" && ((JArray)s["requests"]).All(r => (string)r["status"] == "cancelled") && s["attendanceHistory"].ToString() == history, "Historical state lost");
+                Assert(((JArray)s["seats"]).All(row => (string)row["status"] == "available"), "Cancelled allocations left seats assigned");
             },
             ["requesters cannot delete teams or seasons by calling the API directly"] = () => {
                 foreach (var type in new[] { "removeTeam", "removeSeason" }) {
@@ -111,9 +124,9 @@ internal static class InventoryTests
                 var state = State(); Call("RemoveInventory", state, (string)state["games"][0]["id"]);
                 Assert((bool)state["games"][0]["removed"] && (string)state["games"][0]["status"] == "cancelled" && ((JArray)state["seats"]).Count == 4, "Removal erased native history");
             },
-            ["events with even cancelled requests cannot be removed"] = () => {
+            ["cancelled request history no longer blocks deletion and is retained"] = () => {
                 var state = State(); ((JArray)state["requests"]).Add(new JObject { ["gameId"] = state["games"][0]["id"], ["status"] = "cancelled" });
-                Denied(() => Call("RemoveInventory", state, (string)state["games"][0]["id"]), "requests or allocations");
+                Call("RemoveInventory", state, (string)state["games"][0]["id"]); Assert((bool)state["games"][0]["removed"] && ((JArray)state["requests"]).Count == 1, "History erased during deletion");
             },
             ["event history prevents changing the inventory type or season"] = () => {
                 var state = State(); ((JArray)state["requests"]).Add(new JObject { ["gameId"] = state["games"][0]["id"] });

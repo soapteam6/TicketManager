@@ -1,3 +1,4 @@
+import { findEvent, requestEvents } from '../eventHistory';
 import { requesterIdentity } from './requesterIdentity';
 import { useState } from 'react';
 import { useReview } from '../context';
@@ -11,10 +12,10 @@ import { rowSelection } from './rowSelection';
 
 function Decision({ request }: { request: InterestView }) {
   const { snapshot, busy, run } = useReview();
-  const game = snapshot.catalog.find(g => g.id === request.gameId);
+  const game = findEvent(snapshot, request.gameId);
   const remaining = request.quantity - request.allocated;
-  const maximum = Math.min(remaining, game?.availableTickets ?? 0);
-  const active = !['cancelled', 'fulfilled'].includes(request.status);
+  const maximum = Math.min(remaining, game?.removed ? 0 : game?.availableTickets ?? 0);
+  const active = !game?.removed && !['cancelled', 'fulfilled'].includes(request.status);
   return <section className="work-decision">
     <h3>Allocation decision</h3>
     <p className="work-help">Record the quantity and your reason. Scoring is advisory.</p>
@@ -38,7 +39,7 @@ function Decision({ request }: { request: InterestView }) {
 function RequestDetail({ request, desk, onClose }: { request: InterestView; desk: boolean; onClose: () => void }) {
   const { snapshot, provider, persona } = useReview();
   const admin = snapshot.persona.role === 'coordinator';
-  const game = snapshot.catalog.find(g => g.id === request.gameId);
+  const game = findEvent(snapshot, request.gameId);
   const identity = requesterIdentity(request, snapshot);
   const score = admin ? provider.rank(persona, request.gameId).ranked.find(r => r.requestId === request.id) : undefined;
   const contacts = request.contactIds?.map(id => snapshot.contacts?.find(c => c.id === id)).filter(c => c !== undefined) ?? [];
@@ -73,7 +74,7 @@ export function RequestQueue({ desk = false, gameId, onGameChange }: {
   const [selectedId, setSelectedId] = useState<string>();
   const requests = snapshot.requests.filter(r => {
     const identity = requesterIdentity(r, snapshot);
-    const game = snapshot.catalog.find(g => g.id === r.gameId);
+    const game = findEvent(snapshot, r.gameId);
     return (!gameId || r.gameId === gameId) &&
       (filter === 'all' || filter === 'pending' && !['fulfilled', 'cancelled'].includes(r.status) || r.status === filter) &&
       `${identity.name} ${identity.email} ${r.contactNames} ${game?.title ?? ''} ${r.rationale}`.toLowerCase().includes(query.toLowerCase());
@@ -83,18 +84,18 @@ export function RequestQueue({ desk = false, gameId, onGameChange }: {
     <div className="work-section-heading"><div><h2>{admin ? 'Request queue' : 'My requests'}</h2><p>{admin ? 'Review the requester, business context and available inventory before deciding.' : 'Track the status of your ticket requests.'}</p></div><span className="work-count-label">{requests.length} shown</span></div>
     <div className="work-toolbar"><Search value={query} onChange={next => { setQuery(next); setSelectedId(undefined); }} placeholder="Search people, email or events" />
       <select aria-label="Request status" value={filter} onChange={e => { setFilter(e.target.value); setSelectedId(undefined); }}><option value="pending">Needs allocation</option><option value="all">All requests</option><option value="waitlisted">Waitlisted</option><option value="fulfilled">Fulfilled</option><option value="cancelled">Cancelled</option></select>
-      <select aria-label="Filter requests by event" value={gameId} onChange={e => { onGameChange(e.target.value); setSelectedId(undefined); }}><option value="">All events</option>{snapshot.catalog.map(g => <option value={g.id} key={g.id}>{g.title}</option>)}</select>
+      <select aria-label="Filter requests by event" value={gameId} onChange={e => { onGameChange(e.target.value); setSelectedId(undefined); }}><option value="">All events</option>{requestEvents(snapshot).map(g => <option value={g.id} key={g.id}>{g.title}</option>)}</select>
     </div>
     {!requests.length ? <EmptyRows>Change the filters or record interest from event inventory.</EmptyRows> : <div className={`work-request-split ${selected ? 'has-focused-request' : ''}`}>
       {desk && selected ? <div className="work-queue-list" aria-label="Request list">{requests.map(r => {
         const identity = requesterIdentity(r, snapshot);
-        const game = snapshot.catalog.find(g => g.id === r.gameId);
+        const game = findEvent(snapshot, r.gameId);
         return <button type="button" className={`work-queue-item ${selected?.id === r.id ? 'is-selected' : ''}`} key={r.id} aria-pressed={selected?.id === r.id} onClick={() => setSelectedId(r.id)}>
           <div><strong>{identity.name}</strong><span>{r.quantity - r.allocated} tix</span></div><small>{identity.email || 'Email not recorded'}</small><p>{game?.title ?? 'Historical event'}</p><div><Status value={r.status} /><time>{new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</time></div>
         </button>;
       })}</div> : <div className="work-table-scroll"><table className="work-table work-request-table"><thead><tr><th>Requester</th><th>Event</th><th className="numeric">Tickets</th><th>Status</th><th><span className="sr-only">Review</span></th></tr></thead><tbody>{requests.map(r => {
         const identity = requesterIdentity(r, snapshot);
-        return <tr key={r.id} className={selected?.id === r.id ? 'is-selected' : ''} {...rowSelection(selected?.id === r.id, () => setSelectedId(r.id))}><td><button className="work-record-link" onClick={() => setSelectedId(r.id)}>{identity.name}</button><small>{identity.email || 'Email not recorded'}</small></td><td>{snapshot.catalog.find(g => g.id === r.gameId)?.title}<small>{beneficiaryNames(r, snapshot)}</small></td><td className="numeric"><strong>{r.quantity}</strong><small>{r.allocated} allocated</small></td><td><Status value={r.status} /></td><td><button className="work-icon-button" aria-label={`Review request from ${identity.name}`} onClick={() => setSelectedId(r.id)}><Glyph name="chevron" size={16} /></button></td></tr>;
+        return <tr key={r.id} className={selected?.id === r.id ? 'is-selected' : ''} {...rowSelection(selected?.id === r.id, () => setSelectedId(r.id))}><td><button className="work-record-link" onClick={() => setSelectedId(r.id)}>{identity.name}</button><small>{identity.email || 'Email not recorded'}</small></td><td>{findEvent(snapshot, r.gameId)?.title}<small>{beneficiaryNames(r, snapshot)}</small></td><td className="numeric"><strong>{r.quantity}</strong><small>{r.allocated} allocated</small></td><td><Status value={r.status} /></td><td><button className="work-icon-button" aria-label={`Review request from ${identity.name}`} onClick={() => setSelectedId(r.id)}><Glyph name="chevron" size={16} /></button></td></tr>;
       })}</tbody></table></div>}
       {selected && <RequestDetail key={selected.id} request={selected} desk={desk} onClose={() => setSelectedId(undefined)} />}
     </div>}

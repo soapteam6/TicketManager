@@ -1,3 +1,4 @@
+import { findEvent, requestEvents } from './eventHistory';
 import { useState } from 'react';
 import { Modal } from '../components/Modal';
 import { useReview } from './context';
@@ -25,7 +26,7 @@ function AllocationForm({
   close: () => void;
 }) {
   const { run, busy, snapshot } = useReview(),
-    game = snapshot.catalog.find((g) => g.id === request.gameId);
+    game = findEvent(snapshot, request.gameId);
   return (
     <form
       className="space-y-4"
@@ -110,7 +111,7 @@ export function RequestsPanel() {
         <Field label="Filter inventory">
           <Select value={gameId} onChange={(e) => setGameId(e.target.value)}>
             <option value="">All inventory, including private</option>
-            {snapshot.catalog.map((g) => (
+            {requestEvents(snapshot).map((g) => (
               <option key={g.id} value={g.id}>
                 {g.title}
               </option>
@@ -126,7 +127,7 @@ export function RequestsPanel() {
       )}
       <div className="space-y-4">
         {requests.map((r) => {
-          const game = snapshot.catalog.find((g) => g.id === r.gameId),
+          const game = findEvent(snapshot, r.gameId),
             score = admin
               ? provider
                   .rank(persona, r.gameId)
@@ -238,7 +239,7 @@ export function RequestsPanel() {
 }
 function AttendanceForm({ allocation }: { allocation: Allocation }) {
   const { snapshot, run, busy } = useReview();
-  const game = snapshot.catalog.find(g => g.id === allocation.gameId);
+  const game = findEvent(snapshot, allocation.gameId);
   const open = !!game && !!snapshot.serverNow && attendanceIsOpen(game.gameDate, snapshot.serverNow);
   const [outcome, setOutcome] = useState(allocation.outcome);
   const [evidence, setEvidence] = useState(allocation.evidence);
@@ -275,7 +276,7 @@ export function FollowthroughPanel({ assignmentId }: { assignmentId?: string } =
       {!assignmentId && <Field label="Filter allocations by event">
         <Select value={gameId} onChange={(e) => setGameId(e.target.value)}>
           <option value="">All events and seasons</option>
-          {snapshot.catalog.map((g) => (
+          {requestEvents(snapshot).map((g) => (
             <option key={g.id} value={g.id}>
               {g.title}
             </option>
@@ -290,7 +291,7 @@ export function FollowthroughPanel({ assignmentId }: { assignmentId?: string } =
       )}
       <div className="space-y-4">
         {allocations.map((a) => {
-          const game = snapshot.catalog.find((g) => g.id === a.gameId),
+          const game = findEvent(snapshot, a.gameId),
             contact = snapshot.contacts?.find((c) => c.id === a.contactId);
           return (
             <article

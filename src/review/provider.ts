@@ -78,6 +78,19 @@ function eligible(contact: Contact) {
 function active(allocation: Allocation) {
   return allocation.status !== 'cancelled';
 }
+function closeDeletedInventory(state: ReviewState, games: Inventory[], cancelAllocations: boolean | undefined, actor: Persona, at: string) {
+  const ids = new Set(games.map(g => g.id));
+  const allocations = state.allocations.filter(a => ids.has(a.gameId) && active(a));
+  if (allocations.length && !cancelAllocations) invalid('Confirm cancellation of the active allocations before deleting.');
+  for (const allocation of allocations) {
+    Object.assign(allocation, { statusBeforeDeletion: allocation.status, status: 'cancelled', cancelledAt: at, cancelledBy: actor.id, cancellationReason: 'inventory_deleted' });
+    state.seats.find(s => s.id === allocation.seatId)!.status = 'available';
+  }
+  for (const request of state.requests.filter(r => ids.has(r.gameId) && r.status !== 'cancelled')) {
+    Object.assign(request, { statusBeforeDeletion: request.status, status: 'cancelled', closedAt: at, closedBy: actor.id, closureReason: 'inventory_deleted' });
+  }
+  for (const game of games.filter(g => !g.removed)) Object.assign(game, { removed: true, status: 'cancelled', release: 'private', releaseAt: null, removedAt: at, removedBy: actor.id });
+}
 const defaultDirectory: DirectorySource = {
   readSnapshot: async () => structuredClone(DIRECTORY),
 };
@@ -154,15 +167,15 @@ export class MockReviewProvider implements ReviewProvider {
           g.status === 'scheduled' &&
           instant(g.gameDate) > now)),
     );
-    const catalog = visible.map((g) => {
+    const allCatalog = state.games.map((g) => {
       const demand = state.requests.filter(
-        (r) => r.gameId === g.id && r.status !== 'cancelled',
+        r => r.gameId === g.id && r.status !== 'cancelled' && (admin || visible.some(v => v.id === g.id) || r.requesterId === actor.id || !!actor.directoryId && r.requesterDirectoryId === actor.directoryId),
       );
       return {
         ...g,
         status: eventStatus(g, now),
         released: released(g, now),
-        availableTickets: state.seats.filter(
+        availableTickets: g.removed ? 0 : state.seats.filter(
           (s) => s.gameId === g.id && s.status === 'available',
         ).length,
         requestCount: demand.length,
@@ -175,6 +188,10 @@ export class MockReviewProvider implements ReviewProvider {
         teamName: state.teams.find(t => t.id === state.seasons.find(s => s.id === g.seasonId)?.teamId)?.name,
       };
     });
+    const visibleIds = new Set(visible.map(g => g.id));
+    const catalog = allCatalog.filter(g => visibleIds.has(g.id));
+    const ownGameIds = new Set(state.requests.filter(r => r.requesterId === actor.id || !!actor.directoryId && r.requesterDirectoryId === actor.directoryId).map(r => r.gameId));
+    const historyCatalog = allCatalog.filter(g => !visibleIds.has(g.id) && (admin || ownGameIds.has(g.id)));
     const requests = state.requests
       .filter(r => admin || r.requesterId === actor.id || (!!actor.directoryId && r.requesterDirectoryId === actor.directoryId))
       .map((r) => ({
@@ -232,6 +249,7 @@ export class MockReviewProvider implements ReviewProvider {
       serverNow: new Date(now).toISOString(),
       persona: actor,
       catalog,
+      historyCatalog,
       requests,
       options,
       teams: admin ? state.teams.filter(t => !t.removed) : [],
@@ -446,8 +464,7 @@ export class MockReviewProvider implements ReviewProvider {
       case 'removeInventory': {
         const game = next.games.find(g => g.id === command.gameId && !g.removed);
         if (!game) invalid('Event not found');
-        if (next.requests.some(r => r.gameId === game.id) || next.allocations.some(a => a.gameId === game.id)) invalid('Events with requests or allocations cannot be removed.');
-        Object.assign(game, { removed: true, status: 'cancelled', release: 'private', releaseAt: null });
+        closeDeletedInventory(next, [game], command.cancelAllocations, actor, at);
         result = { message: 'Event removed from inventory.' }; break;
       }
       case 'removeTeam':
@@ -458,9 +475,7 @@ export class MockReviewProvider implements ReviewProvider {
         const seasons = team ? next.seasons.filter(s => s.teamId === team.id) : [season!];
         const seasonIds = new Set(seasons.map(s => s.id));
         const games = next.games.filter(g => !!g.seasonId && seasonIds.has(g.seasonId));
-        const gameIds = new Set(games.map(g => g.id));
-        if (next.requests.some(r => gameIds.has(r.gameId)) || next.allocations.some(a => gameIds.has(a.gameId))) invalid('Cannot delete: an affected game has request or allocation history.');
-        for (const game of games) Object.assign(game, { removed: true, status: 'cancelled', release: 'private', releaseAt: null });
+        closeDeletedInventory(next, games, command.cancelAllocations, actor, at);
         for (const season of seasons) season.removed = true;
         if (team) team.removed = true;
         result = { message: 'Deleted from inventory.' }; break;
@@ -629,7 +644,7 @@ export class MockReviewProvider implements ReviewProvider {
       }
       case 'waitlist': {
         const request = next.requests.find((r) => r.id === command.requestId);
-        if (!request || request.status === 'cancelled')
+        if (!request || request.status === 'cancelled' || next.games.find(g => g.id === request.gameId)?.removed)
           invalid('Choose active interest');
         if (
           next.allocations.some((a) => a.requestId === request.id && active(a))
@@ -646,7 +661,7 @@ export class MockReviewProvider implements ReviewProvider {
         integer(command.quantity, 1, 100, 'Allocation quantity');
         text(command.reason, 'a coordinator decision / override reason');
         const request = next.requests.find((r) => r.id === command.requestId);
-        if (!request || request.status === 'cancelled')
+        if (!request || request.status === 'cancelled' || next.games.find(g => g.id === request.gameId)?.removed)
           invalid('Choose active interest');
         const contacts = request.contactIds.map((id) =>
           next.contacts.find((c) => c.id === id),

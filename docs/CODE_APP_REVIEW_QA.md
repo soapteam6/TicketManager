@@ -320,6 +320,14 @@ npm run preview:review
 
 Open **http://127.0.0.1:4173/** on the same machine. `review-dist/` is ignored. Never serve the normal `dist/` bundle for mock QA: it contains the existing SDK entry.
 
+## Deleting allocated inventory (2026-10-30 follow-up)
+
+- Historical requests and cancelled allocations no longer block deletion. The confirmation shows how many requests will close, active allocations will cancel, and tickets were already transferred.
+- Active allocations require the explicit **Cancel these allocations too** checkbox. Without it, both client and server block deletion before changes are applied. Users can instead cancel allocations separately first.
+- Confirmed deletion cancels affected allocations in this app, closes requests, and hides the selected inventory hierarchy in one transaction. It does not reverse external ticket-provider transfers.
+- Request/allocation IDs, prior statuses, transfer references, notes and attendance history are retained. History screens use a separate event lookup so deleted events retain their names, dates and season labels. Requesters receive historical event metadata only for their own requests.
+- Verification: 129 frontend tests, 78 backend security tests and desktop/iPad browser checks, including explicit cancellation, deleted-event history and rejection without partial changes. Live deletions are not performed for testing.
+
 ## Inventory deletion and AI reset checks (2026-10-30)
 
 - In Setup, select a team, season, game or event and choose its Delete button. The confirmation names the target and shows affected season, event/game and ticket counts. Cancelling leaves all records unchanged.

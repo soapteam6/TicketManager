@@ -219,9 +219,9 @@ namespace Ais.TicketReview
                     Add(s, "seasons", season); result["id"] = season["id"]; break;
                 case "createInventory": result["id"] = AddInventory(s, c); break;
                 case "editInventory": EditInventory(s, c, now); break;
-                case "removeInventory": RemoveInventory(s, Str(c, "gameId")); break;
-                case "removeTeam": RemoveInventoryGroup(s, "teams", Str(c, "teamId")); break;
-                case "removeSeason": RemoveInventoryGroup(s, "seasons", Str(c, "seasonId")); break;
+                case "removeInventory": RemoveInventory(s, Str(c, "gameId"), c, actor, now); break;
+                case "removeTeam": RemoveInventoryGroup(s, "teams", Str(c, "teamId"), c, actor, now); break;
+                case "removeSeason": RemoveInventoryGroup(s, "seasons", Str(c, "seasonId"), c, actor, now); break;
                 case "importSchedule":
                     var importSeasonId = Str(c, "seasonId");
                     if (c["newSeason"] is JObject draft) {
@@ -273,10 +273,11 @@ namespace Ais.TicketReview
                     Add(s, "requests", interest); result["id"] = interest["id"]; result["message"] = "Interest saved. No tickets reserved."; break;
                 case "waitlist":
                     var wait = Find(s, "requests", Str(c, "requestId"));
+                    Check((bool?)Find(s, "games", Str(wait, "gameId"))["removed"] != true, "This event has been deleted.");
                     Check(Active(wait) && !Rows(s, "allocations").Any(a => Str(a, "requestId") == Str(wait, "id") && Active(a)), "Choose active interest without allocations.");
                     wait["status"] = "waitlisted"; result["message"] = "Waitlisted. No seats held or automatically allocated."; break;
                 case "allocate":
-                    var req = Find(s, "requests", Str(c, "requestId")); Check(Active(req), "Request is cancelled.");
+                    var req = Find(s, "requests", Str(c, "requestId")); Check((bool?)Find(s, "games", Str(req, "gameId"))["removed"] != true, "This event has been deleted."); Check(Active(req), "Request is cancelled.");
                     var count = Number(c, "quantity", 1, 100); var reason = Text(c, "reason");
                     var beneficiaries = ((JArray)req["contactIds"]).Values<string>().ToList();
                     Check(beneficiaries.All(id => Eligible(Find(s, "contacts", id))), "Inactive beneficiaries cannot receive tickets.");
@@ -394,10 +395,12 @@ namespace Ais.TicketReview
                 query.Criteria.AddCondition(new ConditionExpression("systemuserid", ConditionOperator.In, ids));
                 identities = service.RetrieveMultiple(query).Entities.ToDictionary(u => u.Id.ToString());
             }
-            var catalog = new JArray();
-            foreach (var g in Rows(s, "games").Where(g => (bool?)g["removed"] != true && (admin || Released(g, now) && Str(g, "status") == "scheduled" && Instant(Str(g, "gameDate")) > now))) {
-                var row = (JObject)g.DeepClone(); row["status"] = InventoryStatus(g, now); var id = Str(g, "id"); var requests = Rows(s, "requests").Where(r => Str(r, "gameId") == id && Active(r)).ToList();
-                row["released"] = Released(g, now); row["availableTickets"] = Rows(s, "seats").Count(x => Str(x, "gameId") == id && Str(x, "status") == "available");
+            var catalog = new JArray(); var historyCatalog = new JArray();
+            foreach (var g in Rows(s, "games")) {
+                var visible = (bool?)g["removed"] != true && (admin || Released(g, now) && Str(g, "status") == "scheduled" && Instant(Str(g, "gameDate")) > now);
+                if (!visible && !admin && !Rows(s, "requests").Any(r => Str(r, "gameId") == Str(g, "id") && OwnInterest(r, actor))) continue;
+                var row = (JObject)g.DeepClone(); row["status"] = InventoryStatus(g, now); var id = Str(g, "id"); var requests = Rows(s, "requests").Where(r => Str(r, "gameId") == id && Active(r) && (visible || admin || OwnInterest(r, actor))).ToList();
+                row["released"] = Released(g, now); row["availableTickets"] = (bool?)g["removed"] == true ? 0 : Rows(s, "seats").Count(x => Str(x, "gameId") == id && Str(x, "status") == "available");
                 row["requestCount"] = requests.Count; row["requestingPeople"] = requests.Select(r => !String.IsNullOrEmpty(Str(r, "requesterDirectoryId")) ? Str(r, "requesterDirectoryId") : identities.TryGetValue(Str(r, "requesterId"), out var identity) && identity.GetAttributeValue<Guid>("azureactivedirectoryobjectid") != Guid.Empty ? identity.GetAttributeValue<Guid>("azureactivedirectoryobjectid").ToString() : Str(r, "requesterId")).Distinct(StringComparer.OrdinalIgnoreCase).Count(); row["requestedTickets"] = requests.Sum(r => (int)r["quantity"]);
                 var season = Rows(s, "seasons").FirstOrDefault(x => Str(x, "id") == Str(g, "seasonId"));
                 row["seasonLabel"] = season?["label"];
@@ -405,7 +408,7 @@ namespace Ais.TicketReview
                 row["seasonEndDate"] = season?["endDate"];
                 row["teamId"] = season?["teamId"];
                 row["teamName"] = Rows(s, "teams").FirstOrDefault(x => Str(x, "id") == Str(season, "teamId"))?["name"];
-                catalog.Add(row);
+                (visible ? catalog : historyCatalog).Add(row);
             }
             var projected = new JArray();
             foreach (var r in Rows(s, "requests").Where(r => admin || OwnInterest(r, actor))) {
@@ -429,7 +432,7 @@ namespace Ais.TicketReview
             foreach (var c in Rows(s, "contacts").Where(c => Eligible(c) && (admin || Str(c, "type") == "customer" && Str(actor, "key") == "rep" || Str(c, "directoryId") == Str(actor, "directoryId")))) {
                 var option = new JObject(); foreach (var k in new[] {"id", "type", "name", "company", "email", "phone"}) option[k] = c[k].DeepClone(); options.Add(option);
             }
-            var snapshot = new JObject { ["mode"] = "dataverse", ["persona"] = actor, ["catalog"] = catalog, ["requests"] = projected, ["options"] = options,
+            var snapshot = new JObject { ["mode"] = "dataverse", ["persona"] = actor, ["catalog"] = catalog, ["historyCatalog"] = historyCatalog, ["requests"] = projected, ["options"] = options,
                 ["teams"] = admin ? new JArray(Rows(s, "teams").Where(t => (bool?)t["removed"] != true).Select(t => t.DeepClone())) : new JArray(), ["seasons"] = admin ? new JArray(Rows(s, "seasons").Where(t => (bool?)t["removed"] != true).Select(t => t.DeepClone())) : new JArray() };
             if ((bool?)actor["isAppAdmin"] == true) {
                 snapshot["accessUsers"] = AccessUsers(service);
