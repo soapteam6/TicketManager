@@ -30,6 +30,11 @@ internal static class Program
     };
     private static void Main()
     {
+        try { RunTests(); }
+        catch (Exception error) { Console.Error.WriteLine(error); Environment.ExitCode = 1; }
+    }
+    private static void RunTests()
+    {
         Test("only the three authenticated logins get fixed admin access", () => {
             foreach (var login in new[] { "emikes@ais-now.com", "JJACKSON@AIS-NOW.COM", "aharouff@ais-now.com" }) {
                 var s = new Fake(); s.Caller["domainname"] = login;
@@ -159,6 +164,7 @@ internal static class Program
             Assert(s.Writes == 0, "Unexpected team creation");
         });
         passed += SearchTests.Run();
+        passed += DirectoryTests.Run();
         Console.WriteLine(passed + " security tests passed; no network access.");
     }
     private static JObject GroupCommand(Entity team, string role, params string[] expected) => new JObject {

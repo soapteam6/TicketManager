@@ -293,8 +293,19 @@ column inclusion, missing standalone components, mismatched IDs and incomplete
 table exports. Post-consolidation live checks verified the retired QA solution is
 absent and all four Ticket Manager role definitions remain in the main solution.
 
-Live individual role assignment/removal with approved testers, requester sign-in acceptance,
-hosted-browser acceptance and a clean-environment import/bootstrap remain manual
-acceptance/deployment work. The offline tests exercise role replacement, stale
+Live individual role assignment/removal with approved testers and requester sign-in
+acceptance remain manual acceptance work; the user is already doing live testing.
+Fresh-environment import/bootstrap is deferred. Scoring configuration is accepted
+as coordinator-managed. Jay's sign-in retest remains a separate follow-up.
+The offline tests exercise role replacement, stale
 edits, fixed-admin protection, preservation of unrelated and inherited roles,
 business-unit copies and paginated queries; they do not replace those live checks.
+
+Employee contact synchronization now reads enabled Microsoft Entra ID member
+accounts through the built-in `aaduser` virtual table, using the authenticated
+coordinator's directory permissions. There is no additional connector or app
+registration to package. Dataverse users and team roles still control app access;
+directory contact creation never grants it. Existing contact IDs, eligibility
+overrides and history are retained. See [Entra sync](../docs/DATAVERSE_REVIEW_QA.md#employee-sync-from-microsoft-entra-id)
+and `scripts/test-entra-directory.py` for the read-only plan, caller-context
+directory probe and guarded one-time sync verification.

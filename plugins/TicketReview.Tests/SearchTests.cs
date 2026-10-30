@@ -96,14 +96,14 @@ internal static class SearchTests
                 var state = new JObject { ["teams"] = new JArray(), ["seasons"] = new JArray(), ["games"] = new JArray(), ["seats"] = new JArray() };
                 var command = new JObject { ["type"] = "importSchedule", ["seasonId"] = "", ["csv"] = "date,time,title,tickets,kind\n2027-10-10,02:00,Example opponent,2,game",
                     ["newSeason"] = new JObject { ["teamId"] = "", ["teamName"] = "Example team", ["label"] = "2027–28", ["startDate"] = "2027-09-01", ["endDate"] = "2028-06-30", ["defaultTickets"] = 2 } };
-                typeof(ReviewApi).GetMethod("Apply", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, new object[] { service, state, Actor(), command, DateTimeOffset.UtcNow });
+                typeof(ReviewApi).GetMethod("Apply", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, new object[] { service, state, Actor(), command, DateTimeOffset.UtcNow, null });
                 Assert(((JArray)state["teams"]).Count == 1 && ((JArray)state["seasons"]).Count == 1 && ((JArray)state["games"]).Count == 1 && ((JArray)state["seats"]).Count == 2, "Incomplete draft destination");
                 Assert((string)state["games"][0]["release"] == "private" && service.Writes == 0, "Planning wrote native data or released inventory");
             },
             ["requesters cannot create an AI import destination"] = () => {
                 var service = new Fake(); var state = new JObject();
                 try {
-                    typeof(ReviewApi).GetMethod("Apply", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, new object[] { service, state, Actor("requester"), new JObject { ["type"] = "importSchedule", ["newSeason"] = new JObject() }, DateTimeOffset.UtcNow });
+                    typeof(ReviewApi).GetMethod("Apply", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, new object[] { service, state, Actor("requester"), new JObject { ["type"] = "importSchedule", ["newSeason"] = new JObject() }, DateTimeOffset.UtcNow, null });
                     throw new Exception("Requester imported a destination");
                 } catch (TargetInvocationException ex) { Assert(ex.InnerException is InvalidPluginExecutionException && ex.InnerException.Message.Contains("Coordinator"), "Wrong rejection"); }
                 Assert(!state.HasValues && service.Writes == 0, "Requester changed state");

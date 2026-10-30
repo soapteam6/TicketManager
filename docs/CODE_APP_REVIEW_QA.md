@@ -92,6 +92,17 @@ The live workspace uses real signed-in identity and server time. It has **no
 persona selector, clock override, or reset button**. Refresh and page reload
 preserve records. Messages remain saved previews and transfers remain manual.
 
+The contact register's **Sync Entra ID** button now reads enabled member accounts
+from Microsoft Entra ID through Microsoft's built-in directory virtual table.
+Employee choices are no longer limited to this environment's Dataverse users.
+Matching uses Entra object IDs and preserves existing contact IDs, app eligibility
+overrides, categories and ticket history. Guests/disabled accounts are excluded;
+historical contacts stay recorded when they become directory-inactive. New
+employee contacts grant no app access or roles. Customer contacts remain manually
+maintained. Directory sync requires the coordinator's existing directory-read
+permissions; failed/incomplete reads leave contacts unchanged. See
+[Entra sync and verification](DATAVERSE_REVIEW_QA.md#employee-sync-from-microsoft-entra-id).
+
 Live verification passed: native record persistence, invalid-date rollback,
 idempotent replay, demand without reservation, competing allocations with exactly
 one winner, future-attendance rejection, cancellation without auto-promotion,

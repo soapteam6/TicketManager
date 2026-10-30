@@ -89,10 +89,60 @@ attendance audit history and operation receipts live in the workspace settings.
 
 This is a QA integration contract. Only the review API understands all of its
 metadata. Use `/review` to edit these records: legacy pages and exports do not
-interpret the complete contract. Cross-org CRM/opportunity search, Entra/Office
-365 directory integration, native attendance rollups and automated delivery are
-not exercised by this route. Opportunity is free-text context; directory sync
-reads this environment's Dataverse users.
+interpret the complete contract. Cross-org CRM/opportunity search, native
+attendance rollups and automated delivery are not exercised by this route.
+Opportunity is free-text context. Employee sync now reads Microsoft Entra ID
+through its built-in `aaduser` virtual table; it is not limited to provisioned
+Dataverse users. See the Entra sync section below.
+
+## Employee sync from Microsoft Entra ID
+
+**Sync Entra ID** reads enabled `Member` accounts through Microsoft's existing
+read-only `aaduser` virtual table. The virtual table reads Microsoft Graph as the
+authenticated coordinator; native ticket transactions retain their existing
+server authorization. No new connector, app registration, API key or tenant
+permission grant is part of this change. Other coordinators need their own
+directory-read permissions; an access failure leaves the contacts unchanged.
+
+The source provides display name, mail (UPN fallback), mobile phone (business
+phone fallback) and company. Existing employee contacts match by Entra object
+ID, preserving contact IDs, app eligibility overrides, categories, allocations
+and attendance history. New members get contact records without provisioning
+Dataverse users or granting app access. Customers are unchanged and remain
+manually maintained. This does not add CRM customer synchronization.
+
+Guest and disabled accounts are excluded. Employees absent from a complete
+enabled-member result remain recorded with directory eligibility inactive.
+Entra `Member` status does not itself prove a person is an employee: enabled
+service accounts represented as members may need an app eligibility override.
+Every source page is read and validated before contact changes. Missing account
+status, duplicate identities, empty results, failed reads and incomplete paging
+fail the entire sync; the existing API transaction protects persisted changes.
+
+```powershell
+# Read-only comparison and coordinator-only backend directory probe:
+python scripts/test-entra-directory.py --verify-backend
+
+# One real employee sync, only after announcing the environment/data changes:
+python scripts/test-entra-directory.py --apply
+```
+
+The verifier prints aggregate counts only and checks preserved contact IDs,
+overrides, customer records, all non-contact workspace state and user/group role
+projections. Local regression checks pass: 93 frontend tests, 50 offline backend
+security tests, production build, changed-source lint and desktop/iPad browser
+checks. Fourteen backend tests cover the directory merge, authorization,
+pagination, source failure and preservation boundaries.
+
+On 2026-10-30, the announced backend update and one sync completed as
+`emikes@ais-now.com`: **263 enabled Entra members**, 88 matched employee contacts,
+175 new employee contacts and 15 historical employee contacts marked
+directory-inactive. There are now 278 retained employee records plus 3 unchanged
+customer records. Workspace revision advanced once, from 19 to 20. The live
+verifier confirmed existing IDs, app eligibility overrides, categories, ticket
+history/inventory, customer records and all user/group role projections were
+preserved. No new connection or permission grant was made. Aggregate evidence:
+[`entra-directory-test.json`](../solutions/entra-directory-test.json).
 
 ## Web schedule search
 

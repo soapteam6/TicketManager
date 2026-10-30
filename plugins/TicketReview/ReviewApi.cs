@@ -13,7 +13,8 @@ using Newtonsoft.Json.Linq;
 namespace Ais.TicketReview
 {
     // A synchronous Custom API. All native rows and the workspace revision are committed
-    // by the same Dataverse transaction. There is no external I/O or message delivery.
+    // by the same Dataverse transaction. Directory reads use the built-in Entra
+    // virtual table; there is no direct HTTP call or message delivery.
     public sealed partial class ReviewApi : IPlugin
     {
         private const string Scope = "ais-ticket-review-v1";
@@ -37,7 +38,15 @@ namespace Ais.TicketReview
                 var actor = Actor(service, context.InitiatingUserId);
                 var input = Parse((string)context.InputParameters["Payload"]);
                 var operation = Str(input, "operation");
-                Check(operation == "snapshot" || operation == "command" || operation == "seed" || operation == "scheduleSearchStart" || operation == "scheduleSearchGet", "Unsupported operation.");
+                Check(operation == "snapshot" || operation == "command" || operation == "seed" || operation == "directoryPreview" || operation == "scheduleSearchStart" || operation == "scheduleSearchGet", "Unsupported operation.");
+                // The virtual table reads Graph as the authenticated caller, not
+                // the elevated service used for transactional Ticket Manager rows.
+                if (operation == "directoryPreview") {
+                    RequireAdmin(actor);
+                    var directory = ReadEntraDirectory(factory.CreateOrganizationService(context.InitiatingUserId));
+                    context.OutputParameters["Result"] = new JObject { ["source"] = "Microsoft Entra ID", ["activeMembers"] = directory.Count, ["writes"] = 0 }.ToString(Formatting.None);
+                    return;
+                }
                 if (operation == "scheduleSearchStart" || operation == "scheduleSearchGet") {
                     context.OutputParameters["Result"] = ScheduleSearch(service, actor, input).ToString(Formatting.None);
                     return;
@@ -84,12 +93,12 @@ namespace Ais.TicketReview
                         foreach (var request in Rows(state, "requests")) { request["requesterId"] = actor["id"]; request["recordedBy"] = actor["id"]; }
                         foreach (var allocation in Rows(state, "allocations")) allocation["decidedBy"] = actor["id"];
                         foreach (var history in Rows(state, "attendanceHistory")) history["recordedBy"] = actor["id"];
-                        // Live employee choices come only from actual Dataverse users.
+                        // Employee choices come from enabled Entra member accounts.
                         state["contacts"] = new JArray(Rows(state, "contacts").Where(c => Str(c, "type") == "customer"));
-                        SyncDirectory(service, state);
+                        SyncDirectory(factory.CreateOrganizationService(context.InitiatingUserId), state);
                         result["message"] = "QA fixtures created in native Dataverse tables.";
                     }
-                    else result = Apply(service, state, actor, (JObject)input["command"], now);
+                    else result = Apply(service, state, actor, (JObject)input["command"], now, factory.CreateOrganizationService(context.InitiatingUserId));
                     Validate(state, now);
                     Persist(service, before, state);
                     revision++;
@@ -185,7 +194,7 @@ namespace Ais.TicketReview
         private static bool Released(JObject g, DateTimeOffset now) => Str(g, "release") == "released" || (Str(g, "release") == "scheduled" && Instant(Str(g, "releaseAt")) <= now);
         private static void Add(JObject s, string key, JObject row) => ((JArray)s[key]).Add(row);
 
-        private static JObject Apply(IOrganizationService service, JObject s, JObject actor, JObject c, DateTimeOffset now)
+        private static JObject Apply(IOrganizationService service, JObject s, JObject actor, JObject c, DateTimeOffset now, IOrganizationService directoryService = null)
         {
             Check(c != null, "A command is required.");
             var type = Str(c, "type");
@@ -307,7 +316,11 @@ namespace Ais.TicketReview
                     var contact = String.IsNullOrEmpty(Str(c, "id")) ? new JObject { ["id"] = NewId(), ["type"] = "customer", ["appActive"] = true, ["directoryActive"] = true, ["directoryId"] = JValue.CreateNull() } : Find(s, "contacts", Str(c, "id"));
                     foreach (var field in new[] {"name", "company", "email", "phone", "tier"}) contact[field] = details[field];
                     if (String.IsNullOrEmpty(Str(c, "id"))) Add(s, "contacts", contact); break;
-                case "syncDirectory": SyncDirectory(service, s); result["message"] = "Dataverse user directory refreshed. App overrides retained."; break;
+                case "syncDirectory":
+                    Check(directoryService != null, "The authenticated Entra directory connection is unavailable.");
+                    result["directory"] = SyncDirectory(directoryService, s);
+                    result["message"] = "Employee contacts refreshed from Microsoft Entra ID. App eligibility retained.";
+                    break;
                 case "scoring":
                     var scoring = (JObject)c["settings"]; Check(scoring != null, "Scoring settings are required.");
                     foreach (var f in Factors) { var v = (double?)scoring["weights"]?[f]; Check(v.HasValue && !Double.IsNaN(v.Value) && v >= 0 && v <= 1, "Weights must be between zero and one."); }
@@ -348,18 +361,6 @@ namespace Ais.TicketReview
                 else if (ch == ',' && !quoted) { cells.Add(cell.Trim()); cell = ""; }
                 else cell += ch;
             } Check(!quoted, "Unclosed CSV quote."); cells.Add(cell.Trim()); return cells;
-        }
-        private static void SyncDirectory(IOrganizationService service, JObject s)
-        {
-            var users = Read(service, "systemuser", new ConditionExpression("isdisabled", ConditionOperator.Equal, false), new ConditionExpression("accessmode", ConditionOperator.Equal, 0)).Where(u => u.GetAttributeValue<Guid>("azureactivedirectoryobjectid") != Guid.Empty).ToList();
-            foreach (var c in Rows(s, "contacts").Where(x => Str(x, "type") == "employee")) c["directoryActive"] = false;
-            foreach (var u in users) {
-                var directoryId = u.GetAttributeValue<Guid>("azureactivedirectoryobjectid").ToString();
-                var contact = Rows(s, "contacts").FirstOrDefault(x => Str(x, "type") == "employee" && Str(x, "directoryId") == directoryId);
-                if (contact == null) { contact = new JObject { ["id"] = NewId(), ["type"] = "employee", ["company"] = "AIS", ["tier"] = "bronze", ["appActive"] = true, ["directoryId"] = directoryId }; Add(s, "contacts", contact); }
-                contact["name"] = u.GetAttributeValue<string>("fullname") ?? ""; contact["email"] = u.GetAttributeValue<string>("internalemailaddress") ?? "";
-                contact["phone"] = u.GetAttributeValue<string>("mobilephone") ?? u.GetAttributeValue<string>("address1_telephone1") ?? ""; contact["directoryActive"] = true;
-            }
         }
         private static void Validate(JObject s, DateTimeOffset now)
         {

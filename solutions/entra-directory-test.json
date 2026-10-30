@@ -1,0 +1,33 @@
+{
+  "authenticatedAs": "emikes@ais-now.com",
+  "source": "Microsoft Entra ID",
+  "virtualTable": "aaduser",
+  "enabledMemberProfiles": 263,
+  "directoryReadPages": 3,
+  "existingEmployeeContacts": 103,
+  "matchingExisting": 88,
+  "newEmployeeContacts": 175,
+  "existingEmployeesOutsideEnabledMembers": 15,
+  "revisionBefore": 19,
+  "writes": 1,
+  "callerDirectoryReadVerified": true,
+  "status": "PASS",
+  "verifiedAtUtc": "2026-10-30T14:28:30.627587+00:00",
+  "revisionAfter": 20,
+  "syncResult": {
+    "source": "Microsoft Entra ID",
+    "activeMembers": 263,
+    "added": 175,
+    "matchedExisting": 88,
+    "markedInactive": 15
+  },
+  "employeeContactsAfter": 278,
+  "totalContactsAfter": 281,
+  "existingContactIdsPreserved": true,
+  "appEligibilityOverridesPreserved": true,
+  "customersUnchanged": true,
+  "ticketHistoryAndInventoryUnchanged": true,
+  "userAndGroupAccessUnchanged": true,
+  "newConnectionsCreated": 0,
+  "newPermissionsGranted": 0
+}
