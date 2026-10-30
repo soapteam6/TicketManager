@@ -1,13 +1,14 @@
 // Dependency-free browser checks against the isolated synthetic review server.
 // Start Chrome with --remote-debugging-port=9224 and npm run dev:review first.
 import assert from 'node:assert/strict';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import ExcelJS from 'exceljs';
 
 const base = process.env.REVIEW_URL || 'http://127.0.0.1:5173';
 assert(['localhost', '127.0.0.1'].includes(new URL(base).hostname));
 const artifacts = 'design-artifacts.local';
+const importRegressionFixture = process.env.IMPORT_REGRESSION_FIXTURE ? JSON.parse(await readFile(process.env.IMPORT_REGRESSION_FIXTURE, 'utf8')) : null;
 await mkdir(artifacts, { recursive: true });
 const importBook = new ExcelJS.Workbook(), importSheet = importBook.addWorksheet('Tickets');
 importSheet.addRows([['Game Date', 'Opponent', 'Recipient', 'Status'], ['2027-09-11', 'Discovered demo opponent', '', ''], ['', '', 'Gary', 'Available']]);
@@ -605,6 +606,37 @@ try {
     await page.wait(`document.querySelector('[aria-label="Allocation details"]')?.textContent.includes('Past Demo Night')`);
     assert(await page.evaluate(`document.querySelector('[aria-label="Allocation details"]').textContent.includes('Sep 30, 2026')`), 'Deleted event lost its date');
     await screenshot('deleted-event-history');
+    if (importRegressionFixture) {
+      await nav('Setup & import');
+      await page.evaluate(`document.querySelector('button[aria-label="AI Import"]').click()`);
+      await click('AI Import', 'document.querySelector(".work-access-sections")');
+      await page.evaluate(`(async () => {
+        const fixture=${JSON.stringify(importRegressionFixture)};
+        const source=await(await fetch('/src/review/SyntheticReview.tsx')).text();
+        const url=source.split('"').find(v=>v.startsWith('/src/review/demo.ts'));
+        const {demoProvider}=await import(url);
+        const original={snapshot:demoProvider.snapshot,start:demoProvider.startScheduleSearch,get:demoProvider.getScheduleSearch,execute:demoProvider.execute};
+        demoProvider.snapshot=function(...args){return {...original.snapshot.apply(this,args),...fixture.snapshot}};
+        demoProvider.startScheduleSearch=async()=>({...fixture.job,status:'queued'});
+        demoProvider.getScheduleSearch=async()=>fixture.job;
+        demoProvider.execute=async function(...args){if(args[1].type!=='importSchedule')throw new Error('Only the local import regression command is allowed');window.capturedInventoryImport=args[1];return {message:'Local regression import captured'}};
+        window.restoreImportRegression=()=>{Object.assign(demoProvider,{snapshot:original.snapshot,startScheduleSearch:original.start,getScheduleSearch:original.get,execute:original.execute});demoProvider.refresh()};
+        demoProvider.refresh();
+      })()`);
+      await set('textarea[name="scheduleQuery"]', 'Import the supplied tracker');
+      await click('Prepare import', 'document.querySelector(".work-schedule-finder form")');
+      await page.wait(`document.querySelectorAll('.work-found-schedule tbody tr').length===44`);
+      assert.equal(await page.evaluate(`document.querySelector('select[name="searchSeason"]').value`), importRegressionFixture.expectedSeasonId);
+      assert.equal(await page.evaluate(`document.querySelectorAll('.work-found-schedule tbody input[type="checkbox"]:checked').length`), 6, 'Existing season dates excluded preseason inventory');
+      assert(await page.evaluate(`document.querySelector('[aria-label="Found schedule"] .work-subtoolbar').textContent.includes('38 already in inventory') && !document.querySelector('.work-found-schedule').textContent.includes('Outside the destination season')`));
+      await screenshot('actual-workbook-destination-regression');
+      await click('Import selected games');
+      await page.wait(`window.capturedInventoryImport`);
+      const captured=await page.evaluate('window.capturedInventoryImport');
+      assert.equal(captured.csv.trim().split('\n').length, 7);
+      assert(captured.csv.includes('2026-09-25,02:00') && captured.csv.includes('2026-09-27,02:00'), 'Preseason games did not reach the import command');
+      await page.evaluate(`window.restoreImportRegression()`);
+    }
     // Exercise the real startup component with a connector module stubbed before
     // import. No SDK authentication, live connection or Dataverse call is made.
     await page.call('Fetch.enable', { patterns: [{ urlPattern: '*src/generated/services/MicrosoftDataverseService.ts*' }] });
@@ -684,7 +716,7 @@ try {
     await page.evaluate(`window.expirationRoot.unmount(); document.getElementById('expiration-check').remove(); document.getElementById('root').hidden=false; delete window.expirationProvider;`);
     assert.deepEqual(errors, [], `${design}: page errors`);
     assert.deepEqual(external, [], `${design}: external requests`);
-    results.push({ design, status: 'PASS', checks: ['no automatic initial selection', 'detail pane dismissal', 'no routine save banners', 'search', 'whole-row and keyboard selection', 'private inventory creation', 'interest', 'single self beneficiary follows requesting person', 'bounded saved contact selection', 'CRM search and recipient allocation', 'requester email', 'allocation', 'right-side allocation details', 'visible rejection reason', 'copy error diagnostics', 'legacy clipboard fallback', 'manual copy when clipboard is blocked', 'startup error diagnostics preserve connector status and request ID', 'startup retry refreshes copied error', 'contact history', ...(design === 'desk' ? ['team and season creation', 'web schedule preview and selected import', 'TBD game excluded', 'CSV fallback', 'iPad schedule search', 'independent detail scrolling'] : []), 'admin-only user access', 'role grant and reversal', 'group role assignment', 'connecting a directory group', 'requester navigation', 'iPad landscape', 'iPad portrait', 'bounded page scroll', 'requester inactive/history controls hidden', 'live event expiration closes interest', 'completed event history', 'attendance controls disabled before event day', 'same-day attendance before event start', 'team and season deletion with descendant counts', 'active allocations require explicit cancellation', 'successful AI import clears prompt and preview', 'failed AI import retains form for retry', 'AI Import ignores legacy saved jobs and opens fresh', 'individual game deletion', 'allocated team deletion preserves named history', 'file-only AI import', 'file names and allocation labels do not block inventory', 'file import skips attendee backfill', 'actual upload and analysis stages with elapsed time'], pageErrors: 0, externalRequests: 0 });
+    results.push({ design, status: 'PASS', checks: ['no automatic initial selection', 'detail pane dismissal', 'no routine save banners', 'search', 'whole-row and keyboard selection', 'private inventory creation', 'interest', 'single self beneficiary follows requesting person', 'bounded saved contact selection', 'CRM search and recipient allocation', 'requester email', 'allocation', 'right-side allocation details', 'visible rejection reason', 'copy error diagnostics', 'legacy clipboard fallback', 'manual copy when clipboard is blocked', 'startup error diagnostics preserve connector status and request ID', 'startup retry refreshes copied error', 'contact history', ...(design === 'desk' ? ['team and season creation', 'web schedule preview and selected import', 'TBD game excluded', 'CSV fallback', 'iPad schedule search', 'independent detail scrolling'] : []), 'admin-only user access', 'role grant and reversal', 'group role assignment', 'connecting a directory group', 'requester navigation', 'iPad landscape', 'iPad portrait', 'bounded page scroll', 'requester inactive/history controls hidden', 'live event expiration closes interest', 'completed event history', 'attendance controls disabled before event day', 'same-day attendance before event start', 'team and season deletion with descendant counts', 'active allocations require explicit cancellation', 'successful AI import clears prompt and preview', 'failed AI import retains form for retry', 'AI Import ignores legacy saved jobs and opens fresh', 'individual game deletion', 'allocated team deletion preserves named history', 'file-only AI import', 'file names and allocation labels do not block inventory', 'file import skips attendee backfill', 'actual upload and analysis stages with elapsed time', ...(importRegressionFixture ? ['actual 44-game tracker with existing season includes both preseason games in six-row command'] : [])], pageErrors: 0, externalRequests: 0 });
     page.close();
     await browser.call('Target.closeTarget', { targetId });
   }

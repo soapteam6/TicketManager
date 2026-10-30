@@ -246,6 +246,13 @@ cached summaries do not reduce the owned capacity or require person matching.
 Attendees, allocations, transfers and attendance are not backfilled. New inventory
 starts private, and existing matching games remain unchanged.
 
+Selecting a destination season groups the imported games; its start/end metadata
+does not exclude preseason games. File requests retain the destination season ID
+without inheriting its date bounds, so choosing a season before upload cannot
+truncate the tracker either. A regression using the user's actual 44-game
+response and existing September 29 season reproduces and fixes the former
+four-game count: both September preseason games reach the six-row import command.
+
 The preview reports total games found, games already in inventory, and selected
 new games. Existing games are shown as already present and excluded from the
 create command. A small new-game count does not mean those existing games were

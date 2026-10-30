@@ -43,6 +43,7 @@ internal static class SearchTests
                 input["request"]["files"] = new JArray(new JObject { ["name"] = "Tracker.xlsx", ["mediaType"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ["size"] = 6, ["data"] = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("sample")) });
                 var result = Call(service, Actor(), input);
                 Assert(service.Jobs.Count == 1 && service.Notes.Count == 1 && service.Writes == 2, "File and job not saved together");
+                Assert((string)result["request"]["seasonId"] == Season.ToString() && result["request"]["from"].Type == JTokenType.Null && result["request"]["through"].Type == JTokenType.Null, "The destination season filtered games out of the uploaded tracker");
                 Assert(!result.ToString().Contains("c2FtcGxl") && !service.Jobs[0].GetAttributeValue<string>("cr9cd_input").Contains("c2FtcGxl"), "File contents leaked into metadata");
                 Assert(service.Notes[0].GetAttributeValue<EntityReference>("objectid").Id == service.Jobs[0].Id && (string)result["request"]["files"][0]["sha256"] != "", "File ownership/hash missing");
                 Call(service, Actor(), input); Assert(service.Writes == 2, "Repeated job created duplicate attachments");

@@ -21,6 +21,7 @@ def main():
     parser.add_argument("--job-id")
     parser.add_argument("--query", default="Las Vegas Aviators home games in September 2026")
     parser.add_argument("--file", action="append", default=[], help="File to prepare with Claude; never imports ticket data.")
+    parser.add_argument("--season-id", help="Explicit destination season, including file imports; file contents must not be date-filtered.")
     parser.add_argument("--freeform", action="store_true", help="Resolve the requested season without imposing an existing one.")
     parser.add_argument("--artifact-stem", default="schedule-search-live")
     parser.add_argument("--wait-seconds", type=int, default=300, help="Polling window; file batches can take longer than web-only searches.")
@@ -42,11 +43,15 @@ def main():
     if args.create:
         seasons = snapshot["snapshot"]["seasons"]
         season = {} if args.freeform or args.file else next((s for s in seasons if s["startDate"] <= "2026-09-01" and s["endDate"] >= "2026-09-30"), seasons[0])
+        if args.season_id:
+            season = next((s for s in seasons if s["id"] == args.season_id), None)
+            if season is None:
+                raise RuntimeError("The requested test destination season was not found.")
         files = []
         for name in args.file:
             path = Path(name); content = path.read_bytes()
             files.append({"name": path.name, "mediaType": mimetypes.guess_type(path.name)[0] or "application/octet-stream", "size": len(content), "data": base64.b64encode(content).decode()})
-        result = api({"operation": "scheduleSearchStart", "jobId": job_id, "request": {"query": args.query, "seasonId": "" if args.freeform or files else season["id"], "ticketsPerEvent": 0 if args.freeform or files else 4, "homeOnly": True, "timeZone": "America/Los_Angeles", **({"files": files} if files else {})}})
+        result = api({"operation": "scheduleSearchStart", "jobId": job_id, "request": {"query": args.query, "seasonId": args.season_id or ("" if args.freeform or files else season["id"]), "ticketsPerEvent": 0 if args.freeform or files else 4, "homeOnly": True, "timeZone": "America/Los_Angeles", **({"files": files} if files else {})}})
         print("Created search job " + job_id + "; status " + result["status"], flush=True)
     else:
         result = api({"operation": "scheduleSearchGet", "jobId": job_id})

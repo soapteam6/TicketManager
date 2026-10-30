@@ -62,10 +62,7 @@ export function ScheduleFinder({ initialSeasonId = '' }: { initialSeasonId?: str
     return () => { active = false; clearTimeout(timer); };
   }, [jobId, provider, persona]);
   function issues(game: DiscoveredGame) {
-    const list = discoveredGameIssues(game, snapshot.catalog, homeOnly);
-    const start = season?.startDate || draft.startDate, end = season?.endDate || draft.endDate;
-    if (game.localDate && ((start && game.localDate < start) || (end && game.localDate > end))) list.push('Outside the destination season');
-    return list;
+    return discoveredGameIssues(game, snapshot.catalog, homeOnly);
   }
   const existingCount = discovery?.games.filter(g => discoveredGameExists(g, snapshot.catalog)).length ?? 0;
   const ready = discovery?.games.filter(g => g.selected && issues(g).length === 0) ?? [];

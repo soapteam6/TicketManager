@@ -31,5 +31,5 @@ const record = {
   ...(files.length > 0 && { uploadedFiles: files.length, sourceFileCount: found.sources.filter(s => s.fileName).length, totalTickets: found.games.reduce((n, g) => n + g.tickets, 0), attendeeBackfill: false }),
   ...(stem === 'ai-import-live' && { notes: found.warnings }),
 };
-await writeFile(stem === 'ai-inventory-workbook-live' ? 'solutions/ai-inventory-import-test.json' : files.length ? 'solutions/ai-file-import-test.json' : stem === 'ai-import-live' ? 'solutions/ai-import-test.json' : stem === 'claude-env-live' ? 'solutions/claude-environment-test.json' : 'solutions/schedule-search-test.json', JSON.stringify(record, null, 2) + '\n');
+await writeFile(stem === 'ai-season-workbook-live' ? 'solutions/ai-season-import-test.json' : stem === 'ai-inventory-workbook-live' ? 'solutions/ai-inventory-import-test.json' : files.length ? 'solutions/ai-file-import-test.json' : stem === 'ai-import-live' ? 'solutions/ai-import-test.json' : stem === 'claude-env-live' ? 'solutions/claude-environment-test.json' : 'solutions/schedule-search-test.json', JSON.stringify(record, null, 2) + '\n');
 console.log(JSON.stringify(record, null, 2));

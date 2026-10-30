@@ -50,7 +50,7 @@ namespace Ais.TicketReview
                 Check(request["homeOnly"]?.Type == JTokenType.Boolean, "Choose home games or all games.");
                 var payload = new JObject {
                     ["query"] = text, ["seasonId"] = seasonId == Guid.Empty ? "" : seasonId.ToString(), ["seasonLabel"] = season["label"],
-                    ["from"] = season["startDate"], ["through"] = season["endDate"],
+                    ["from"] = files.Count > 0 ? null : season["startDate"], ["through"] = files.Count > 0 ? null : season["endDate"],
                     ["ticketsPerEvent"] = tickets, ["homeOnly"] = request["homeOnly"].DeepClone()
                 };
                 if (!String.IsNullOrEmpty(Str(request, "timeZone"))) {
