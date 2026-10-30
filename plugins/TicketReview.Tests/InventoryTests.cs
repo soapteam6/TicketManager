@@ -19,6 +19,20 @@ internal static class InventoryTests
     private static void Denied(Action run, string message) { try { run(); } catch (Microsoft.Xrm.Sdk.InvalidPluginExecutionException e) { Assert(e.Message.Contains(message), e.Message); return; } throw new Exception("Expected rejection: " + message); }
     public static int Run() {
         var tests = new Dictionary<string, Action> {
+            ["past scheduled events complete at their exact instant and cancellations are preserved"] = () => {
+                var now = DateTimeOffset.Parse("2026-10-30T15:00:00Z"); var game = new JObject { ["status"] = "scheduled", ["gameDate"] = "2026-10-30T08:00:00-07:00" };
+                Assert((string)Call("InventoryStatus", game, now.AddTicks(-1)) == "scheduled", "Future event completed early");
+                Assert((string)Call("InventoryStatus", game, now) == "completed", "Past event still scheduled");
+                Denied(() => Call("RequireOpenInterest", game, now), "scheduled time has passed");
+                Assert((string)game["status"] == "scheduled", "Read rewrote stored status");
+                game["status"] = "cancelled"; Assert((string)Call("InventoryStatus", game, now) == "cancelled", "Cancellation overwritten");
+            },
+            ["future scheduled events accept interest while completed cancelled and removed events do not"] = () => {
+                var now = DateTimeOffset.Parse("2026-10-30T15:00:00Z"); var game = new JObject { ["status"] = "scheduled", ["gameDate"] = "2026-10-30T15:00:01Z" };
+                Call("RequireOpenInterest", game, now);
+                foreach (var status in new[] { "completed", "cancelled" }) { game["status"] = status; Denied(() => Call("RequireOpenInterest", game, now), "no longer accepting"); }
+                game["status"] = "scheduled"; game["removed"] = true; Denied(() => Call("RequireOpenInterest", game, now), "no longer accepting");
+            },
             ["event edits preserve identity and grow/shrink unused ticket capacity"] = () => {
                 var state = State(); var id = (string)state["games"][0]["id"];
                 Call("EditInventory", state, Edit(state, 6), DateTimeOffset.UtcNow);

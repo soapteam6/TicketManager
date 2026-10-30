@@ -8,6 +8,17 @@ namespace Ais.TicketReview
 {
     public sealed partial class ReviewApi
     {
+        private static string InventoryStatus(JObject game, DateTimeOffset now)
+        {
+            return Str(game, "status") == "scheduled" && Instant(Str(game, "gameDate")) <= now ? "completed" : Str(game, "status");
+        }
+
+        private static void RequireOpenInterest(JObject game, DateTimeOffset now)
+        {
+            Check(Instant(Str(game, "gameDate")) > now, "This event's scheduled time has passed. New interest is closed.");
+            Check((bool?)game["removed"] != true && InventoryStatus(game, now) == "scheduled", "This event is no longer accepting interest.");
+        }
+
         private static void EditInventory(JObject state, JObject command, DateTimeOffset now)
         {
             var game = Find(state, "games", Str(command, "gameId"));

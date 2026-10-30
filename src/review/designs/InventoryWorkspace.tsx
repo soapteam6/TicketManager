@@ -19,7 +19,8 @@ export function InventoryWorkspace({ onRequests }: { onRequests: (gameId: string
   const [seasonId, setSeasonId] = useState('');
   const [independent, setIndependent] = useState(false);
   const [query, setQuery] = useState('');
-  const [showInactive, setShowInactive] = useState(false);
+  const [includeInactive, setShowInactive] = useState(false);
+  const showInactive = coordinator && includeInactive;
   const hierarchy = inventoryHierarchy(snapshot);
   const team = hierarchy.teams.find(item => item.id === teamId && (showInactive || item.active));
   const season = hierarchy.seasons.find(item => item.id === seasonId && item.teamId === team?.id && (showInactive || item.active));
@@ -41,7 +42,7 @@ export function InventoryWorkspace({ onRequests }: { onRequests: (gameId: string
     {team && navigation}
     <div className="work-section-heading"><div><h2>{team ? team.name : 'Events & Games inventory'}</h2><p>{team ? 'Season inventory' : 'Teams & other events'}</p></div></div>
     <div className="work-toolbar"><Search value={query} onChange={setQuery} placeholder={team ? 'Search seasons' : 'Search teams'} />
-      <label className="work-inactive-toggle"><input type="checkbox" aria-label="Show inactive teams and seasons" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} />Show inactive</label>
+      {coordinator && <label className="work-inactive-toggle"><input type="checkbox" aria-label="Show inactive teams and seasons" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} />Show inactive</label>}
       <span className="work-toolbar-count">{team ? `${visibleSeasons.length} ${visibleSeasons.length === 1 ? 'season' : 'seasons'}` : `${visibleTeams.length} ${visibleTeams.length === 1 ? 'team' : 'teams'}`}</span></div>
     <div className="work-dashboard-scroll">
       <ul className="work-inventory-cards">

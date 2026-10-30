@@ -254,7 +254,7 @@ namespace Ais.TicketReview
                     foreach (var g in targets) { g["release"] = action; g["releaseAt"] = action == "scheduled" ? c["at"] : JValue.CreateNull(); } break;
                 case "interest":
                     var game = Find(s, "games", Str(c, "gameId"));
-                    Check(Str(game, "status") == "scheduled" && Instant(Str(game, "gameDate")) > now, "Choose a future scheduled event.");
+                    RequireOpenInterest(game, now);
                     Check(IsAdmin(actor) || Released(game, now), "Inventory is private.");
                     var quantity = Number(c, "quantity", 1, 100); var purpose = Str(c, "purpose");
                     Check(purpose == "customer" || purpose == "employee", "Choose a purpose.");
@@ -394,7 +394,7 @@ namespace Ais.TicketReview
             }
             var catalog = new JArray();
             foreach (var g in Rows(s, "games").Where(g => (bool?)g["removed"] != true && (admin || Released(g, now) && Str(g, "status") == "scheduled" && Instant(Str(g, "gameDate")) > now))) {
-                var row = (JObject)g.DeepClone(); var id = Str(g, "id"); var requests = Rows(s, "requests").Where(r => Str(r, "gameId") == id && Active(r)).ToList();
+                var row = (JObject)g.DeepClone(); row["status"] = InventoryStatus(g, now); var id = Str(g, "id"); var requests = Rows(s, "requests").Where(r => Str(r, "gameId") == id && Active(r)).ToList();
                 row["released"] = Released(g, now); row["availableTickets"] = Rows(s, "seats").Count(x => Str(x, "gameId") == id && Str(x, "status") == "available");
                 row["requestCount"] = requests.Count; row["requestingPeople"] = requests.Select(r => !String.IsNullOrEmpty(Str(r, "requesterDirectoryId")) ? Str(r, "requesterDirectoryId") : identities.TryGetValue(Str(r, "requesterId"), out var identity) && identity.GetAttributeValue<Guid>("azureactivedirectoryobjectid") != Guid.Empty ? identity.GetAttributeValue<Guid>("azureactivedirectoryobjectid").ToString() : Str(r, "requesterId")).Distinct(StringComparer.OrdinalIgnoreCase).Count(); row["requestedTickets"] = requests.Sum(r => (int)r["quantity"]);
                 var season = Rows(s, "seasons").FirstOrDefault(x => Str(x, "id") == Str(g, "seasonId"));

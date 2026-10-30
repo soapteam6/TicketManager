@@ -1,5 +1,6 @@
 import { rankReviewState } from './ranking';
 import { prepareCrmPeople } from './crmPeople';
+import { eventStatus } from './eventActivity';
 import { FACTOR_KEYS } from '../domain/enums';
 import type { GameRankingResult } from '../domain/scoring-types';
 import { createFixtures, DIRECTORY, GUID, PERSONAS } from './fixtures';
@@ -158,6 +159,7 @@ export class MockReviewProvider implements ReviewProvider {
       );
       return {
         ...g,
+        status: eventStatus(g, now),
         released: released(g, now),
         availableTickets: state.seats.filter(
           (s) => s.gameId === g.id && s.status === 'available',
@@ -526,7 +528,7 @@ export class MockReviewProvider implements ReviewProvider {
           invalid('Released inventory not found');
         if (
           game.status !== 'scheduled' ||
-          (actor.role !== 'coordinator' && instant(game.gameDate) <= now)
+          instant(game.gameDate) <= now
         )
           invalid('This event no longer accepts new interest');
         integer(command.quantity, 1, 100, 'Requested quantity');

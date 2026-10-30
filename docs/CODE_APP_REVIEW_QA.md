@@ -320,6 +320,13 @@ npm run preview:review
 
 Open **http://127.0.0.1:4173/** on the same machine. `review-dist/` is ignored. Never serve the normal `dist/` bundle for mock QA: it contains the existing SDK entry.
 
+## Event completion and requester inventory checks (2026-10-30)
+
+- Scheduled events automatically show Completed at their event instant, using server time plus elapsed time in an open tab. Equivalent UTC and local-offset timestamps have the same boundary. Cancelled events remain cancelled. Completion is a date-based projection, with no history rewrites or inferred attendance.
+- Coordinators retain Include history and Show inactive. Employees and sales representatives see upcoming active inventory without either control, including after a coordinator enabled Show inactive before switching preview role.
+- New interest closes at the event instant for every role. A loaded detail pane removes the interest action, and an already-open form disables submission with an explanation. Returning to a backgrounded tab updates the clock immediately.
+- Verification: 116 frontend tests, 71 backend tests, targeted lint, production build and desktop/iPad browser checks, including a live-provider fixture that expires while its interest form is open. No real requests or allocations are created by these tests.
+
 ## Requester and CRM checks (2026-10-30)
 
 - In Record interest, Requesting person uses active employee contacts from the same register, with email addresses. Coordinators can record on behalf of an Entra employee who has no Dataverse user. The authenticated coordinator remains the recorder; role assignments are unchanged.

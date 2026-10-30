@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { ReviewContext } from './context';
 import type { PersonaKey, ReviewCommand, ReviewProvider } from './types';
 import { SaveErrorNotice } from './SaveErrorNotice';
@@ -6,6 +6,7 @@ import { createErrorReport, type ErrorReport } from './errorReport';
 import { DesignWorkspace } from './designs/DesignWorkspace';
 import './designs/workspace.css';
 import { withSeasonActivity } from './seasonActivity';
+import { withEventActivity } from './eventActivity';
 
 export function ReviewApp({ provider, onRefresh }: {
   provider: ReviewProvider;
@@ -16,8 +17,16 @@ export function ReviewApp({ provider, onRefresh }: {
   const [error, setError] = useState<ErrorReport | null>(null);
   const [errorTitle, setErrorTitle] = useState('Change not saved');
   useSyncExternalStore(provider.subscribe, provider.revision, provider.revision);
-  const snapshot = withSeasonActivity(provider.snapshot(persona));
+  const [, tick] = useState(0);
   const live = provider.mode === 'dataverse';
+  useEffect(() => {
+    if (!live) return;
+    const timer = window.setInterval(() => tick(n => n + 1), 1000);
+    const resume = () => { if (document.visibilityState === 'visible') tick(n => n + 1); };
+    document.addEventListener('visibilitychange', resume);
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', resume); };
+  }, [live]);
+  const snapshot = withSeasonActivity(withEventActivity(provider.snapshot(persona)));
   async function refresh(): Promise<boolean> {
     if (!live) { window.location.reload(); return true; }
     setBusy(true); setError(null);

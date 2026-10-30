@@ -4,6 +4,7 @@ import { useReview } from './context';
 import { isoToLocalDateTimeInput, localDateTimeInputToIso, timeZoneLabel } from './dates';
 import { interestPeople } from './interestPeople';
 import { CrmBeneficiaryPicker } from './CrmBeneficiaryPicker';
+import { acceptsInterest } from './eventActivity';
 import { personName } from './personName';
 import type { CrmBeneficiary, Inventory, InventoryView, ReleaseCommand } from './types';
 import {
@@ -128,8 +129,10 @@ export function InterestForm({ game, close }: { game: InventoryView; close: () =
   const matches = customers.filter(c => `${c.name} ${c.email}`.toLowerCase().includes(query.toLowerCase())).slice(0, 25);
   const recipients = purpose === 'employee' ? (requester ? [requester.id] : []) : source === 'saved' ? selected : [];
   const recipientCount = purpose === 'customer' && source === 'crm' ? crmContacts.length : recipients.length;
+  const acceptingInterest = acceptsInterest(game, Date.parse(snapshot.serverNow ?? new Date().toISOString()));
   return <form className="space-y-4" onSubmit={async e => {
     e.preventDefault();
+    if (!acceptingInterest) return;
     const form = new FormData(e.currentTarget);
     if (await run({ type: 'interest', gameId: game.id, purpose, contactIds: recipients,
       crmContacts: purpose === 'customer' && source === 'crm' ? crmContacts : undefined,
@@ -138,6 +141,7 @@ export function InterestForm({ game, close }: { game: InventoryView; close: () =
     })) close();
   }}>
     <FormError />
+    {!acceptingInterest && <p role="status" className="text-sm text-amber-800">This event has ended or is no longer accepting interest.</p>}
     <p className="text-sm">{dateTime(game.gameDate)} · {game.availableTickets} / {game.totalTickets} tickets available.</p>
     {admin && <Field label="Requesting person"><Select name="onBehalfContactId" value={onBehalfContactId} onChange={e => setOnBehalfContactId(e.target.value)}>
       <option value="">{personName(snapshot.persona.name)} — {snapshot.persona.email} (self)</option>
@@ -174,7 +178,7 @@ export function InterestForm({ game, close }: { game: InventoryView; close: () =
     {recipientCount > quantity && <p role="alert" className="text-sm text-red-700">Request at least one ticket per selected person.</p>}
     <Field label="Related opportunity / value context (optional)"><TextInput name="opportunity" maxLength={200} placeholder="Opportunity or MRR context for coordinator review" /></Field>
     <Field label="Business justification" required><TextArea name="rationale" required maxLength={1000} rows={3} placeholder="Briefly explain the purpose of this visit." /></Field>
-    <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={close}>Cancel</Button><Button type="submit" disabled={busy || !recipientCount || recipientCount > quantity}>Record interest</Button></div>
+    <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={close}>Cancel</Button><Button type="submit" disabled={busy || !acceptingInterest || !recipientCount || recipientCount > quantity}>Record interest</Button></div>
   </form>;
 }
 export function ReleasePanel({

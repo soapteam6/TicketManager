@@ -36,7 +36,7 @@ export function InventoryGrid({ onRequests, scope, title, subtitle, navigation }
     <div className="work-section-heading"><div><h2>{title}</h2><p>{subtitle}</p></div></div>
     <div className="work-toolbar">
       <Search value={query} onChange={setQuery} placeholder="Search events or seasons" />
-      <select aria-label="Inventory period" value={period} onChange={e => setPeriod(e.target.value)}><option value="scheduled">Scheduled events</option><option value="all">Include history</option></select>
+      {admin && <select aria-label="Inventory period" value={period} onChange={e => setPeriod(e.target.value)}><option value="scheduled">Scheduled events</option><option value="all">Include history</option></select>}
       {admin && <select aria-label="Inventory visibility" value={visibility} onChange={e => setVisibility(e.target.value)}><option value="all">All visibility</option><option value="private">Private</option><option value="released">Released</option><option value="scheduled">Scheduled release</option></select>}
       {admin && <Button variant="secondary" disabled={!selected.length || busy} onClick={() => setReleaseIds(selected)}>Set visibility{selected.length ? ` (${selected.length})` : ''}</Button>}
       <span className="work-toolbar-count">{games.length} events</span>
@@ -68,7 +68,7 @@ export function InventoryGrid({ onRequests, scope, title, subtitle, navigation }
         <p className="work-help">Interest adds to demand. Only a coordinator allocation reduces availability.</p>
       </aside>}
     </div>
-    <Modal open={Boolean(interest)} onClose={() => setInterestId(undefined)} title="Record ticket interest">{interest && <InterestForm key={interest.id} game={interest} close={() => setInterestId(undefined)} />}</Modal>
+    <Modal open={Boolean(interestId)} onClose={() => setInterestId(undefined)} title="Record ticket interest">{interest ? <InterestForm key={interest.id} game={interest} close={() => setInterestId(undefined)} /> : <div className="space-y-4"><p>This event no longer accepts interest.</p><Button onClick={() => setInterestId(undefined)}>Close</Button></div>}</Modal>
     <Modal open={releaseIds !== null} onClose={() => setReleaseIds(null)} title="Set inventory visibility" size="lg">{releaseIds && <ReleasePanel selected={releaseIds} inventoryIds={inventory.map(game => game.id)} clear={() => { setReleaseIds(null); setSelected([]); }} />}</Modal>
   </section>;
 }

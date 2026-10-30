@@ -3,6 +3,7 @@ import { ReviewError } from './provider';
 import { rankReviewState } from './ranking';
 import { previewScheduleCsv } from './schedule';
 import { createSnapshotLoader } from './workspaceLoading';
+import { advancingServerTime, withEventActivity } from './eventActivity';
 import type { CommandResult, CrmDirectory, PersonaKey, ReviewCommand, ReviewProvider, ReviewSnapshot, ReviewState, ScheduleSearchJob, ScheduleSearchRequest } from './types';
 
 export interface PlatformResponse {
@@ -22,6 +23,7 @@ export class DataverseReviewProvider implements ReviewProvider {
   private listeners = new Set<() => void>();
   private version = 0;
   private current: PlatformResponse;
+  private receivedAt = performance.now();
   private transport: PlatformTransport;
   private loadSnapshot: () => Promise<PlatformResponse>;
   private searchTransport?: ScheduleSearchTransport;
@@ -36,7 +38,7 @@ export class DataverseReviewProvider implements ReviewProvider {
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   revision = () => this.version;
   refresh = () => { this.version++; for (const listener of this.listeners) listener(); };
-  snapshot = (): ReviewSnapshot => structuredClone({ ...this.current.snapshot, serverNow: this.current.serverNow });
+  snapshot = (): ReviewSnapshot => withEventActivity(structuredClone({ ...this.current.snapshot, serverNow: advancingServerTime(this.current.serverNow, this.receivedAt, performance.now()) }));
   async reload() {
     this.accept(await this.loadSnapshot());
   }
@@ -44,6 +46,7 @@ export class DataverseReviewProvider implements ReviewProvider {
     // A read that started before a save must not overwrite that save's response.
     if (response.revision < this.current.revision) return;
     this.current = response;
+    this.receivedAt = performance.now();
     this.refresh();
   }
   async execute(_key: PersonaKey, command: ReviewCommand): Promise<CommandResult> {
