@@ -14,8 +14,6 @@ import { EmptyRows } from './parts';
 export function ScheduleFinder({ initialSeasonId = '' }: { initialSeasonId?: string }) {
   const { snapshot, provider, persona, run, busy } = useReview();
   const initialSeason = snapshot.seasons.find(s => s.id === initialSeasonId);
-  const storageKey = `ticket-ai-import:${snapshot.persona.id}:${initialSeasonId || 'any'}`;
-  const storedId = () => { try { return sessionStorage.getItem(storageKey) ?? ''; } catch { return ''; } };
   const [query, setQuery] = useState('');
   const [files, setFiles] = useState<ImportFileUpload[]>([]);
   const [readingFiles, setReadingFiles] = useState(false);
@@ -23,7 +21,7 @@ export function ScheduleFinder({ initialSeasonId = '' }: { initialSeasonId?: str
   const [homeOnly, setHomeOnly] = useState(true);
   const [seasonId, setSeasonId] = useState(initialSeasonId);
   const [draft, setDraft] = useState({ teamId: '', teamName: '', label: '', startDate: '', endDate: '' });
-  const [jobId, setJobId] = useState(storedId);
+  const [jobId, setJobId] = useState('');
   const [job, setJob] = useState<ScheduleSearchJob>();
   const [discovery, setDiscovery] = useState<ScheduleDiscovery>();
   const [starting, setStarting] = useState(false);
@@ -89,7 +87,6 @@ export function ScheduleFinder({ initialSeasonId = '' }: { initialSeasonId?: str
       setStarting(true); setError(null); setJobId(''); setJob(undefined); setDiscovery(undefined);
       try {
         const result = await provider.startScheduleSearch(persona, { query: query.trim(), seasonId: initialSeasonId, ticketsPerEvent: defaultTicketsValid ? Number(tickets) : 0, homeOnly, timeZone: localTimeZone(), ...(files.length > 0 && { files }) }, crypto.randomUUID());
-        try { sessionStorage.setItem(storageKey, result.id); } catch { /* Search still works without browser storage. */ }
         setJob(result); setJobId(result.id);
       } catch (err) { setError(createErrorReport(err, 'Start AI Import')); }
       finally { setStarting(false); }
@@ -107,7 +104,7 @@ export function ScheduleFinder({ initialSeasonId = '' }: { initialSeasonId?: str
       {!available && <p className="work-help">AI Import is unavailable. CSV import is available.</p>}
       {error && <div className="space-y-2"><p className="work-import-error-message" role="alert">{error.message}</p><CopyErrorButton details={error.details} /></div>}
       <Button type="submit" disabled={busy || searching || readingFiles || !available || !query.trim() && !files.length}>{readingFiles ? 'Reading files…' : searching ? 'Preparing import…' : 'Prepare import'}</Button>
-      {searching && <p className="work-help" role="status">Preparing the import. Files can take several minutes. You can leave this screen and return while it runs.</p>}
+      {searching && <p className="work-help" role="status">Preparing the import. Files can take several minutes. Keep AI Import open until your preview is ready.</p>}
     </form>
     {discovery && <section className="work-import-preview" aria-label="Found schedule"><div className="work-subtoolbar"><h3>{discovery.team || 'Import preview'}{discovery.season ? ` · ${discovery.season}` : ''}</h3><span className="work-help">{ready.length} selected · {timeZoneLabel()}</span></div>
       <div className="work-table-scroll">
@@ -135,7 +132,6 @@ export function ScheduleFinder({ initialSeasonId = '' }: { initialSeasonId?: str
       {discovery.games.some(g => g.ticketRows?.some(t => !t.resolution || t.resolution !== 'available' && !t.contactId && !t.crmContact)) && <p className="work-import-errors" role="status">Games with unresolved tickets are excluded until you review their statuses and recipients.</p>}
       {discovery.games.length > 0 && <div className="work-import-commit"><div><strong>{ready.length} games · {ready.reduce((n, g) => n + g.tickets, 0)} tickets</strong><p>{!ticketsValid ? 'Enter the number of tickets you own per game.' : !needsSeason ? 'Imported events start private.' : seasonId ? 'Imported games start private.' : 'The team, season and private games will be saved together.'}</p></div><Button disabled={busy || searching || !ticketsValid || !targetValid || !ready.length || ready.length > 100} onClick={async () => {
         if (await run({ type: 'importSchedule', csv: discoveredGamesCsv(ready), seasonId, importedAllocations: discoveredAllocations(ready), ...(!seasonId && needsSeason && { newSeason: { ...draft, defaultTickets: defaultTicketsValid ? Number(tickets) : ready[0]?.tickets ?? 0 } }) })) {
-          try { sessionStorage.removeItem(storageKey); } catch { /* Import succeeded even when storage is unavailable. */ }
           setJobId(''); setJob(undefined); setDiscovery(undefined); setError(null);
           setQuery(''); setFiles([]); setHomeOnly(true); setSeasonId(initialSeasonId);
           setTickets(initialSeason ? String(snapshot.teams.find(t => t.id === initialSeason.teamId)?.defaultTickets ?? '') : '');

@@ -336,11 +336,11 @@ try {
       })()`);
       await click('Create season & import');
       await page.wait(`document.querySelector('aside[role="alert"]')?.textContent.includes('Synthetic import could not save')`);
-      assert(await page.evaluate(`document.querySelector('[aria-label="Found schedule"]') && document.querySelector('textarea[name="scheduleQuery"]').value && Object.keys(sessionStorage).some(k=>k.startsWith('ticket-ai-import:'))`), 'Failed import cleared the form or resumable search');
+      assert(await page.evaluate(`document.querySelector('[aria-label="Found schedule"]') && document.querySelector('textarea[name="scheduleQuery"]').value`), 'Failed import cleared the current form');
       await page.evaluate(`document.querySelector('[aria-label="Dismiss save error"]').click()`);
       await click('Create season & import');
       await page.wait(`!document.querySelector('[aria-label="Found schedule"]') && document.querySelector('textarea[name="scheduleQuery"]').value===''`);
-      assert(await page.evaluate(`!Object.keys(sessionStorage).some(k=>k.startsWith('ticket-ai-import:'))`), 'Successful import retained the resumable search');
+      assert(await page.evaluate(`!Object.keys(sessionStorage).some(k=>k.startsWith('ticket-ai-import:'))`), 'AI Import saved a job in browser storage');
       await page.evaluate(`document.querySelector('button[aria-label="Teams"]').click()`);
       await page.wait(`document.querySelector('.work-setup-register tbody tr')`);
       await page.evaluate(`[...document.querySelectorAll('.work-setup-register tbody tr')].find(r=>r.textContent.includes('Demo schedule search')).click()`);
@@ -390,10 +390,24 @@ try {
       await screenshot('schedule-search');
       await click('Import selected games');
       await page.wait(`!document.querySelector('[aria-label="Found schedule"]') && document.querySelector('textarea[name="scheduleQuery"]').value===''`);
-      assert(await page.evaluate(`!Object.keys(sessionStorage).some(k=>k.startsWith('ticket-ai-import:'))`), 'Successful import retained the resumable search');
+      assert(await page.evaluate(`!Object.keys(sessionStorage).some(k=>k.startsWith('ticket-ai-import:'))`), 'AI Import saved a job in browser storage');
       await page.evaluate(`document.querySelector('button[aria-label="Seasons"]').click()`);
       await click('Import into this season');
       assert(await page.evaluate(`!document.querySelector('[aria-label="Found schedule"]') && document.querySelector('textarea[name="scheduleQuery"]').value===''`), 'Reopening AI Import restored the completed job');
+      await page.evaluate(`(async () => {
+        const source=await (await fetch('/src/review/SyntheticReview.tsx')).text();
+        const url=source.split('"').find(v=>v.startsWith('/src/review/demo.ts'));
+        const { demoProvider }=await import(url);
+        const job=await demoProvider.startScheduleSearch('coordinator', { query:'Old saved import', seasonId:'', ticketsPerEvent:2, homeOnly:true }, 'old-saved-import');
+        const id=demoProvider.snapshot('coordinator').persona.id;
+        window.legacyImportKey='ticket-ai-import:'+id+':'+demoProvider.snapshot('coordinator').seasons.find(s=>s.label==='QA 2027 season').id;
+        sessionStorage.setItem(window.legacyImportKey, job.id);
+      })()`);
+      await click('CSV import');
+      await click('AI Import', 'document.querySelector(".work-import-container>.work-subtoolbar")');
+      await page.wait(`document.querySelector('textarea[name="scheduleQuery"]') && !document.querySelector('.work-schedule-finder').textContent.includes('Preparing import')`);
+      assert(await page.evaluate(`!document.querySelector('[aria-label="Found schedule"]') && document.querySelector('textarea[name="scheduleQuery"]').value===''`), 'AI Import reopened a stored job');
+      await page.evaluate(`sessionStorage.removeItem(window.legacyImportKey)`);
       await click('CSV import');
       await set('textarea[name="scheduleCsv"]', 'wrong,columns\nexample,invalid');
       await click('Validate & preview');
@@ -663,7 +677,7 @@ try {
     await page.evaluate(`window.expirationRoot.unmount(); document.getElementById('expiration-check').remove(); document.getElementById('root').hidden=false; delete window.expirationProvider;`);
     assert.deepEqual(errors, [], `${design}: page errors`);
     assert.deepEqual(external, [], `${design}: external requests`);
-    results.push({ design, status: 'PASS', checks: ['no automatic initial selection', 'detail pane dismissal', 'no routine save banners', 'search', 'whole-row and keyboard selection', 'private inventory creation', 'interest', 'single self beneficiary follows requesting person', 'bounded saved contact selection', 'CRM search and recipient allocation', 'requester email', 'allocation', 'right-side allocation details', 'visible rejection reason', 'copy error diagnostics', 'legacy clipboard fallback', 'manual copy when clipboard is blocked', 'startup error diagnostics preserve connector status and request ID', 'startup retry refreshes copied error', 'contact history', ...(design === 'desk' ? ['team and season creation', 'web schedule preview and selected import', 'TBD game excluded', 'CSV fallback', 'iPad schedule search', 'independent detail scrolling'] : []), 'admin-only user access', 'role grant and reversal', 'group role assignment', 'connecting a directory group', 'requester navigation', 'iPad landscape', 'iPad portrait', 'bounded page scroll', 'requester inactive/history controls hidden', 'live event expiration closes interest', 'completed event history', 'attendance controls disabled before event day', 'same-day attendance before event start', 'team and season deletion with descendant counts', 'active allocations require explicit cancellation', 'successful AI import clears prompt preview and resumable job', 'failed AI import retains form for retry', 'individual game deletion', 'allocated team deletion preserves named history', 'file-only AI import', 'ambiguous recipient requires human mapping', 'reviewed allocation import and reset'], pageErrors: 0, externalRequests: 0 });
+    results.push({ design, status: 'PASS', checks: ['no automatic initial selection', 'detail pane dismissal', 'no routine save banners', 'search', 'whole-row and keyboard selection', 'private inventory creation', 'interest', 'single self beneficiary follows requesting person', 'bounded saved contact selection', 'CRM search and recipient allocation', 'requester email', 'allocation', 'right-side allocation details', 'visible rejection reason', 'copy error diagnostics', 'legacy clipboard fallback', 'manual copy when clipboard is blocked', 'startup error diagnostics preserve connector status and request ID', 'startup retry refreshes copied error', 'contact history', ...(design === 'desk' ? ['team and season creation', 'web schedule preview and selected import', 'TBD game excluded', 'CSV fallback', 'iPad schedule search', 'independent detail scrolling'] : []), 'admin-only user access', 'role grant and reversal', 'group role assignment', 'connecting a directory group', 'requester navigation', 'iPad landscape', 'iPad portrait', 'bounded page scroll', 'requester inactive/history controls hidden', 'live event expiration closes interest', 'completed event history', 'attendance controls disabled before event day', 'same-day attendance before event start', 'team and season deletion with descendant counts', 'active allocations require explicit cancellation', 'successful AI import clears prompt and preview', 'failed AI import retains form for retry', 'AI Import ignores legacy saved jobs and opens fresh', 'individual game deletion', 'allocated team deletion preserves named history', 'file-only AI import', 'ambiguous recipient requires human mapping', 'reviewed allocation import and reset'], pageErrors: 0, externalRequests: 0 });
     page.close();
     await browser.call('Target.closeTarget', { targetId });
   }

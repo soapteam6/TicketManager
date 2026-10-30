@@ -230,8 +230,8 @@ PDFs and images do not require a template. Unsupported/encrypted content must
 produce a warning rather than a silent partial import. For example, request
 VGK home games for next season, or attach a purchased-ticket tracker.
 Select **Prepare import**. No team, season or quantity is required first.
-Unpublished schedules produce an explained empty result. Other ticket work can
-continue while preparation runs.
+Unpublished schedules produce an explained empty result. Keep AI Import open while preparation runs; reopening it starts with a blank
+request rather than restoring an earlier job.
 
 After results arrive, review the resolved team/season and choose an existing
 season or the proposed new destination. Enter the number of tickets the company
@@ -287,7 +287,8 @@ File analysis uses one-request Claude message batches, polled every 30 seconds,
 to avoid Power Automate's 120-second synchronous HTTP limit. Up to three server-tool
 continuations are supported, each limited to one hour; file jobs expire in the
 app after four hours. Ordinary web-only searches retain their existing ten-minute
-lifetime. Files may take several minutes and continue when the user leaves Setup.
+lifetime. Files may take several minutes. The flow continues if the user leaves Setup,
+but the app intentionally does not restore that job or its preview.
 Only files/batches created by the current job are cleaned up in Claude; completed
 batch results and uploaded copies are deleted, unfinished batches are cancelled
 before cleanup. Native job Notes retain the submitted original for provenance.
@@ -375,7 +376,7 @@ Open **http://127.0.0.1:4173/** on the same machine. `review-dist/` is ignored. 
 - In Setup, select a team, season, game or event and choose its Delete button. The confirmation names the target and shows affected season, event/game and ticket counts. Cancelling leaves all records unchanged.
 - Deleting a team removes all its seasons/games from the app; deleting a season removes its games while keeping its team. Any request or allocation history, including cancelled records, blocks the whole operation. Native rows and IDs are retained; no bulk hard delete is performed.
 - Deleted groups disappear from Setup, dashboards and selectors and cannot accept new games, imports or season-scoped AI searches. Replacement teams/seasons can reuse their names.
-- Both Import selected games and Create season & import clear the prompt, preview, destination draft and resumable browser search on success. A failed import retains the form. Navigating away and back must not restore a completed preview.
+- Both Import selected games and Create season & import clear the prompt, preview and destination draft on success. A failed import retains the current form. AI Import never saves a job ID in browser storage or restores an earlier job; navigating away and back or reloading opens a blank request.
 - Verification: 127 frontend tests, 77 backend security tests and desktop/iPad browser checks covering team/season cascades, individual game deletion, confirmation cancellation, history protection and success/failure import resets. Live inventory is not deleted for testing.
 
 ## Event-day attendance checks (2026-10-30)
