@@ -32,5 +32,12 @@
   "ticketHistoryAndInventoryUnchanged": true,
   "userAndGroupAccessUnchanged": true,
   "newConnectionsCreated": 0,
-  "newPermissionsGranted": 0
+  "newPermissionsGranted": 0,
+  "backupServiceContactIneligible": true,
+  "backupServiceAccountAbsentFromPickers": true,
+  "backendMatchesLocalBuild": true,
+  "backendSha256": "21640dbe9ba062a135f53c960c4185cedd7fc0c2fc512be272e1a0a151ce2785",
+  "frontendTests": 105,
+  "backendTests": 62,
+  "desktopAndIPadBrowserChecks": "PASS"
 }
