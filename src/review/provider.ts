@@ -158,6 +158,8 @@ export class MockReviewProvider implements ReviewProvider {
         requestingPeople: new Set(demand.map((r) => r.requesterId)).size,
         requestedTickets: demand.reduce((sum, r) => sum + r.quantity, 0),
         seasonLabel: state.seasons.find((s) => s.id === g.seasonId)?.label,
+        seasonStartDate: state.seasons.find(s => s.id === g.seasonId)?.startDate,
+        seasonEndDate: state.seasons.find(s => s.id === g.seasonId)?.endDate,
         teamId: state.seasons.find((s) => s.id === g.seasonId)?.teamId,
         teamName: state.teams.find(t => t.id === state.seasons.find(s => s.id === g.seasonId)?.teamId)?.name,
       };
@@ -216,6 +218,7 @@ export class MockReviewProvider implements ReviewProvider {
       }));
     return structuredClone({
       mode: this.mode,
+      serverNow: new Date(now).toISOString(),
       persona: actor,
       catalog,
       requests,

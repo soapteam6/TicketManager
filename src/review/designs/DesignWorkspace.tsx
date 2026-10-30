@@ -15,7 +15,7 @@ import { SetupWorkspace } from './SetupWorkspace';
 import { UserAccess } from './UserAccess';
 
 const areas = [
-  { id: 'inventory', label: 'Event inventory', icon: 'inventory' },
+  { id: 'inventory', label: 'Events & Games inventory', icon: 'inventory' },
   { id: 'requests', label: 'Request queue', icon: 'requests' },
   { id: 'transfer', label: 'Allocations', icon: 'transfer' },
   { id: 'people', label: 'Contact register', icon: 'people' },

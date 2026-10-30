@@ -44,6 +44,7 @@ export interface Team {
   id: string;
   name: string;
   defaultTickets: number;
+  active?: boolean;
 }
 export interface Season {
   id: string;
@@ -51,6 +52,7 @@ export interface Season {
   label: string;
   startDate: string;
   endDate: string;
+  active?: boolean;
 }
 export interface Inventory {
   id: GameId;
@@ -172,6 +174,8 @@ export interface InventoryView extends Inventory, Demand {
   seasonLabel?: string;
   teamId?: string;
   teamName?: string;
+  seasonStartDate?: string;
+  seasonEndDate?: string;
 }
 export interface ContactOption {
   id: ContactId;
@@ -201,6 +205,7 @@ export interface InterestView {
   confirmedNoShows?: number;
 }
 export interface ReviewSnapshot {
+  serverNow?: string;
   mode: 'mock' | 'dataverse' | 'platform-unavailable';
   persona: Persona;
   catalog: InventoryView[];

@@ -1,4 +1,5 @@
 import type { InventoryView, ReviewSnapshot } from './types';
+import { activityDate, seasonIsActive, withSeasonActivity } from './seasonActivity';
 
 export type InventoryScope = { kind: 'season'; seasonId: string } | { kind: 'independent' };
 
@@ -17,6 +18,7 @@ export function inventoryTotals(games: InventoryView[]) {
 }
 
 export function inventoryHierarchy(snapshot: ReviewSnapshot) {
+  snapshot = withSeasonActivity(snapshot);
   const coordinator = snapshot.persona.role === 'coordinator';
   const teams = new Map((coordinator ? snapshot.teams : []).map(team => [team.id, team]));
   const seasons = new Map((coordinator ? snapshot.seasons : []).map(season => [season.id, season]));
@@ -26,13 +28,13 @@ export function inventoryHierarchy(snapshot: ReviewSnapshot) {
     if (!game.seasonId) continue;
     let season = seasons.get(game.seasonId);
     if (!season) {
-      season = { id: game.seasonId, teamId: game.teamId || `season:${game.seasonId}`, label: game.seasonLabel || 'Season', startDate: '', endDate: '' };
+      season = { id: game.seasonId, teamId: game.teamId || `season:${game.seasonId}`, label: game.seasonLabel || 'Season', startDate: game.seasonStartDate ?? '', endDate: game.seasonEndDate ?? '', active: seasonIsActive(game.seasonEndDate ?? '', activityDate(snapshot)) };
       seasons.set(season.id, season);
     }
     if (!teams.has(season.teamId)) teams.set(season.teamId, { id: season.teamId, name: game.teamName || 'Team inventory', defaultTickets: 0 });
   }
   return {
-    teams: [...teams.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    teams: [...teams.values()].map(team => ({ ...team, active: [...seasons.values()].some(season => season.teamId === team.id && season.active !== false) })).sort((a, b) => a.name.localeCompare(b.name)),
     seasons: [...seasons.values()].sort((a, b) => b.startDate.localeCompare(a.startDate) || b.label.localeCompare(a.label, undefined, { numeric: true })),
   };
 }

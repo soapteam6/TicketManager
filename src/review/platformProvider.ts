@@ -34,7 +34,7 @@ export class DataverseReviewProvider implements ReviewProvider {
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   revision = () => this.version;
   refresh = () => { this.version++; for (const listener of this.listeners) listener(); };
-  snapshot = (): ReviewSnapshot => structuredClone(this.current.snapshot);
+  snapshot = (): ReviewSnapshot => structuredClone({ ...this.current.snapshot, serverNow: this.current.serverNow });
   async reload() {
     this.accept(await this.loadSnapshot());
   }

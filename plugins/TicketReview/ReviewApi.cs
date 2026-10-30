@@ -404,6 +404,8 @@ namespace Ais.TicketReview
                 row["requestCount"] = requests.Count; row["requestingPeople"] = requests.Select(r => Str(r, "requesterId")).Distinct().Count(); row["requestedTickets"] = requests.Sum(r => (int)r["quantity"]);
                 var season = Rows(s, "seasons").FirstOrDefault(x => Str(x, "id") == Str(g, "seasonId"));
                 row["seasonLabel"] = season?["label"];
+                row["seasonStartDate"] = season?["startDate"];
+                row["seasonEndDate"] = season?["endDate"];
                 row["teamId"] = season?["teamId"];
                 row["teamName"] = Rows(s, "teams").FirstOrDefault(x => Str(x, "id") == Str(season, "teamId"))?["name"];
                 catalog.Add(row);

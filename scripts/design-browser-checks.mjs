@@ -103,12 +103,16 @@ try {
     };
     if (design === 'operations') await page.evaluate(`document.querySelector('.work-table tbody tr').cells[2].click()`);
     await screenshot('desktop');
-    await nav('Event inventory');
+    await nav('Events & Games inventory');
     await page.wait(`document.querySelector('[aria-label="Team dashboard"]')`);
     assert(await page.evaluate(`!document.querySelector('.work-table') && ![...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='+ New event')`));
     await screenshot('team-dashboard');
     await page.evaluate(`document.querySelector('[aria-label="View seasons for Synthetic Comets"]').click()`);
     await page.wait(`document.querySelector('[aria-label="Season dashboard"]')`);
+    assert(await page.evaluate(`!document.querySelector('[aria-label="View events for 2025–26 Demo"]')`), 'Finished season was not hidden');
+    await page.evaluate(`document.querySelector('[aria-label="Show inactive teams and seasons"]').click()`);
+    await page.wait(`document.querySelector('[aria-label="View events for 2025–26 Demo"]')`);
+    assert(await page.evaluate(`document.querySelector('[aria-label="View events for 2025–26 Demo"]').textContent.includes('inactive')`));
     assert(await page.evaluate(`document.querySelector('[aria-label="View events for 2026–27 Demo"]').textContent.includes('8')`));
     await screenshot('season-dashboard');
     await page.evaluate(`document.querySelector('[aria-label="View events for 2026–27 Demo"]').click()`);
@@ -117,7 +121,7 @@ try {
     await set('select[aria-label="Inventory period"]', 'all');
     assert(await page.evaluate(`document.querySelectorAll('.work-table tbody tr').length===3 && !document.querySelector('tbody').textContent.includes('Previous Season')`));
     await nav('Setup & import');
-    await page.evaluate(`document.querySelector('button[aria-label="Events"]').click()`);
+    await page.evaluate(`document.querySelector('button[aria-label="Events & Games"]').click()`);
     await click('+ New event');
     await page.wait(`document.querySelector('[aria-label="New event"] input[name="title"]')`);
     await set('[aria-label="New event"] input[name="title"]', 'QA removable event');
@@ -141,7 +145,7 @@ try {
     await set('[aria-label="New event"] input[name="tickets"]', '2');
     await click('Create private inventory');
     await page.wait(`!document.querySelector('[aria-label="New event"]')`);
-    await nav('Event inventory');
+    await nav('Events & Games inventory');
     await page.evaluate(`document.querySelector('[aria-label="View other events"]').click()`);
     await set('input[placeholder="Search events or seasons"]', 'Winter');
     await page.wait(`document.querySelectorAll('.work-table tbody tr').length===1`);
@@ -241,7 +245,9 @@ try {
       await screenshot('ai-import-prompt');
       await set('textarea[name="scheduleQuery"]', 'I got tickets for next season. Find their home schedule.');
       await page.evaluate(`(async () => {
-        const { demoProvider } = await import('/src/review/demo.ts');
+        const source = await (await fetch('/src/review/SyntheticReview.tsx')).text();
+        const demoUrl = source.split('"').find(value => value.startsWith('/src/review/demo.ts'));
+        const { demoProvider } = await import(demoUrl);
         const original = demoProvider.startScheduleSearch;
         demoProvider.startScheduleSearch = async function(...args) {
           demoProvider.startScheduleSearch = original;
@@ -281,12 +287,19 @@ try {
       await set('input[name="defaultTickets"]', '2');
       await click('Save team');
       await page.wait(`document.querySelector('[aria-label="Team details"] h3')?.textContent==='QA setup team'`);
+      assert(await page.evaluate(`document.querySelector('[aria-label="Team details"]').textContent.includes('inactive')`), 'New team without seasons was active');
       await click('Add a season');
       await set('input[name="seasonLabel"]', 'QA 2027 season');
       await set('input[name="seasonStart"]', '2027-01-01');
       await set('input[name="seasonEnd"]', '2027-12-31');
       await click('Save season');
       await page.wait(`document.querySelector('[aria-label="Season details"] h3')?.textContent==='QA 2027 season'`);
+      await click('Create game');
+      await page.wait(`document.querySelector('[aria-label="New event"] select[name="season"]')`);
+      assert(await page.evaluate(`document.querySelector('[aria-label="New event"] select[name="kind"]').value==='game' && document.querySelector('[aria-label="New event"] select[name="season"] option:checked').textContent.includes('QA 2027 season')`), 'Season did not preselect the new game');
+      await page.evaluate(`document.querySelector('[aria-label="Close event editor"]').click()`);
+      await page.evaluate(`document.querySelector('button[aria-label="Seasons"]').click()`);
+      await page.wait(`document.querySelector('[aria-label="Season details"]')`);
       await click('Import into this season');
       await page.evaluate(`document.querySelector('button[aria-label="AI Import"]').click()`);
       await set('textarea[name="scheduleQuery"]', 'Demo schedule 2027');
@@ -354,12 +367,12 @@ try {
     await page.wait(`!document.querySelector('nav[aria-label="Workspace navigation"]').textContent.includes('Contact register')`);
     await nav('Help');
     assert(await page.evaluate(`!document.querySelector('.work-help-list').textContent.includes('How do I make games?') && document.querySelector('.work-help-list').textContent.includes('How do I request tickets?')`));
-    await nav('Event inventory');
+    await nav('Events & Games inventory');
     await page.wait(`document.querySelector('[aria-label="Team dashboard"]')`);
     await page.evaluate(`document.querySelector('[aria-label="View seasons for Synthetic Comets"]').click()`);
     assert(await page.evaluate(`!document.querySelector('[aria-label="View events for 2025–26 Demo"]')`));
     await set('select[aria-label="Synthetic persona"]', 'coordinator');
-    await nav(design === 'desk' ? 'Request queue' : 'Event inventory');
+    await nav(design === 'desk' ? 'Request queue' : 'Events & Games inventory');
     await page.evaluate(`document.querySelector('.work-request-table tbody tr').cells[0].click()`);
     for (const [orientation, width, height] of [['landscape', 1024, 768], ['portrait', 768, 1024]]) {
       await page.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
@@ -368,7 +381,7 @@ try {
       assert(await page.evaluate(`document.documentElement.scrollWidth <= window.innerWidth`), `${design}: iPad ${orientation} horizontal page overflow`);
       assert(await page.evaluate(`document.documentElement.scrollHeight <= window.innerHeight + 1`), `${design}: iPad ${orientation} whole page scrolls`);
       if (design === 'desk') {
-        await nav('Event inventory');
+        await nav('Events & Games inventory');
         await page.wait(`document.querySelector('[aria-label="Team dashboard"]')`);
         assert(await page.evaluate(`document.documentElement.scrollWidth<=innerWidth && document.documentElement.scrollHeight<=innerHeight+1`), 'Inventory dashboard overflows iPad');
         await screenshot(`ipad-${orientation}-inventory-dashboard`);

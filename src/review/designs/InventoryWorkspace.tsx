@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useReview } from '../context';
 import { inventoryHierarchy, inventoryTotals, scopedInventory } from '../inventoryNavigation';
 import { InventoryGrid } from './InventoryGrid';
-import { EmptyRows, Glyph, Search } from './parts';
+import { EmptyRows, Glyph, Search, Status } from './parts';
 
 function TicketTotals({ totals }: { totals: ReturnType<typeof inventoryTotals> }) {
   return <span className="work-inventory-metrics">
@@ -19,9 +19,10 @@ export function InventoryWorkspace({ onRequests }: { onRequests: (gameId: string
   const [seasonId, setSeasonId] = useState('');
   const [independent, setIndependent] = useState(false);
   const [query, setQuery] = useState('');
+  const [showInactive, setShowInactive] = useState(false);
   const hierarchy = inventoryHierarchy(snapshot);
-  const team = hierarchy.teams.find(item => item.id === teamId);
-  const season = hierarchy.seasons.find(item => item.id === seasonId && item.teamId === team?.id);
+  const team = hierarchy.teams.find(item => item.id === teamId && (showInactive || item.active));
+  const season = hierarchy.seasons.find(item => item.id === seasonId && item.teamId === team?.id && (showInactive || item.active));
   function showTeams() { setTeamId(''); setSeasonId(''); setIndependent(false); setQuery(''); }
   function showTeam(id: string) { setTeamId(id); setSeasonId(''); setIndependent(false); setQuery(''); }
   const navigation = <nav className="work-inventory-navigation" aria-label="Inventory navigation">
@@ -33,31 +34,34 @@ export function InventoryWorkspace({ onRequests }: { onRequests: (gameId: string
     title={independent ? 'Other events' : season!.label} subtitle={independent ? 'Dated events without a sports season.' : team!.name}
     navigation={navigation} onRequests={onRequests} />;
 
-  const visibleTeams = hierarchy.teams.filter(item => item.name.toLowerCase().includes(query.toLowerCase()));
-  const visibleSeasons = hierarchy.seasons.filter(item => item.teamId === team?.id && item.label.toLowerCase().includes(query.toLowerCase()));
+  const visibleTeams = hierarchy.teams.filter(item => (showInactive || item.active) && item.name.toLowerCase().includes(query.toLowerCase()));
+  const visibleSeasons = hierarchy.seasons.filter(item => (showInactive || item.active) && item.teamId === team?.id && item.label.toLowerCase().includes(query.toLowerCase()));
   const otherGames = scopedInventory(snapshot.catalog, { kind: 'independent' });
   return <section className="work-surface work-inventory-dashboard" aria-label={team ? 'Season dashboard' : 'Team dashboard'}>
     {team && navigation}
-    <div className="work-section-heading"><div><h2>{team ? team.name : 'Event inventory'}</h2><p>{team ? 'Season inventory' : 'Teams & other events'}</p></div></div>
+    <div className="work-section-heading"><div><h2>{team ? team.name : 'Events & Games inventory'}</h2><p>{team ? 'Season inventory' : 'Teams & other events'}</p></div></div>
     <div className="work-toolbar"><Search value={query} onChange={setQuery} placeholder={team ? 'Search seasons' : 'Search teams'} />
-      <span className="work-toolbar-count">{team ? `${visibleSeasons.length} seasons` : `${visibleTeams.length} teams`}</span></div>
+      <label className="work-inactive-toggle"><input type="checkbox" aria-label="Show inactive teams and seasons" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} />Show inactive</label>
+      <span className="work-toolbar-count">{team ? `${visibleSeasons.length} ${visibleSeasons.length === 1 ? 'season' : 'seasons'}` : `${visibleTeams.length} ${visibleTeams.length === 1 ? 'team' : 'teams'}`}</span></div>
     <div className="work-dashboard-scroll">
       <ul className="work-inventory-cards">
         {team ? visibleSeasons.map(item => {
           const totals = inventoryTotals(scopedInventory(snapshot.catalog, { kind: 'season', seasonId: item.id }));
           return <li key={item.id}><button type="button" className="work-inventory-card" aria-label={`View events for ${item.label}`} onClick={() => { setSeasonId(item.id); setQuery(''); }}>
             <span className="work-inventory-card-title"><strong>{item.label}</strong><Glyph name="chevron" /></span>
+            {item.active === false && <span><Status value="inactive" /></span>}
             {(item.startDate || item.endDate) && <span className="work-inventory-card-description">{item.startDate} – {item.endDate}</span>}
             <TicketTotals totals={totals} />
             {totals.historical > 0 && <span className="work-inventory-card-description">{totals.historical} historical {totals.historical === 1 ? 'event' : 'events'}</span>}
           </button></li>;
         }) : <>
           {visibleTeams.map(item => {
-            const seasons = hierarchy.seasons.filter(entry => entry.teamId === item.id);
+            const seasons = hierarchy.seasons.filter(entry => entry.teamId === item.id && (showInactive || entry.active));
             const ids = new Set(seasons.map(entry => entry.id));
             const totals = inventoryTotals(snapshot.catalog.filter(game => game.seasonId && ids.has(game.seasonId)));
             return <li key={item.id}><button type="button" className="work-inventory-card" aria-label={`View seasons for ${item.name}`} onClick={() => showTeam(item.id)}>
               <span className="work-inventory-card-title"><strong>{item.name}</strong><Glyph name="chevron" /></span>
+              {item.active === false && <span><Status value="inactive" /></span>}
               <span className="work-inventory-card-description">{seasons.length} {seasons.length === 1 ? 'season' : 'seasons'}</span><TicketTotals totals={totals} />
             </button></li>;
           })}

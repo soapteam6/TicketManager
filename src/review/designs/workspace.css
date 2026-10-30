@@ -382,6 +382,9 @@
 .work-ai-target legend { padding-top:16px; font-size:12px; font-weight:600; }
 
 .work-dashboard-scroll,.work-change-scroll { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; padding:22px; }
+.work-inactive-toggle { display:flex; align-items:center; gap:8px; white-space:nowrap; color:var(--work-muted); font-size:12px; }
+.work-inactive-toggle input { accent-color:var(--work-accent); }
+.work-season-actions { display:grid; gap:10px; margin-top:20px; }
 .work-inventory-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; list-style:none; margin:0; padding:0; }
 .work-inventory-cards>li { min-width:0; }
 .work-inventory-card { display:flex; flex-direction:column; gap:9px; width:100%; height:100%; text-align:left; padding:20px; border:1px solid var(--work-border); border-radius:5px; background:white; }

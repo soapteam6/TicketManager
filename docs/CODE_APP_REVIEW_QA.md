@@ -37,6 +37,22 @@ applied environment changes, test evidence, roles, and remaining checks.
 
 ## Main UI
 
+Teams and seasons now have automatically derived app activity. A season stays
+active through its calendar end date in the viewer's local timezone; future
+seasons are active. A team is active when it has at least one active season.
+Empty teams and teams with only finished seasons are inactive. **Show inactive**
+is available in the team/season dashboards and in Setup's team/season registers.
+These calculations use the latest snapshot's server instant and are reevaluated
+on load/refresh, without writing on reads or creating a scheduled flow. They are
+app view status, not manual overrides of Dataverse's generic state/status fields.
+All records and historical inventory remain available when inactives are shown.
+
+Setup retains newly created inactive teams in view so **Add a season** is still
+reachable. Season details provide **Create game**, which opens the game editor
+with that season selected, **View events & games**, and schedule import.
+The navigation labels are **Events & Games** and **Events & Games inventory**.
+The Help guide and change timeline use the same names.
+
 The 2026-10-30 update adds **Help** for all roles, with searchable articles and a
 dated **What’s new** timeline. Coordinator/admin articles follow the user's role.
 Maintain `src/review/helpContent.ts` with a plain-language entry for every

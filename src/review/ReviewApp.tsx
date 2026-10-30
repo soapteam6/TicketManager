@@ -5,6 +5,7 @@ import { SaveErrorNotice } from './SaveErrorNotice';
 import { createErrorReport, type ErrorReport } from './errorReport';
 import { DesignWorkspace } from './designs/DesignWorkspace';
 import './designs/workspace.css';
+import { withSeasonActivity } from './seasonActivity';
 
 export function ReviewApp({ provider, onRefresh }: {
   provider: ReviewProvider;
@@ -15,7 +16,7 @@ export function ReviewApp({ provider, onRefresh }: {
   const [error, setError] = useState<ErrorReport | null>(null);
   const [errorTitle, setErrorTitle] = useState('Change not saved');
   useSyncExternalStore(provider.subscribe, provider.revision, provider.revision);
-  const snapshot = provider.snapshot(persona);
+  const snapshot = withSeasonActivity(provider.snapshot(persona));
   const live = provider.mode === 'dataverse';
   async function refresh(): Promise<boolean> {
     if (!live) { window.location.reload(); return true; }
