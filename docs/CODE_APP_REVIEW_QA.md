@@ -314,8 +314,9 @@ inventory was imported and workspace revision 18 was unchanged. An earlier
 current-season substitution was rejected; UTC conversion is now calculated in
 the client from source local fields. See [AI Import evidence](../solutions/ai-import-test.json).
 
-Local regression coverage now includes **86 frontend tests and 36 backend
-security tests**, plus the desktop and iPad preview/import checks. Requester
+Local regression coverage now includes **138 frontend tests, 84 backend
+security tests and 12 flow security checks**, plus desktop and iPad file-review
+and preview/import checks. Requester
 sign-in and human acceptance in the hosted app remain pending.
 
 ## Isolated synthetic regression testing

@@ -112,6 +112,16 @@ class FlowSecretTests(unittest.TestCase):
         self.assertEqual(flow["actions"]["Cleanup_private_batches"]["foreach"], "@variables('batchIds')")
         self.assertIn("Cleanup_private_batches", flow["actions"]["Delete_Claude_uploads"]["runAfter"])
 
+    def test_file_blocks_and_result_blocks_remain_arrays_in_workflow_expressions(self):
+        work = self.build("textEnvironmentVariable")["actions"]["Find_schedule"]["actions"]
+        branch = work["Choose_import_path"]["actions"]
+        messages = branch["Private_round_1"]["actions"]["Submit_private_1"]["inputs"]["body"]["requests"][0]["params"]["messages"]
+        self.assertIn("'content', union(createArray(", messages)
+        self.assertNotIn("'content', concat(", messages)
+        result = branch["Check_private_complete"]["actions"]["Save_private_result"]["inputs"]["parameters"]["item/cr9cd_result"]
+        self.assertIn("'content', union(", result)
+        self.assertNotIn("'content', concat(", result)
+
     def test_export_validation_covers_nested_private_calls_and_cleanup(self):
         for mode in ["textEnvironmentVariable", "secretEnvironmentVariable"]:
             assert_protected_actions(self.build(mode))

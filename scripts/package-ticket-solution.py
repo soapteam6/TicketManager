@@ -103,6 +103,9 @@ def inspect_schedule_search(archive, roots):
         if env.findtext("defaultvalue") or any("environmentvariablevalue" in n.lower() and search["credentialEnvironmentVariable"].lower() in n.lower() for n in archive.namelist() if n not in env_files):
             raise RuntimeError("Credential defaults/current values must not be packaged.")
     customizations = ET.fromstring(archive.read("customizations.xml"))
+    job_entities = [e for e in customizations.findall("./Entities/Entity") if e.findtext("Name") == search["jobTable"]]
+    if len(job_entities) != 1 or job_entities[0].findtext("EntityInfo/entity/HasRelatedNotes") != "True":
+        raise RuntimeError("The exported AI Import job table must include file attachments.")
     refs = {r.attrib["connectionreferencelogicalname"]: r for r in customizations.iter("connectionreference")}
     for name in ["cr9cd_ticketscheduledataverse"] + (["cr9cd_ticketscheduleclaude"] if legacy else []):
         if name not in refs or refs[name].find("connectionid") is not None:
@@ -126,7 +129,7 @@ def inspect_schedule_search(archive, roots):
     if any(re.search(rb"sk-ant-[A-Za-z0-9_-]{20,}", archive.read(n)) for n in archive.namelist() if not n.endswith("/")):
         raise RuntimeError("An API-key pattern was detected in the solution export; contents withheld.")
     return {"flowDefinitionMatchesSource": True, "credentialSource": search.get("credentialSource", "connection"),
-            "customConnectorRequired": legacy, "keyActionsMasked": not legacy,
+            "customConnectorRequired": legacy, "keyActionsMasked": not legacy, "fileAttachmentsIncluded": True,
             "apiKeyPatternsDetected": False, "currentCredentialValueExported": False, "liveConnectionsExported": False}
 
 

@@ -1,6 +1,6 @@
 """Run or inspect a schedule-search job as emikes@ais-now.com.
 
---create creates one public-web search job and consumes the existing Claude API
+--create creates one AI preparation job and consumes the existing Claude API
 service. It never imports inventory. Without --create, pass --job-id for polling.
 """
 import argparse
@@ -23,7 +23,10 @@ def main():
     parser.add_argument("--file", action="append", default=[], help="File to prepare with Claude; never imports ticket data.")
     parser.add_argument("--freeform", action="store_true", help="Resolve the requested season without imposing an existing one.")
     parser.add_argument("--artifact-stem", default="schedule-search-live")
+    parser.add_argument("--wait-seconds", type=int, default=300, help="Polling window; file batches can take longer than web-only searches.")
     args = parser.parse_args()
+    if not 1 <= args.wait_seconds <= 7200:
+        parser.error("Polling window must be between 1 and 7200 seconds.")
     if not re.fullmatch(r"[a-z0-9-]+", args.artifact_stem):
         parser.error("Artifact stem must contain only lowercase letters, numbers and hyphens.")
     if not args.create and not args.job_id:
@@ -48,7 +51,7 @@ def main():
     else:
         result = api({"operation": "scheduleSearchGet", "jobId": job_id})
     last = ""
-    deadline = time.monotonic() + 300
+    deadline = time.monotonic() + args.wait_seconds
     while True:
         if result["status"] != last:
             print("Search status: " + result["status"], flush=True)

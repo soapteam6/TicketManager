@@ -113,7 +113,7 @@ def definition(entity_set, connector_api="", credential_mode="textEnvironmentVar
         public_research["runAfter"] = {}
         # No private prompt, file bytes or Claude response ever enters a variable.
         # Each private continuation reads only earlier MASKED HTTP outputs.
-        user_message = "setProperty(json('{\"role\":\"user\"}'), 'content', concat(createArray(setProperty(json('{\"type\":\"text\"}'), 'text', " + prompt[1:] + ")), variables('userContent')))"
+        user_message = "setProperty(json('{\"role\":\"user\"}'), 'content', union(createArray(setProperty(json('{\"type\":\"text\"}'), 'text', " + prompt[1:] + ")), variables('userContent')))"
         # Each batch contains exactly one request. Polling avoids Power Automate's
         # two-minute synchronous HTTP limit for spreadsheet analysis. Private
         # content stays exclusively in masked HTTP/Dataverse actions.
@@ -142,7 +142,7 @@ def definition(entity_set, connector_api="", credential_mode="textEnvironmentVar
         pause2 = {"type": "If", "runAfter": {"Private_round_2": ["Succeeded"]}, "expression": {"equals": ["@json(trim(string(body('Private_Claude_2'))))?['result']?['message']?['stop_reason']", "pause_turn"]}, "actions": {"Private_round_3": calls[3]}, "else": {"actions": {}}}
         pause1 = {"type": "If", "runAfter": {"Private_round_1": ["Succeeded"]}, "expression": {"equals": ["@json(trim(string(body('Private_Claude_1'))))?['result']?['message']?['stop_reason']", "pause_turn"]}, "actions": {"Private_round_2": calls[2], "Private_pause_2": pause2}, "else": {"actions": {}}}
         final_reason = "if(equals(actions('Private_Claude_3')?['status'], 'Succeeded'), json(trim(string(body('Private_Claude_3'))))?['result']?['message']?['stop_reason'], if(equals(actions('Private_Claude_2')?['status'], 'Succeeded'), json(trim(string(body('Private_Claude_2'))))?['result']?['message']?['stop_reason'], json(trim(string(body('Private_Claude_1'))))?['result']?['message']?['stop_reason']))"
-        content = "concat(json(trim(string(body('Private_Claude_1'))))?['result']?['message']?['content'], if(equals(actions('Private_Claude_2')?['status'], 'Succeeded'), json(trim(string(body('Private_Claude_2'))))?['result']?['message']?['content'], json('[]')), if(equals(actions('Private_Claude_3')?['status'], 'Succeeded'), json(trim(string(body('Private_Claude_3'))))?['result']?['message']?['content'], json('[]')))"
+        content = "union(json(trim(string(body('Private_Claude_1'))))?['result']?['message']?['content'], if(equals(actions('Private_Claude_2')?['status'], 'Succeeded'), json(trim(string(body('Private_Claude_2'))))?['result']?['message']?['content'], json('[]')), if(equals(actions('Private_Claude_3')?['status'], 'Succeeded'), json(trim(string(body('Private_Claude_3'))))?['result']?['message']?['content'], json('[]')))"
         save = update({"cr9cd_status": "complete", "cr9cd_result": "@string(setProperty(setProperty(setProperty(json('{}'), 'content', " + content + "), 'stop_reason', " + final_reason + "), 'uploads', variables('uploadedFiles')))", "cr9cd_error": ""})
         save["runtimeConfiguration"] = secure
         private_check = {"type": "If", "runAfter": {"Private_pause_1": ["Succeeded"]}, "expression": {"equals": ["@" + final_reason, "end_turn"]}, "actions": {"Save_private_result": save}, "else": {"actions": {"Private_incomplete": update({"cr9cd_status": "failed", "cr9cd_error": "The file preparation did not finish. Try fewer files or a narrower request."})}}}

@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import { build } from 'esbuild';
 
+process.on('uncaughtException', error => { console.error(error.message); process.exitCode = 1; });
+
 const stem = process.argv[2] || 'schedule-search-live';
 assert(/^[a-z0-9-]+$/.test(stem));
 const result = JSON.parse(await readFile(`design-artifacts.local/${stem}.json`, 'utf8'));
