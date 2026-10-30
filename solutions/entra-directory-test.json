@@ -29,5 +29,8 @@
   "ticketHistoryAndInventoryUnchanged": true,
   "userAndGroupAccessUnchanged": true,
   "newConnectionsCreated": 0,
-  "newPermissionsGranted": 0
+  "newPermissionsGranted": 0,
+  "backendAssemblyMatchesLocalBuild": true,
+  "backendAssemblySha256": "c98cab6ea733c97d495aaff80a1919ac5a16e8a762dd007a37b6c20de36ac00a",
+  "bothSolutionExportsMatchDeployedBackend": true
 }

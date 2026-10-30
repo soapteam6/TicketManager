@@ -143,6 +143,9 @@ verifier confirmed existing IDs, app eligibility overrides, categories, ticket
 history/inventory, customer records and all user/group role projections were
 preserved. No new connection or permission grant was made. Aggregate evidence:
 [`entra-directory-test.json`](../solutions/entra-directory-test.json).
+The contact-register UI was published to AIS Ticket Manager on the same date.
+Both solution exports match the production UI build and deployed signed backend
+byte for byte. Existing credential-value exclusion checks also passed.
 
 ## Web schedule search
 
