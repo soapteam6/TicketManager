@@ -6,11 +6,12 @@ import { Button, Field, FormError, Select, TextArea, TextInput } from '../ui';
 import { EmptyRows, Glyph, Status } from './parts';
 import { rowSelection } from './rowSelection';
 import { ScheduleFinder } from './ScheduleFinder';
+import { EventSetup } from './EventSetup';
 import { CopyErrorButton } from '../CopyErrorButton';
 import { createErrorReport, type ErrorReport } from '../errorReport';
 
 const example = 'date,time,title,tickets,kind\n2027-01-10,03:00,Example home game,4,game\n2027-01-15,02:00,Example performance,2,event';
-type Section = 'teams' | 'seasons' | 'import';
+type Section = 'teams' | 'seasons' | 'events' | 'import';
 
 export function SetupWorkspace() {
   const { snapshot, provider, persona, run, busy } = useReview();
@@ -33,12 +34,14 @@ export function SetupWorkspace() {
   const sections = [
     { id: 'teams' as const, label: 'Teams', hint: 'Ticket defaults & seasons', count: snapshot.teams.length },
     { id: 'seasons' as const, label: 'Seasons', hint: 'Calendar boundaries', count: snapshot.seasons.length },
+    { id: 'events' as const, label: 'Events', hint: 'Add, edit & remove', count: snapshot.catalog.length },
     { id: 'import' as const, label: 'AI Import', hint: 'Describe what you need', count: null },
   ];
   return <section className="work-surface work-setup">
     <div className="work-section-heading"><div><h2>Setup & import</h2><p>Configure one area at a time. Review records before saving.</p></div></div>
     <div className="work-setup-body">
       <nav className="work-setup-navigation" aria-label="Setup sections">{sections.map(item => <button type="button" key={item.id} aria-label={item.label} aria-current={section === item.id ? 'page' : undefined} onClick={() => changeSection(item.id)}><span>{item.label}{item.count !== null && <small>{item.count}</small>}</span><span>{item.hint}</span></button>)}<p>New inventory starts private. Importing a schedule never sends an announcement.</p></nav>
+      {section === 'events' && <EventSetup />}
       {section === 'teams' && <div className={`work-setup-section ${(creating || team) ? 'has-inspector' : ''}`}>
         <div className="work-setup-register"><div className="work-subtoolbar"><h3>Team register</h3><Button onClick={() => setCreating(true)}>+ New team</Button></div><div className="work-table-scroll"><table className="work-table"><thead><tr><th>Team</th><th className="numeric">Default tickets</th><th className="numeric">Seasons</th></tr></thead><tbody>{snapshot.teams.map(t => <tr key={t.id} className={!creating && team?.id === t.id ? 'is-selected' : ''} {...rowSelection(!creating && team?.id === t.id, () => { setTeamId(t.id); setCreating(false); })}><td>{t.name}</td><td className="numeric">{t.defaultTickets}</td><td className="numeric">{snapshot.seasons.filter(s => s.teamId === t.id).length}</td></tr>)}</tbody></table>{!snapshot.teams.length && <EmptyRows>Add a team to configure sports seasons.</EmptyRows>}</div></div>
         {(creating || team) && <aside className="work-setup-editor" aria-label="Team details">{creating ? <>

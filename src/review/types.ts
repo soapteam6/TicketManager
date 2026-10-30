@@ -62,6 +62,7 @@ export interface Inventory {
   status: 'scheduled' | 'completed' | 'cancelled';
   release: 'private' | 'released' | 'scheduled';
   releaseAt: string | null;
+  removed?: boolean;
 }
 export interface Seat {
   id: string;
@@ -169,6 +170,8 @@ export interface InventoryView extends Inventory, Demand {
   availableTickets: number;
   released: boolean;
   seasonLabel?: string;
+  teamId?: string;
+  teamName?: string;
 }
 export interface ContactOption {
   id: ContactId;
@@ -269,6 +272,8 @@ export type ReviewCommand =
       tickets: number;
       seasonId?: string;
     }
+  | { type: 'editInventory'; gameId: GameId; kind: Inventory['kind']; title: string; gameDate: string; tickets: number; seasonId?: string; status: Inventory['status'] }
+  | { type: 'removeInventory'; gameId: GameId }
   | { type: 'importSchedule'; csv: string; seasonId: string; newSeason?: { teamId: string; teamName: string; label: string; startDate: string; endDate: string; defaultTickets: number } }
   | ReleaseCommand
   | {

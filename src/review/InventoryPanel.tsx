@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Modal } from '../components/Modal';
 import { useReview } from './context';
-import { localDateTimeInputToIso, timeZoneLabel } from './dates';
+import { isoToLocalDateTimeInput, localDateTimeInputToIso, timeZoneLabel } from './dates';
 import { PERSONAS } from './fixtures';
 import { personName } from './personName';
-import type { InventoryView, ReleaseCommand } from './types';
+import type { Inventory, InventoryView, ReleaseCommand } from './types';
 import {
   Badge,
   Button,
@@ -17,11 +17,13 @@ import {
   TextInput,
 } from './ui';
 import { dateTime, number, value } from './form';
+import { scopedWindowIds } from './inventoryNavigation';
 
-export function InventoryForm({ close }: { close: () => void }) {
+export function InventoryForm({ close, defaultSeasonId = '', game }: { close: () => void; defaultSeasonId?: string; game?: InventoryView }) {
   const { snapshot, run, busy } = useReview(),
-    [kind, setKind] = useState<'game' | 'event'>('event');
-  const [seasonId, setSeasonId] = useState('');
+    [kind, setKind] = useState<'game' | 'event'>(game?.kind ?? (defaultSeasonId ? 'game' : 'event'));
+  const [seasonId, setSeasonId] = useState(game?.seasonId ?? defaultSeasonId);
+  const hasHistory = !!game && (snapshot.requests.some(r => r.gameId === game.id) || snapshot.allocations?.some(a => a.gameId === game.id));
   const selectedTeam = snapshot.teams.find(
     (t) => t.id === snapshot.seasons.find((s) => s.id === seasonId)?.teamId,
   );
@@ -33,12 +35,12 @@ export function InventoryForm({ close }: { close: () => void }) {
         const form = new FormData(e.currentTarget);
         if (
           await run(() => ({
-            type: 'createInventory',
+            ...(game ? { type: 'editInventory' as const, gameId: game.id, status: value(form, 'status') as Inventory['status'] } : { type: 'createInventory' as const }),
             kind,
             title: value(form, 'title'),
             gameDate: localDateTimeInputToIso(value(form, 'date')),
             tickets: number(form, 'tickets'),
-            seasonId: kind === 'game' ? value(form, 'season') : undefined,
+            seasonId: kind === 'game' ? seasonId : undefined,
           }))
         )
           close();
@@ -47,6 +49,7 @@ export function InventoryForm({ close }: { close: () => void }) {
       <FormError />
       <Field label="Inventory type">
         <Select
+          name="kind" disabled={hasHistory}
           value={kind}
           onChange={(e) => setKind(e.target.value as 'game' | 'event')}
         >
@@ -55,12 +58,13 @@ export function InventoryForm({ close }: { close: () => void }) {
         </Select>
       </Field>
       <Field label="Title / opponent" required>
-        <TextInput name="title" required maxLength={200} />
+        <TextInput name="title" defaultValue={game?.title} required maxLength={200} />
       </Field>
       {kind === 'game' && (
         <Field label="Season" required>
           <Select
             name="season"
+            disabled={hasHistory}
             value={seasonId}
             onChange={(e) => setSeasonId(e.target.value)}
             required
@@ -77,7 +81,7 @@ export function InventoryForm({ close }: { close: () => void }) {
       )}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={`Event date and time (${timeZoneLabel()})`} required>
-          <TextInput name="date" type="datetime-local" required />
+          <TextInput name="date" type="datetime-local" defaultValue={game ? isoToLocalDateTimeInput(game.gameDate) : undefined} required />
         </Field>
         <Field label="Ticket inventory" required>
           <TextInput
@@ -88,22 +92,20 @@ export function InventoryForm({ close }: { close: () => void }) {
             max={1000}
             step={1}
             defaultValue={
-              kind === 'game' ? (selectedTeam?.defaultTickets ?? 4) : 4
+              game?.totalTickets ?? (kind === 'game' ? (selectedTeam?.defaultTickets ?? 4) : 4)
             }
             required
           />
         </Field>
       </div>
-      <p className="text-sm text-slate-600">
-        Creates private inventory. No requests, releases or messages are sent
-        automatically.
-      </p>
+      {game && <Field label="Event status"><Select name="status" defaultValue={game.status}><option value="scheduled">Scheduled</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></Select></Field>}
+      <p className="text-sm text-slate-600">{game ? 'Existing requests and allocation history are retained. Tickets with allocation history cannot be removed.' : 'Creates private inventory. Release it separately in Event inventory.'}</p>
       <div className="flex justify-end gap-2">
         <Button type="button" variant="secondary" onClick={close}>
           Cancel
         </Button>
         <Button type="submit" disabled={busy}>
-          Create private inventory
+          {game ? 'Save event' : 'Create private inventory'}
         </Button>
       </div>
     </form>
@@ -284,11 +286,13 @@ export function InterestForm({
 export function ReleasePanel({
   selected,
   clear,
+  inventoryIds,
 }: {
   selected: string[];
   clear: () => void;
+  inventoryIds?: string[];
 }) {
-  const { run, busy } = useReview(),
+  const { run, busy, snapshot } = useReview(),
     [scope, setScope] = useState('selected'),
     [action, setAction] = useState<ReleaseCommand['action']>('released');
   return (
@@ -306,7 +310,7 @@ export function ReleasePanel({
               type: 'release',
               ...(scope === 'selected'
                 ? { ids: selected }
-                : {
+                : inventoryIds ? { ids: scopedWindowIds(snapshot.catalog, inventoryIds, localDateTimeInputToIso(value(form, 'from')), localDateTimeInputToIso(value(form, 'through'))) } : {
                     from: localDateTimeInputToIso(value(form, 'from')),
                     through: localDateTimeInputToIso(value(form, 'through')),
                   }),

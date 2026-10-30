@@ -16,9 +16,9 @@ export function PeopleRegister() {
   const [selectedId, setSelectedId] = useState<string>();
   const [editing, setEditing] = useState<Contact | null | undefined>();
   const contacts = (snapshot.contacts ?? []).filter(c =>
-    (type === 'all' || c.type === type) && `${c.name} ${c.email} ${c.company} ${c.phone}`.toLowerCase().includes(query.toLowerCase()),
+    (c.type !== 'employee' || c.directoryActive) && (type === 'all' || c.type === type) && `${c.name} ${c.email} ${c.company} ${c.phone}`.toLowerCase().includes(query.toLowerCase()),
   ).sort((a, b) => personName(a.name).localeCompare(personName(b.name)));
-  const selected = snapshot.contacts?.find(c => c.id === selectedId);
+  const selected = contacts.find(c => c.id === selectedId);
   const allocations = (snapshot.allocations ?? []).filter(a => a.contactId === selectedId);
   return <section className="work-surface">
     <div className="work-section-heading"><div><h2>Contact register</h2><p>Employee eligibility, customer details and cross-season allocation history.</p></div><Button onClick={() => setEditing(null)}>+ Customer contact</Button></div>

@@ -37,6 +37,37 @@ applied environment changes, test evidence, roles, and remaining checks.
 
 ## Main UI
 
+The 2026-10-30 update adds **Help** for all roles, with searchable articles and a
+dated **What’s new** timeline. Coordinator/admin articles follow the user's role.
+Maintain `src/review/helpContent.ts` with a plain-language entry for every
+user-visible release; update affected articles when workflows change.
+
+**Event inventory** opens with team cards, then season cards with scheduled
+ticket/availability totals, then the existing event table scoped to that season.
+Other events holds dated events without a season. Historical events remain
+available using Include history. Requester cards/counts derive only from their
+released catalog. Date-window visibility changes stay inside the selected scope.
+
+Manual creation, editing and removal moved to **Setup & import → Events**.
+Coordinators can update event details, status and ticket quantity. Allocation
+history protects occupied/historical tickets from removal, and requests or
+allocations protect an event from removal or changing its type/season. Removing
+an unused event hides a retained record; it does not delete the event's native
+row. A capacity reduction deletes only unused ticket rows without allocation
+references. Cancelling an event requires cancelling active allocations first.
+
+Directory-inactive employee contacts are hidden from Contact register. Manually
+deactivated app eligibility stays visible so it can be reactivated. Customer
+contacts and historical names in requests/allocations remain available. Disabled
+status reflects the latest Entra sync; this change does not run another sync.
+
+Validation for this update: 99 frontend tests, 58 backend security tests,
+TypeScript/production build and changed-source lint pass. Synthetic browser
+checks cover desktop and both iPad orientations, team/season isolation,
+requester privacy, Setup event creation/edit/removal, Help articles/timeline and
+hidden directory-inactive contacts. No live event edits/removals are made by
+publication verification.
+
 Allocation desk (B) is the only UI, available at `#/` and `#/review`. The layout
 comparison bar and alternate-layout routes have been removed. Old bookmarks
 redirect to the main workspace. The isolated synthetic preview uses this same UI. Refresh progress and a brief Updated confirmation appear on the refresh button. Decorative page and list footers have been removed.

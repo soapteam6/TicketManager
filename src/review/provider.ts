@@ -139,10 +139,10 @@ export class MockReviewProvider implements ReviewProvider {
       state = this.state;
     const visible = state.games.filter(
       (g) =>
-        admin ||
+        !g.removed && (admin ||
         (released(g, now) &&
           g.status === 'scheduled' &&
-          instant(g.gameDate) > now),
+          instant(g.gameDate) > now)),
     );
     const catalog = visible.map((g) => {
       const demand = state.requests.filter(
@@ -158,6 +158,8 @@ export class MockReviewProvider implements ReviewProvider {
         requestingPeople: new Set(demand.map((r) => r.requesterId)).size,
         requestedTickets: demand.reduce((sum, r) => sum + r.quantity, 0),
         seasonLabel: state.seasons.find((s) => s.id === g.seasonId)?.label,
+        teamId: state.seasons.find((s) => s.id === g.seasonId)?.teamId,
+        teamName: state.teams.find(t => t.id === state.seasons.find(s => s.id === g.seasonId)?.teamId)?.name,
       };
     });
     const requests = state.requests
@@ -400,6 +402,38 @@ export class MockReviewProvider implements ReviewProvider {
             'Inventory created privately. Release and announcements are separate choices.',
         };
         break;
+      }
+      case 'editInventory': {
+        const game = next.games.find(g => g.id === command.gameId && !g.removed);
+        if (!game) invalid('Event not found');
+        text(command.title, 'an event title', 200); instant(command.gameDate); integer(command.tickets, 0, 1000, 'Ticket inventory');
+        if (!['game', 'event'].includes(command.kind) || !['scheduled', 'completed', 'cancelled'].includes(command.status)) invalid('Choose a valid event type and status');
+        const seasonId = command.kind === 'game' ? command.seasonId ?? '' : null;
+        if (command.kind === 'game' && !next.seasons.some(s => s.id === seasonId)) invalid('Choose a season');
+        const allocations = next.allocations.filter(a => a.gameId === game.id);
+        const hasHistory = allocations.length > 0 || next.requests.some(r => r.gameId === game.id);
+        if (hasHistory && (game.kind !== command.kind || game.seasonId !== seasonId)) invalid('An event with request or allocation history cannot change type or season.');
+        if (command.status === 'cancelled' && allocations.some(active)) invalid('Cancel active allocations before cancelling this event.');
+        if ((command.status === 'completed' || allocations.some(a => a.outcome !== 'unknown')) && instant(command.gameDate) > now) invalid('Completed events or confirmed attendance cannot be in the future.');
+        if (next.games.some(g => g.id !== game.id && !g.removed && g.title === command.title.trim() && instant(g.gameDate) === instant(command.gameDate))) invalid('Duplicate dated inventory.');
+        const seats = next.seats.filter(s => s.gameId === game.id);
+        const protectedIds = new Set(allocations.map(a => a.seatId));
+        const removable = seats.filter(s => s.status === 'available' && !protectedIds.has(s.id));
+        if (seats.length - command.tickets > removable.length) invalid('Ticket quantity cannot be reduced below tickets with allocation history.');
+        const removed = new Set(removable.slice(0, Math.max(0, seats.length - command.tickets)).map(s => s.id));
+        next.seats = next.seats.filter(s => !removed.has(s.id));
+        let label = Math.max(0, ...seats.map(s => Number(s.label.match(/\d+$/)?.[0] ?? 0)));
+        for (let i = seats.length; i < command.tickets; i++) next.seats.push({ id: this.id(), gameId: game.id, label: `Ticket ${++label}`, status: 'available' });
+        Object.assign(game, { title: command.title.trim(), gameDate: command.gameDate, kind: command.kind, seasonId, totalTickets: command.tickets, status: command.status });
+        if (command.status !== 'scheduled') { game.release = 'private'; game.releaseAt = null; }
+        result = { message: 'Event updated.' }; break;
+      }
+      case 'removeInventory': {
+        const game = next.games.find(g => g.id === command.gameId && !g.removed);
+        if (!game) invalid('Event not found');
+        if (next.requests.some(r => r.gameId === game.id) || next.allocations.some(a => a.gameId === game.id)) invalid('Events with requests or allocations cannot be removed.');
+        Object.assign(game, { removed: true, status: 'cancelled', release: 'private', releaseAt: null });
+        result = { message: 'Event removed from inventory.' }; break;
       }
       case 'importSchedule': {
         let targetSeason = command.seasonId;
@@ -880,7 +914,7 @@ export class MockReviewProvider implements ReviewProvider {
     if (
       state.games.some(
         (g) =>
-          g.title === input.title.trim() &&
+          !g.removed && g.title === input.title.trim() &&
           instant(g.gameDate) === instant(input.gameDate),
       )
     )

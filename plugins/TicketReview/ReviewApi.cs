@@ -218,6 +218,8 @@ namespace Ais.TicketReview
                     var season = new JObject { ["id"] = NewId(), ["teamId"] = c["teamId"], ["label"] = Text(c, "label", 200), ["startDate"] = c["startDate"], ["endDate"] = c["endDate"] };
                     Add(s, "seasons", season); result["id"] = season["id"]; break;
                 case "createInventory": result["id"] = AddInventory(s, c); break;
+                case "editInventory": EditInventory(s, c, now); break;
+                case "removeInventory": RemoveInventory(s, Str(c, "gameId")); break;
                 case "importSchedule":
                     var importSeasonId = Str(c, "seasonId");
                     if (c["newSeason"] is JObject draft) {
@@ -346,7 +348,7 @@ namespace Ais.TicketReview
             var title = Text(c, "title", 200); var date = Instant(Str(c, "gameDate")); var tickets = Number(c, "tickets", 0, 1000); var kind = Str(c, "kind");
             Check(kind == "game" || kind == "event", "Choose game or event.");
             if (kind == "game") Find(s, "seasons", Str(c, "seasonId"));
-            Check(!Rows(s, "games").Any(g => Str(g, "title") == title && Instant(Str(g, "gameDate")) == date), "Duplicate dated inventory.");
+            Check(!Rows(s, "games").Any(g => (bool?)g["removed"] != true && Str(g, "title") == title && Instant(Str(g, "gameDate")) == date), "Duplicate dated inventory.");
             var id = NewId(); Add(s, "games", new JObject { ["id"] = id, ["kind"] = kind, ["title"] = title, ["seasonId"] = kind == "game" ? c["seasonId"] : JValue.CreateNull(),
                 ["gameDate"] = date.ToString("o"), ["totalTickets"] = tickets, ["status"] = "scheduled", ["release"] = "private", ["releaseAt"] = JValue.CreateNull() });
             for (var i = 0; i < tickets; i++) Add(s, "seats", new JObject { ["id"] = NewId(), ["gameId"] = id, ["label"] = "Ticket " + (i + 1), ["status"] = "available" });
@@ -396,11 +398,15 @@ namespace Ais.TicketReview
                 identities = service.RetrieveMultiple(query).Entities.ToDictionary(u => u.Id.ToString());
             }
             var catalog = new JArray();
-            foreach (var g in Rows(s, "games").Where(g => admin || Released(g, now) && Str(g, "status") == "scheduled" && Instant(Str(g, "gameDate")) > now)) {
+            foreach (var g in Rows(s, "games").Where(g => (bool?)g["removed"] != true && (admin || Released(g, now) && Str(g, "status") == "scheduled" && Instant(Str(g, "gameDate")) > now))) {
                 var row = (JObject)g.DeepClone(); var id = Str(g, "id"); var requests = Rows(s, "requests").Where(r => Str(r, "gameId") == id && Active(r)).ToList();
                 row["released"] = Released(g, now); row["availableTickets"] = Rows(s, "seats").Count(x => Str(x, "gameId") == id && Str(x, "status") == "available");
                 row["requestCount"] = requests.Count; row["requestingPeople"] = requests.Select(r => Str(r, "requesterId")).Distinct().Count(); row["requestedTickets"] = requests.Sum(r => (int)r["quantity"]);
-                row["seasonLabel"] = Rows(s, "seasons").FirstOrDefault(x => Str(x, "id") == Str(g, "seasonId"))?["label"]; catalog.Add(row);
+                var season = Rows(s, "seasons").FirstOrDefault(x => Str(x, "id") == Str(g, "seasonId"));
+                row["seasonLabel"] = season?["label"];
+                row["teamId"] = season?["teamId"];
+                row["teamName"] = Rows(s, "teams").FirstOrDefault(x => Str(x, "id") == Str(season, "teamId"))?["name"];
+                catalog.Add(row);
             }
             var projected = new JArray();
             foreach (var r in Rows(s, "requests").Where(r => admin || Str(r, "requesterId") == actorId)) {
@@ -441,6 +447,12 @@ namespace Ais.TicketReview
 
         private static void Persist(IOrganizationService service, JObject before, JObject after)
         {
+            var retainedSeats = new HashSet<string>(Rows(after, "seats").Select(row => Str(row, "id")));
+            var deletedSeats = Rows(before, "seats").Where(row => !retainedSeats.Contains(Str(row, "id"))).ToList();
+            foreach (var seat in deletedSeats) {
+                Check(Str(seat, "status") == "available" && !Read(service, "cr9cd_assignment", new ConditionExpression("cr9cd_seat", ConditionOperator.Equal, Guid.Parse(Str(seat, "id")))).Any(),
+                    "A ticket with allocation history cannot be removed.");
+            }
             foreach (var pair in Tables) {
                 var old = Rows(before, pair.Key).ToDictionary(x => Str(x, "id"));
                 foreach (var row in Rows(after, pair.Key)) {
@@ -450,6 +462,9 @@ namespace Ais.TicketReview
                     else { Check(!Read(service, pair.Value, new ConditionExpression(pair.Value + "id", ConditionOperator.Equal, Guid.Parse(id))).Any(), "Fixture ID collides with existing data."); service.Create(entity); }
                 }
             }
+            // Only unused ticket rows removed by a capacity edit are deleted.
+            // Events themselves are retained and hidden with a removal marker.
+            foreach (var seat in deletedSeats) service.Delete(Tables["seats"], Guid.Parse(Str(seat, "id")));
         }
         private static void Ref(Entity e, string field, string table, JToken value) { var id = (string)value; if (!String.IsNullOrEmpty(id)) e[field] = new EntityReference(table, Guid.Parse(id)); }
         private static void Choice(Entity e, string field, string value, params string[] choices) { var index = Array.IndexOf(choices, value); Check(index >= 0, "Invalid choice for " + field); e[field] = new OptionSetValue(100000000 + index); }
@@ -459,7 +474,7 @@ namespace Ais.TicketReview
             switch (key) {
                 case "teams": e["cr9cd_default_tickets_per_game"] = (int)r["defaultTickets"]; break;
                 case "seasons": Ref(e, "cr9cd_team", "cr9cd_team", r["teamId"]); e["cr9cd_start_date"] = DateTime.Parse(Str(r, "startDate"), CultureInfo.InvariantCulture); e["cr9cd_end_date"] = DateTime.Parse(Str(r, "endDate"), CultureInfo.InvariantCulture); Choice(e, "cr9cd_status", "active", "draft", "active", "archived", "completed"); break;
-                case "games": Ref(e, "cr9cd_season", "cr9cd_season", r["seasonId"]); e["cr9cd_game_date"] = Instant(Str(r, "gameDate")).UtcDateTime; e["cr9cd_title"] = Str(r, "title"); e["cr9cd_opponent"] = Str(r, "kind") == "game" ? Str(r, "title") : ""; e["cr9cd_total_seats"] = (int)r["totalTickets"]; Choice(e, "cr9cd_kind", Str(r, "kind"), "game", "event"); Choice(e, "cr9cd_status", Str(r, "status"), "scheduled", "transfer_pending", "completed", "cancelled"); break;
+                case "games": e["cr9cd_season"] = String.IsNullOrEmpty(Str(r, "seasonId")) ? null : new EntityReference("cr9cd_season", Guid.Parse(Str(r, "seasonId"))); e["cr9cd_game_date"] = Instant(Str(r, "gameDate")).UtcDateTime; e["cr9cd_title"] = Str(r, "title"); e["cr9cd_opponent"] = Str(r, "kind") == "game" ? Str(r, "title") : ""; e["cr9cd_total_seats"] = (int)r["totalTickets"]; Choice(e, "cr9cd_kind", Str(r, "kind"), "game", "event"); Choice(e, "cr9cd_status", Str(r, "status"), "scheduled", "transfer_pending", "completed", "cancelled"); break;
                 case "seats": Ref(e, "cr9cd_game", "cr9cd_game", r["gameId"]); e["cr9cd_seat_number"] = Str(r, "label"); Choice(e, "cr9cd_status", Str(r, "status"), "available", "held", "assigned", "transferred", "cancelled"); break;
                 case "contacts": e["cr9cd_name"] = "[QA] " + Str(r, "name"); e["cr9cd_company"] = Str(r, "company"); e["cr9cd_email"] = Str(r, "email"); e["cr9cd_phone"] = Str(r, "phone"); Choice(e, "cr9cd_type", Str(r, "type"), "customer", "employee"); Choice(e, "cr9cd_value_tier", Str(r, "tier"), "platinum", "gold", "silver", "bronze", "prospect"); break;
                 case "requests": Ref(e, "cr9cd_game", "cr9cd_game", r["gameId"]); Ref(e, "cr9cd_beneficiary_contact", "cr9cd_contact_beneficiary", r["contactIds"]?.First); e["cr9cd_quantity"] = (int)r["quantity"]; e["cr9cd_narrative"] = Str(r, "rationale"); e["cr9cd_crm_opportunity_name"] = Str(r, "opportunity"); Choice(e, "cr9cd_beneficiary_type", Str(r, "purpose"), "customer", "employee"); Choice(e, "cr9cd_status", Str(r, "status"), "submitted", "scored", "recommended", "approved", "partially_fulfilled", "fulfilled", "waitlisted", "declined", "cancelled"); break;

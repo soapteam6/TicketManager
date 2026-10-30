@@ -6,7 +6,8 @@ import { personName } from '../personName';
 import type { PersonaKey } from '../types';
 import { ScoringPanel, MessagesPanel } from '../SettingsPanels';
 import { AllocationRegister } from './AllocationRegister';
-import { InventoryGrid } from './InventoryGrid';
+import { InventoryWorkspace } from './InventoryWorkspace';
+import { HelpWorkspace } from './HelpWorkspace';
 import { PeopleRegister } from './PeopleRegister';
 import { RequestQueue } from './RequestQueue';
 import { Glyph } from './parts';
@@ -22,6 +23,7 @@ const areas = [
   { id: 'scoring', label: 'Scoring policy', icon: 'scoring' },
   { id: 'messages', label: 'Message previews', icon: 'messages' },
   { id: 'access', label: 'User access', icon: 'people' },
+  { id: 'help', label: 'Help', icon: 'help' },
 ] as const;
 type Area = typeof areas[number]['id'];
 
@@ -40,7 +42,7 @@ export function DesignWorkspace({ onRefresh, onPersona }: {
     const timer = window.setTimeout(() => setRefreshState('idle'), 1600);
     return () => window.clearTimeout(timer);
   }, [refreshState]);
-  const permitted = (id: Area) => id === 'access' ? !!snapshot.persona.isAppAdmin : admin || ['inventory', 'requests'].includes(id);
+  const permitted = (id: Area) => id === 'access' ? !!snapshot.persona.isAppAdmin : admin || ['inventory', 'requests', 'help'].includes(id);
   const effectiveArea = permitted(area) ? area : 'inventory';
   const visibleAreas = areas.filter(a => permitted(a.id));
   const pending = snapshot.requests.filter(r => !['fulfilled', 'cancelled'].includes(r.status)).length;
@@ -62,7 +64,7 @@ export function DesignWorkspace({ onRefresh, onPersona }: {
     <div className="work-app-body">
       <main className="work-main">
         {!live && <label className="work-demo-persona">Preview role<select aria-label="Synthetic persona" value={persona} onChange={e => onPersona(e.target.value as PersonaKey)}>{Object.values(PERSONAS).map(p => <option key={p.key} value={p.key}>{p.name}</option>)}</select></label>}
-        {effectiveArea === 'inventory' && <InventoryGrid onRequests={id => { setGameId(id); setArea('requests'); }} />}
+        {effectiveArea === 'inventory' && <InventoryWorkspace onRequests={id => { setGameId(id); setArea('requests'); }} />}
         {effectiveArea === 'requests' && <RequestQueue desk gameId={gameId} onGameChange={setGameId} />}
         {admin && effectiveArea === 'transfer' && <AllocationRegister />}
         {admin && effectiveArea === 'people' && <PeopleRegister />}
@@ -70,6 +72,7 @@ export function DesignWorkspace({ onRefresh, onPersona }: {
         {admin && effectiveArea === 'scoring' && <div className="work-embedded"><ScoringPanel /></div>}
         {admin && effectiveArea === 'messages' && <div className="work-embedded"><MessagesPanel /></div>}
         {snapshot.persona.isAppAdmin && effectiveArea === 'access' && <UserAccess />}
+        {effectiveArea === 'help' && <HelpWorkspace onNavigate={destination => { if (destination === 'requests') setGameId(''); setArea(destination); }} />}
       </main>
     </div>
   </div>;

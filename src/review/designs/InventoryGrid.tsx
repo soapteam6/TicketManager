@@ -1,13 +1,16 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Modal } from '../../components/Modal';
 import { useReview } from '../context';
 import { dateTime } from '../form';
-import { InterestForm, InventoryForm, ReleasePanel } from '../InventoryPanel';
+import { InterestForm, ReleasePanel } from '../InventoryPanel';
 import { Button } from '../ui';
 import { Capacity, EmptyRows, Glyph, Search, Status } from './parts';
 import { rowSelection } from './rowSelection';
+import { scopedInventory, type InventoryScope } from '../inventoryNavigation';
 
-export function InventoryGrid({ onRequests }: { onRequests: (gameId: string) => void }) {
+export function InventoryGrid({ onRequests, scope, title, subtitle, navigation }: {
+  onRequests: (gameId: string) => void; scope: InventoryScope; title: string; subtitle: string; navigation: ReactNode;
+}) {
   const { snapshot, busy } = useReview();
   const admin = snapshot.persona.role === 'coordinator';
   const [query, setQuery] = useState('');
@@ -16,21 +19,21 @@ export function InventoryGrid({ onRequests }: { onRequests: (gameId: string) => 
   const [descending, setDescending] = useState(false);
   const [focusedId, setFocusedId] = useState<string>();
   const [selected, setSelected] = useState<string[]>([]);
-  const [creating, setCreating] = useState(false);
   const [interestId, setInterestId] = useState<string>();
   const [releaseIds, setReleaseIds] = useState<string[] | null>(null);
-  const games = snapshot.catalog.filter(g =>
+  const inventory = scopedInventory(snapshot.catalog, scope);
+  const games = inventory.filter(g =>
     `${g.title} ${g.seasonLabel ?? ''}`.toLowerCase().includes(query.toLowerCase()) &&
     (period === 'all' || g.status === period) &&
     (visibility === 'all' || (visibility === 'released' ? g.released : !g.released && g.release === visibility)),
   ).sort((a, b) => (Date.parse(a.gameDate) - Date.parse(b.gameDate)) * (descending ? -1 : 1));
-  const focused = snapshot.catalog.find(g => g.id === focusedId);
-  const interest = snapshot.catalog.find(g => g.id === interestId);
+  const focused = inventory.find(g => g.id === focusedId);
+  const interest = inventory.find(g => g.id === interestId);
   const allSelected = games.length > 0 && games.every(g => selected.includes(g.id));
   const partial = !allSelected && games.some(g => selected.includes(g.id));
   return <section className="work-surface">
-    <div className="work-section-heading"><div><h2>Event inventory</h2><p>Manage capacity, visibility and demand across the schedule.</p></div>
-      {admin && <Button onClick={() => setCreating(true)}>+ New event</Button>}</div>
+    {navigation}
+    <div className="work-section-heading"><div><h2>{title}</h2><p>{subtitle}</p></div></div>
     <div className="work-toolbar">
       <Search value={query} onChange={setQuery} placeholder="Search events or seasons" />
       <select aria-label="Inventory period" value={period} onChange={e => setPeriod(e.target.value)}><option value="scheduled">Scheduled events</option><option value="all">Include history</option></select>
@@ -65,8 +68,7 @@ export function InventoryGrid({ onRequests }: { onRequests: (gameId: string) => 
         <p className="work-help">Interest adds to demand. Only a coordinator allocation reduces availability.</p>
       </aside>}
     </div>
-    <Modal open={creating} onClose={() => setCreating(false)} title="New private event"><InventoryForm close={() => setCreating(false)} /></Modal>
     <Modal open={Boolean(interest)} onClose={() => setInterestId(undefined)} title="Record ticket interest">{interest && <InterestForm key={interest.id} game={interest} close={() => setInterestId(undefined)} />}</Modal>
-    <Modal open={releaseIds !== null} onClose={() => setReleaseIds(null)} title="Set inventory visibility" size="lg">{releaseIds && <ReleasePanel selected={releaseIds} clear={() => { setReleaseIds(null); setSelected([]); }} />}</Modal>
+    <Modal open={releaseIds !== null} onClose={() => setReleaseIds(null)} title="Set inventory visibility" size="lg">{releaseIds && <ReleasePanel selected={releaseIds} inventoryIds={inventory.map(game => game.id)} clear={() => { setReleaseIds(null); setSelected([]); }} />}</Modal>
   </section>;
 }

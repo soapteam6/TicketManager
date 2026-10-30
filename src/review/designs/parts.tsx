@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useReview } from '../context';
 
-export function Glyph({ name, size = 18 }: { name: 'inventory' | 'requests' | 'transfer' | 'people' | 'setup' | 'scoring' | 'messages' | 'refresh' | 'check' | 'search' | 'chevron' | 'close'; size?: number }) {
+export function Glyph({ name, size = 18 }: { name: 'inventory' | 'requests' | 'transfer' | 'people' | 'setup' | 'scoring' | 'messages' | 'refresh' | 'check' | 'search' | 'chevron' | 'close' | 'help'; size?: number }) {
   const paths = {
     inventory: 'M3 5h18v15H3zM3 10h18M8 3v4m8-4v4M7 14h3m4 0h3',
     requests: 'M6 3h12v18H6zM9 8h6m-6 4h6m-6 4h4',
@@ -15,6 +15,7 @@ export function Glyph({ name, size = 18 }: { name: 'inventory' | 'requests' | 't
     search: 'M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0',
     chevron: 'm9 5 7 7-7 7',
     close: 'm6 6 12 12M6 18 18 6',
+    help: 'M12 17h.01M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2-3 4m9-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0',
   };
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name]} /></svg>;
 }
