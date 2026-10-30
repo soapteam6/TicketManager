@@ -53,6 +53,13 @@ with that season selected, **View events & games**, and schedule import.
 The navigation labels are **Events & Games** and **Events & Games inventory**.
 The Help guide and change timeline use the same names.
 
+Published on 2026-10-30 as `emikes@ais-now.com`. Live read-only verification found
+4 retained seasons (2 finished) and 3 retained teams (1 with no active seasons),
+with workspace revision still 21. The deployed signed backend matches the local
+build. Validation: 105 frontend tests, 58 backend tests, production build,
+changed-source lint and desktop/iPad browser checks pass. See
+[activity verification](../solutions/season-activity-test.json).
+
 The 2026-10-30 update adds **Help** for all roles, with searchable articles and a
 dated **What’s new** timeline. Coordinator/admin articles follow the user's role.
 Maintain `src/review/helpContent.ts` with a plain-language entry for every

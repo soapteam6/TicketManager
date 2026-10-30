@@ -1,0 +1,18 @@
+{
+  "verifiedAtUtc": "2026-10-30T15:26:01.432863+00:00",
+  "authenticatedAs": "emikes@ais-now.com",
+  "activityMode": "derived per local calendar date on snapshot load/refresh",
+  "dateUsed": "2026-10-30",
+  "workspaceRevision": 21,
+  "seasonRecords": 4,
+  "inactiveSeasons": 2,
+  "teamRecords": 3,
+  "inactiveTeams": 1,
+  "seasonDatesProjectedToCatalog": true,
+  "backendMatchesBuild": true,
+  "backendSha256": "47d42b40fc1ae6530965c6ca4d04e7addc63c213b291efdf18f9f4700a180a36",
+  "liveBusinessDataMutations": 0,
+  "frontendTests": 105,
+  "backendTests": 58,
+  "desktopAndIPadBrowserChecks": "PASS"
+}
