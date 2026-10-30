@@ -320,6 +320,15 @@ npm run preview:review
 
 Open **http://127.0.0.1:4173/** on the same machine. `review-dist/` is ignored. Never serve the normal `dist/` bundle for mock QA: it contains the existing SDK entry.
 
+## Requester and CRM checks (2026-10-30)
+
+- In Record interest, Requesting person uses active employee contacts from the same register, with email addresses. Coordinators can record on behalf of an Entra employee who has no Dataverse user. The authenticated coordinator remains the recorder; role assignments are unchanged.
+- Choose Employee / self: exactly one beneficiary appears, automatically following Requesting person. There is no employee checkbox directory. Inactive or missing employee contacts prevent submission.
+- For customer interest, choose CRM contacts, search an active parent business, and select its active contacts. Results are bounded (10 businesses / 25 contacts); refine by name or email. Selected contacts remain visible in a separately scrolling summary. Saved contacts remains available.
+- CRM browsing is read-only. Saving interest creates or reuses local customer beneficiaries in the same Dataverse transaction as the request. Existing inactive overrides and coordinator edits remain intact. Allocate from Request queue, then complete the manual transfer as usual.
+- Regression checks cover requester ownership by Entra identity, recording attribution, single-person self requests, CRM deduplication, mixed-business rejection, inactive contacts, rollback and allocation. Directory filtering was not changed and no whitelist was added.
+- Local verification: 112 frontend tests, 69 backend security tests, production build, targeted lint and desktop/iPad browser checks. The synthetic browser exercises CRM selection through allocation without external calls. Live read-only CRM account/contact filters were checked as `emikes@ais-now.com`; live requests and allocations were not created for testing.
+
 ## Fixtures, personas and reset
 
 All records are invented: Synthetic Comets, Juniper Example Labs, Cobalt Sample Studio, `.invalid` email addresses, 555 phone numbers and GUIDs generated for fixtures. Sports dates are examples, not verified real schedules.

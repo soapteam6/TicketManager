@@ -3,7 +3,7 @@ import { ReviewError } from './provider';
 import { rankReviewState } from './ranking';
 import { previewScheduleCsv } from './schedule';
 import { createSnapshotLoader } from './workspaceLoading';
-import type { CommandResult, PersonaKey, ReviewCommand, ReviewProvider, ReviewSnapshot, ReviewState, ScheduleSearchJob, ScheduleSearchRequest } from './types';
+import type { CommandResult, CrmDirectory, PersonaKey, ReviewCommand, ReviewProvider, ReviewSnapshot, ReviewState, ScheduleSearchJob, ScheduleSearchRequest } from './types';
 
 export interface PlatformResponse {
   revision: number;
@@ -25,11 +25,13 @@ export class DataverseReviewProvider implements ReviewProvider {
   private transport: PlatformTransport;
   private loadSnapshot: () => Promise<PlatformResponse>;
   private searchTransport?: ScheduleSearchTransport;
-  constructor(transport: PlatformTransport, initial: PlatformResponse, searchTransport?: ScheduleSearchTransport) {
+  readonly crm?: CrmDirectory;
+  constructor(transport: PlatformTransport, initial: PlatformResponse, searchTransport?: ScheduleSearchTransport, crm?: CrmDirectory) {
     this.transport = transport;
     this.loadSnapshot = createSnapshotLoader(transport);
     this.current = initial;
     this.searchTransport = searchTransport;
+    this.crm = crm;
   }
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   revision = () => this.version;

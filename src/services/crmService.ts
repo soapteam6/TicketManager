@@ -51,6 +51,7 @@ async function listRecords<T = Record<string, unknown>>(entityName: string, sele
     undefined,
     top
   );
+  if (!result.success) throw new Error('CRM search failed. Check your Dataverse connection and CRM access.', { cause: result.error });
   const value = (result.data as { value?: T[] } | undefined)?.value;
   return value ?? [];
 }
@@ -66,7 +67,7 @@ export async function searchAccounts(query: string): Promise<CrmAccountSummary[]
   }>(
     'accounts',
     'name,accountid,_ownerid_value',
-    `contains(name, '${escapeODataString(query)}') and ais_isparent eq true`,
+    `contains(name, '${escapeODataString(query.trim())}') and ais_isparent eq true and statecode eq 0`,
     10
   );
   return rows.map((a) => ({
@@ -76,14 +77,16 @@ export async function searchAccounts(query: string): Promise<CrmAccountSummary[]
   }));
 }
 
-export async function listContactsForAccount(accountId: string): Promise<CrmContactSummary[]> {
+export async function listContactsForAccount(accountId: string, query = ''): Promise<CrmContactSummary[]> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(accountId)) throw new Error('Choose a CRM business.');
+  const term = escapeODataString(query.trim());
   const rows = await listRecords<{
     contactid: string;
     fullname?: string;
     emailaddress1?: string;
     telephone1?: string;
     jobtitle?: string;
-  }>('contacts', 'contactid,fullname,emailaddress1,telephone1,jobtitle', `_parentcustomerid_value eq ${accountId}`);
+  }>('contacts', 'contactid,fullname,emailaddress1,telephone1,jobtitle', `_parentcustomerid_value eq ${accountId} and statecode eq 0${term ? ` and (contains(fullname,'${term}') or contains(emailaddress1,'${term}'))` : ''}`);
   return rows.map((c) => ({
     id: c.contactid,
     fullName: c.fullname ?? '(no name)',

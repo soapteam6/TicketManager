@@ -83,11 +83,18 @@ export interface Contact {
   appActive: boolean;
   directoryActive: boolean;
   directoryId: string | null;
+  crmContactId?: string;
+  crmAccountId?: string;
+  crmOrganization?: string;
 }
 export interface Interest {
   id: RequestId;
   gameId: GameId;
   requesterId: string;
+  requesterDirectoryId?: string;
+  requesterContactId?: string;
+  requesterName?: string;
+  requesterEmail?: string;
   recordedBy: string;
   purpose: ContactType;
   contactIds: ContactId[];
@@ -290,6 +297,8 @@ export type ReviewCommand =
       rationale: string;
       opportunity?: string;
       onBehalfOf?: string;
+      onBehalfContactId?: ContactId;
+      crmContacts?: CrmBeneficiary[];
     }
   | { type: 'waitlist'; requestId: RequestId }
   | { type: 'allocate'; requestId: RequestId; quantity: number; reason: string }
@@ -321,8 +330,18 @@ export interface CommandResult {
   message: string;
   id?: string;
 }
+export interface CrmAccount { id: string; name: string; ownerName: string | null }
+export interface CrmPerson { id: string; fullName: string; email?: string; phone?: string; title?: string }
+export interface CrmBeneficiary {
+  contactId: string; accountId: string; accountName: string; name: string; email: string; phone: string;
+}
+export interface CrmDirectory {
+  searchAccounts(query: string): Promise<CrmAccount[]>;
+  searchContacts(accountId: string, query: string): Promise<CrmPerson[]>;
+}
 export interface ReviewProvider {
   readonly mode: ReviewSnapshot['mode'];
+  readonly crm?: CrmDirectory;
   subscribe(listener: () => void): () => void;
   revision(): number;
   refresh(): void;

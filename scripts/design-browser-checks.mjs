@@ -152,10 +152,28 @@ try {
     await set('input[placeholder="Search events or seasons"]', '');
     await click(`QA layout ${design}`);
     await click('Record interest');
-    await page.wait(`document.querySelector('[role="dialog"] select[name="onBehalfOf"]')`);
+    await page.wait(`document.querySelector('[role="dialog"] select[name="onBehalfContactId"]')`);
+    await set('[role="dialog"] select[name="purpose"]', 'employee');
+    await page.wait(`document.querySelector('[aria-label="Employee beneficiary"]')?.textContent.includes('Demo Coordinator')`);
+    assert(await page.evaluate(`document.querySelectorAll('[role="dialog"] input[type="checkbox"]').length===0`), 'Self interest displayed the employee directory');
+    await set('[role="dialog"] select[name="onBehalfContactId"]', '00000004-0000-4000-8000-000000000005');
+    assert(await page.evaluate(`document.querySelector('[aria-label="Employee beneficiary"]').textContent.includes('employee@example.invalid') && !document.querySelector('[aria-label="Employee beneficiary"]').textContent.includes('coordinator@example.invalid')`), 'Self beneficiary did not follow requesting person');
+    await screenshot('self-interest');
+    await set('[role="dialog"] select[name="onBehalfContactId"]', '');
+    await set('[role="dialog"] select[name="purpose"]', 'customer');
+    await set('[role="dialog"] select[name="contactSource"]', 'saved');
     await page.evaluate(`(() => { const select=[...document.querySelectorAll('[role="dialog"] select')].find(s=>[...s.options].some(o=>o.value==='Juniper Example Labs')); select.value='Juniper Example Labs';select.dispatchEvent(new Event('change',{bubbles:true})); })()`);
     await page.wait(`document.querySelector('[role="dialog"] input[name="contacts"]')`);
     await page.evaluate(`document.querySelector('[role="dialog"] input[name="contacts"]').click()`);
+    assert(await page.evaluate(`document.querySelector('[aria-label="Selected saved contacts"]').textContent.includes('Alex Sample')`));
+    await set('[role="dialog"] select[name="contactSource"]', 'crm');
+    await set('input[placeholder="Search parent businesses (at least 2 characters)"]', 'Juniper');
+    await page.wait(`document.querySelector('[aria-label="CRM business results"] button')`);
+    await page.evaluate(`document.querySelector('[aria-label="CRM business results"] button').click()`);
+    await page.wait(`document.querySelector('[aria-label="CRM contact results"] input')`);
+    await page.evaluate(`document.querySelector('[aria-label="CRM contact results"] input').click()`);
+    assert(await page.evaluate(`document.querySelector('[aria-label="Selected CRM contacts"]').textContent.includes('Casey CRM Example')`));
+    await screenshot('crm-interest');
     await set('[role="dialog"] input[name="quantity"]', '2');
     await set('[role="dialog"] textarea[name="rationale"]', 'QA layout interaction test.');
     await click('Record interest', 'document.querySelector(\'[role="dialog"]\')');
@@ -226,7 +244,7 @@ try {
     await page.evaluate(`document.querySelector('[aria-label="Dismiss save error"]').click()`);
     await nav('Contact register');
     assert(await page.evaluate(`!document.querySelector('tbody').textContent.includes('Directory Inactive Example')`));
-    await set('input[placeholder="Search name, email, business or phone"]', 'alex@example.invalid');
+    await set('input[placeholder="Search name, email, business or phone"]', 'casey@example.invalid');
     await page.wait(`document.querySelectorAll('.work-table tbody tr').length===1`);
     await page.evaluate(`document.querySelector('.work-table tbody tr').cells[1].click()`);
     await page.wait(`document.querySelector('[aria-label="Contact history"]')?.textContent.includes('QA layout ${design}')`);
@@ -489,7 +507,7 @@ try {
     await page.evaluate(`window.startupRoot.unmount(); document.getElementById('startup-error-check').remove(); document.getElementById('root').hidden = false;`);
     assert.deepEqual(errors, [], `${design}: page errors`);
     assert.deepEqual(external, [], `${design}: external requests`);
-    results.push({ design, status: 'PASS', checks: ['no automatic initial selection', 'detail pane dismissal', 'no routine save banners', 'search', 'whole-row and keyboard selection', 'private inventory creation', 'interest', 'requester email', 'allocation', 'right-side allocation details', 'visible rejection reason', 'copy error diagnostics', 'legacy clipboard fallback', 'manual copy when clipboard is blocked', 'startup error diagnostics preserve connector status and request ID', 'startup retry refreshes copied error', 'contact history', ...(design === 'desk' ? ['team and season creation', 'web schedule preview and selected import', 'TBD game excluded', 'CSV fallback', 'iPad schedule search', 'independent detail scrolling'] : []), 'admin-only user access', 'role grant and reversal', 'group role assignment', 'connecting a directory group', 'requester navigation', 'iPad landscape', 'iPad portrait', 'bounded page scroll'], pageErrors: 0, externalRequests: 0 });
+    results.push({ design, status: 'PASS', checks: ['no automatic initial selection', 'detail pane dismissal', 'no routine save banners', 'search', 'whole-row and keyboard selection', 'private inventory creation', 'interest', 'single self beneficiary follows requesting person', 'bounded saved contact selection', 'CRM search and recipient allocation', 'requester email', 'allocation', 'right-side allocation details', 'visible rejection reason', 'copy error diagnostics', 'legacy clipboard fallback', 'manual copy when clipboard is blocked', 'startup error diagnostics preserve connector status and request ID', 'startup retry refreshes copied error', 'contact history', ...(design === 'desk' ? ['team and season creation', 'web schedule preview and selected import', 'TBD game excluded', 'CSV fallback', 'iPad schedule search', 'independent detail scrolling'] : []), 'admin-only user access', 'role grant and reversal', 'group role assignment', 'connecting a directory group', 'requester navigation', 'iPad landscape', 'iPad portrait', 'bounded page scroll'], pageErrors: 0, externalRequests: 0 });
     page.close();
     await browser.call('Target.closeTarget', { targetId });
   }

@@ -9,6 +9,7 @@ import logoUrl from '../assets/ais-logo.webp?inline';
 import type { ScheduleSearchJob } from './types';
 import { CopyErrorButton } from './CopyErrorButton';
 import { createErrorReport, type ErrorReport } from './errorReport';
+import { searchAccounts, listContactsForAccount } from '../services/crmService';
 
 const callApi = async (payload: Record<string, unknown>): Promise<unknown> => {
   const response = await MicrosoftDataverseService.PerformUnboundActionWithOrganization(
@@ -29,7 +30,7 @@ export function PlatformReview() {
   useEffect(() => {
     let active = true;
     loadSnapshot().then(initial => {
-      if (active) { setProvider(new DataverseReviewProvider(transport, initial, async payload => await callApi(payload) as ScheduleSearchJob)); setError(null); }
+      if (active) { setProvider(new DataverseReviewProvider(transport, initial, async payload => await callApi(payload) as ScheduleSearchJob, { searchAccounts, searchContacts: listContactsForAccount })); setError(null); }
     }).catch(err => { if (active) setError(createErrorReport(err, 'Load workspace', workspaceLoadMessage(err))); });
     return () => { active = false; };
   }, [attempt]);

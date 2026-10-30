@@ -16,6 +16,7 @@ export const PERSONAS: Record<'coordinator' | 'rep' | 'employee', Persona> = {
     email: 'coordinator@example.invalid',
     role: 'coordinator',
     isAppAdmin: true,
+    directoryId: 'directory-coordinator',
   },
   rep: {
     key: 'rep',
@@ -55,6 +56,10 @@ export const DIRECTORY: DirectoryEntry[] = [
     email: 'inactive@example.invalid',
     phone: '+1 202 555 0104',
     active: false,
+  },
+  {
+    id: 'directory-coordinator', name: 'Demo Coordinator', email: 'coordinator@example.invalid',
+    phone: '+1 202 555 0101', active: true,
   },
 ];
 export const GUID = (group: number, number: number) =>

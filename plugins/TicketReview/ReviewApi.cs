@@ -258,19 +258,14 @@ namespace Ais.TicketReview
                     Check(IsAdmin(actor) || Released(game, now), "Inventory is private.");
                     var quantity = Number(c, "quantity", 1, 100); var purpose = Str(c, "purpose");
                     Check(purpose == "customer" || purpose == "employee", "Choose a purpose.");
-                    var contacts = ((JArray)c["contactIds"]).Values<string>().Distinct().Select(id => Find(s, "contacts", id)).ToList();
+                    Check(IsAdmin(actor) || Str(actor, "key") != "employee" || purpose == "employee", "Employees request for self.");
+                    var requester = InterestRequester(service, s, actor, c);
+                    var contacts = InterestCrmContacts(s, c);
+                    if (contacts.Count == 0) contacts = ((JArray)c["contactIds"]).Values<string>().Distinct().Select(id => Find(s, "contacts", id)).ToList();
                     Check(contacts.Count > 0 && contacts.Count <= quantity && contacts.All(x => Eligible(x) && Str(x, "type") == purpose), "Select eligible contacts matching the purpose.");
                     Check(purpose != "customer" || contacts.Select(x => Str(x, "company")).Distinct().Count() == 1, "Select contacts from one business.");
-                    Check(IsAdmin(actor) || String.IsNullOrEmpty(Str(c, "onBehalfOf")), "Only coordinators enter interest on behalf.");
-                    Check(IsAdmin(actor) || Str(actor, "key") != "employee" || purpose == "employee", "Employees request for self.");
-                    Check(IsAdmin(actor) || purpose != "employee" || contacts.All(x => Str(x, "directoryId") == Str(actor, "directoryId")), "Employee interest must be for yourself.");
-                    var requester = String.IsNullOrEmpty(Str(c, "onBehalfOf")) ? Str(actor, "id") : Str(c, "onBehalfOf");
-                    Check(Guid.TryParse(requester, out var requesterId), "Choose a Dataverse requesting user.");
-                    var user = service.Retrieve("systemuser", requesterId, new ColumnSet("isdisabled", "azureactivedirectoryobjectid"));
-                    Check(!user.GetAttributeValue<bool>("isdisabled"), "Requesting user is disabled.");
-                    var requesterDirectory = user.GetAttributeValue<Guid>("azureactivedirectoryobjectid").ToString();
-                    Check(!Rows(s, "contacts").Any(x => Str(x, "type") == "employee" && Str(x, "directoryId") == requesterDirectory && !Eligible(x)), "Requesting person is inactive.");
-                    var interest = new JObject { ["id"] = NewId(), ["gameId"] = game["id"], ["requesterId"] = requester, ["recordedBy"] = actor["id"],
+                    Check(purpose != "employee" || contacts.Count == 1 && String.Equals(Str(contacts[0], "directoryId"), Str(requester, "directoryId"), StringComparison.OrdinalIgnoreCase), "Employee interest must have only the requesting person as beneficiary.");
+                    var interest = new JObject { ["id"] = NewId(), ["gameId"] = game["id"], ["requesterId"] = requester["id"], ["requesterDirectoryId"] = requester["directoryId"], ["requesterContactId"] = requester["contactId"], ["requesterName"] = requester["name"], ["requesterEmail"] = requester["email"], ["recordedBy"] = actor["id"],
                         ["purpose"] = purpose, ["contactIds"] = new JArray(contacts.Select(x => Str(x, "id"))), ["quantity"] = quantity,
                         ["rationale"] = Text(c, "rationale"), ["opportunity"] = Str(c, "opportunity").Trim(), ["status"] = "submitted", ["createdAt"] = now.ToString("o") };
                     Add(s, "requests", interest); result["id"] = interest["id"]; result["message"] = "Interest saved. No tickets reserved."; break;
@@ -390,10 +385,10 @@ namespace Ais.TicketReview
         {
             var admin = IsAdmin(actor); var actorId = Str(actor, "id");
             var identities = new Dictionary<string, Entity>();
-            if (admin) {
+            {
                 var ids = Rows(s, "requests").SelectMany(r => new[] { Str(r, "requesterId"), Str(r, "recordedBy") })
                     .Concat(new[] { actorId }).Where(id => Guid.TryParse(id, out _)).Select(Guid.Parse).Distinct().Cast<object>().ToArray();
-                var query = new QueryExpression("systemuser") { ColumnSet = new ColumnSet("fullname", "internalemailaddress") };
+                var query = new QueryExpression("systemuser") { ColumnSet = new ColumnSet("fullname", "internalemailaddress", "azureactivedirectoryobjectid") };
                 query.Criteria.AddCondition(new ConditionExpression("systemuserid", ConditionOperator.In, ids));
                 identities = service.RetrieveMultiple(query).Entities.ToDictionary(u => u.Id.ToString());
             }
@@ -401,7 +396,7 @@ namespace Ais.TicketReview
             foreach (var g in Rows(s, "games").Where(g => (bool?)g["removed"] != true && (admin || Released(g, now) && Str(g, "status") == "scheduled" && Instant(Str(g, "gameDate")) > now))) {
                 var row = (JObject)g.DeepClone(); var id = Str(g, "id"); var requests = Rows(s, "requests").Where(r => Str(r, "gameId") == id && Active(r)).ToList();
                 row["released"] = Released(g, now); row["availableTickets"] = Rows(s, "seats").Count(x => Str(x, "gameId") == id && Str(x, "status") == "available");
-                row["requestCount"] = requests.Count; row["requestingPeople"] = requests.Select(r => Str(r, "requesterId")).Distinct().Count(); row["requestedTickets"] = requests.Sum(r => (int)r["quantity"]);
+                row["requestCount"] = requests.Count; row["requestingPeople"] = requests.Select(r => !String.IsNullOrEmpty(Str(r, "requesterDirectoryId")) ? Str(r, "requesterDirectoryId") : identities.TryGetValue(Str(r, "requesterId"), out var identity) && identity.GetAttributeValue<Guid>("azureactivedirectoryobjectid") != Guid.Empty ? identity.GetAttributeValue<Guid>("azureactivedirectoryobjectid").ToString() : Str(r, "requesterId")).Distinct(StringComparer.OrdinalIgnoreCase).Count(); row["requestedTickets"] = requests.Sum(r => (int)r["quantity"]);
                 var season = Rows(s, "seasons").FirstOrDefault(x => Str(x, "id") == Str(g, "seasonId"));
                 row["seasonLabel"] = season?["label"];
                 row["seasonStartDate"] = season?["startDate"];
@@ -411,12 +406,13 @@ namespace Ais.TicketReview
                 catalog.Add(row);
             }
             var projected = new JArray();
-            foreach (var r in Rows(s, "requests").Where(r => admin || Str(r, "requesterId") == actorId)) {
+            foreach (var r in Rows(s, "requests").Where(r => admin || OwnInterest(r, actor))) {
                 var row = new JObject(); foreach (var k in new[] {"id", "gameId", "quantity", "purpose", "rationale", "opportunity", "status", "createdAt"}) row[k] = r[k].DeepClone();
                 var ids = ((JArray)r["contactIds"]).Values<string>().ToList(); row["contactNames"] = String.Join(", ", ids.Select(id => Str(Find(s, "contacts", id), "name")));
                 row["allocated"] = Rows(s, "allocations").Count(a => Str(a, "requestId") == Str(r, "id") && Active(a));
                 if (admin) {
                     row["contactIds"] = r["contactIds"].DeepClone(); row["requesterId"] = r["requesterId"];
+                    row["requesterName"] = r["requesterName"]; row["requesterEmail"] = r["requesterEmail"];
                     if (identities.TryGetValue(Str(r, "requesterId"), out var requester)) {
                         row["requesterName"] = requester.GetAttributeValue<string>("fullname");
                         row["requesterEmail"] = requester.GetAttributeValue<string>("internalemailaddress");

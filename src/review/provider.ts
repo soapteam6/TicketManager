@@ -1,4 +1,5 @@
 import { rankReviewState } from './ranking';
+import { prepareCrmPeople } from './crmPeople';
 import { FACTOR_KEYS } from '../domain/enums';
 import type { GameRankingResult } from '../domain/scoring-types';
 import { createFixtures, DIRECTORY, GUID, PERSONAS } from './fixtures';
@@ -103,6 +104,13 @@ export class MockReviewProvider implements ReviewProvider {
     return { ...base, key: user.effectiveRole, role: user.effectiveRole === 'coordinator' ? 'coordinator' : 'requester' };
   }
   readonly mode = 'mock' as const;
+  readonly crm = {
+    searchAccounts: async (query: string) => query.trim().length >= 2 && 'juniper example labs'.includes(query.trim().toLowerCase()) ? [{ id: GUID(20, 1), name: 'Juniper Example Labs', ownerName: 'Demo Representative' }] : [],
+    searchContacts: async (accountId: string, query: string) => accountId === GUID(20, 1) ? [
+      { id: GUID(21, 1), fullName: 'Casey CRM Example', email: 'casey@example.invalid', phone: '+1 202 555 0121' },
+      { id: GUID(21, 2), fullName: 'Taylor CRM Example', email: 'taylor@example.invalid', phone: '+1 202 555 0122' },
+    ].filter(c => `${c.fullName} ${c.email}`.toLowerCase().includes(query.trim().toLowerCase())) : [],
+  };
   private state: ReviewState;
   private version = 0;
   private sequence = 1000;
@@ -155,7 +163,7 @@ export class MockReviewProvider implements ReviewProvider {
           (s) => s.gameId === g.id && s.status === 'available',
         ).length,
         requestCount: demand.length,
-        requestingPeople: new Set(demand.map((r) => r.requesterId)).size,
+        requestingPeople: new Set(demand.map(r => r.requesterDirectoryId ?? Object.values(PERSONAS).find(p => p.id === r.requesterId)?.directoryId ?? r.requesterId)).size,
         requestedTickets: demand.reduce((sum, r) => sum + r.quantity, 0),
         seasonLabel: state.seasons.find((s) => s.id === g.seasonId)?.label,
         seasonStartDate: state.seasons.find(s => s.id === g.seasonId)?.startDate,
@@ -165,7 +173,7 @@ export class MockReviewProvider implements ReviewProvider {
       };
     });
     const requests = state.requests
-      .filter((r) => admin || r.requesterId === actor.id)
+      .filter(r => admin || r.requesterId === actor.id || (!!actor.directoryId && r.requesterDirectoryId === actor.directoryId))
       .map((r) => ({
         id: r.id,
         gameId: r.gameId,
@@ -189,8 +197,8 @@ export class MockReviewProvider implements ReviewProvider {
           ? {
               contactIds: [...r.contactIds],
               requesterId: r.requesterId,
-              requesterName: Object.values(PERSONAS).find((p) => p.id === r.requesterId)?.name,
-              requesterEmail: Object.values(PERSONAS).find((p) => p.id === r.requesterId)?.email,
+              requesterName: r.requesterName ?? Object.values(PERSONAS).find((p) => p.id === r.requesterId)?.name,
+              requesterEmail: r.requesterEmail ?? Object.values(PERSONAS).find((p) => p.id === r.requesterId)?.email,
               recordedById: r.recordedBy,
               recordedByName: Object.values(PERSONAS).find((p) => p.id === r.recordedBy)?.name,
               confirmedNoShows: state.allocations.filter(
@@ -525,7 +533,14 @@ export class MockReviewProvider implements ReviewProvider {
         text(command.rationale, 'a concise business justification');
         if (!['customer', 'employee'].includes(command.purpose))
           invalid('Choose employee/self or customer purpose');
-        const ids = [...new Set(command.contactIds)];
+        let ids = [...new Set(command.contactIds)];
+        if (command.crmContacts?.length) {
+          if (command.purpose !== 'customer' || ids.length) invalid('Choose CRM contacts or saved customer contacts');
+          if (command.crmContacts.length > command.quantity) invalid('Request at least one ticket per selected contact');
+          const imported = prepareCrmPeople(next.contacts, command.crmContacts, () => this.id());
+          for (const c of imported) if (!next.contacts.some(existing => existing.id === c.id)) next.contacts.push(c);
+          ids = imported.map(c => c.id);
+        }
         if (!ids.length || ids.length > command.quantity)
           invalid('Select active contacts and at least one ticket per contact');
         const contacts = ids.map((id) =>
@@ -542,7 +557,7 @@ export class MockReviewProvider implements ReviewProvider {
           invalid('Choose contacts from one customer');
         if (
           actor.role !== 'coordinator' &&
-          (command.onBehalfOf ||
+          (command.onBehalfOf || command.onBehalfContactId ||
             (actor.key === 'employee' && command.purpose !== 'employee') ||
             (command.purpose === 'employee' &&
               contacts.some((c) => c?.directoryId !== actor.directoryId)))
@@ -560,21 +575,24 @@ export class MockReviewProvider implements ReviewProvider {
           !eligible(actorContact)
         )
           invalid('Your employee entry is inactive in the app or directory');
-        const requester = command.onBehalfOf
-          ? Object.values(PERSONAS).find((p) => p.id === command.onBehalfOf)
-          : actor;
+        if (command.onBehalfOf && command.onBehalfContactId) invalid('Choose one requesting person');
+        const selectedRequester = command.onBehalfContactId ? next.contacts.find(c => c.id === command.onBehalfContactId) : undefined;
+        if (command.onBehalfContactId && (!selectedRequester || selectedRequester.type !== 'employee' || !eligible(selectedRequester) || !selectedRequester.directoryId)) invalid('Choose an active employee requesting person');
+        const requester = selectedRequester
+          ? { id: selectedRequester.id, directoryId: selectedRequester.directoryId!, name: selectedRequester.name, email: selectedRequester.email }
+          : command.onBehalfOf ? Object.values(PERSONAS).find(p => p.id === command.onBehalfOf) : actor;
         if (!requester) invalid('Choose a known synthetic requesting person');
-        const requesterContact = next.contacts.find(
-          (c) =>
-            c.type === 'employee' && c.directoryId === requester.directoryId,
-        );
-        if (requesterContact && !eligible(requesterContact))
-          invalid('Requesting person is inactive');
+        const requesterContact = next.contacts.find(c => c.type === 'employee' && c.directoryId === requester.directoryId);
+        if (requesterContact && !eligible(requesterContact)) invalid('Requesting person is inactive');
+        if (command.purpose === 'employee' && (contacts.length !== 1 || !requester.directoryId || contacts[0]?.directoryId !== requester.directoryId)) invalid('Employee interest must have only the requesting person as beneficiary');
         const id = this.id();
         next.requests.push({
           id,
           gameId: game.id,
           requesterId: requester.id,
+          requesterDirectoryId: requester.directoryId,
+          requesterContactId: requesterContact?.id,
+          requesterName: requester.name, requesterEmail: requester.email,
           recordedBy: actor.id,
           purpose: command.purpose,
           contactIds: ids,
