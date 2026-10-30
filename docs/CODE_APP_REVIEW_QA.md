@@ -320,6 +320,14 @@ npm run preview:review
 
 Open **http://127.0.0.1:4173/** on the same machine. `review-dist/` is ignored. Never serve the normal `dist/` bundle for mock QA: it contains the existing SDK entry.
 
+## Inventory deletion and AI reset checks (2026-10-30)
+
+- In Setup, select a team, season, game or event and choose its Delete button. The confirmation names the target and shows affected season, event/game and ticket counts. Cancelling leaves all records unchanged.
+- Deleting a team removes all its seasons/games from the app; deleting a season removes its games while keeping its team. Any request or allocation history, including cancelled records, blocks the whole operation. Native rows and IDs are retained; no bulk hard delete is performed.
+- Deleted groups disappear from Setup, dashboards and selectors and cannot accept new games, imports or season-scoped AI searches. Replacement teams/seasons can reuse their names.
+- Both Import selected games and Create season & import clear the prompt, preview, destination draft and resumable browser search on success. A failed import retains the form. Navigating away and back must not restore a completed preview.
+- Verification: 127 frontend tests, 77 backend security tests and desktop/iPad browser checks covering team/season cascades, individual game deletion, confirmation cancellation, history protection and success/failure import resets. Live inventory is not deleted for testing.
+
 ## Event-day attendance checks (2026-10-30)
 
 - Attendance opens at midnight on the event calendar day in **Pacific Time**, in both client and server validation. It does not wait for the scheduled start. Summer, winter and daylight-saving transition days use the same calendar rule.

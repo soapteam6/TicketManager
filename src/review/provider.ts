@@ -234,8 +234,8 @@ export class MockReviewProvider implements ReviewProvider {
       catalog,
       requests,
       options,
-      teams: admin ? state.teams : [],
-      seasons: admin ? state.seasons : [],
+      teams: admin ? state.teams.filter(t => !t.removed) : [],
+      seasons: admin ? state.seasons.filter(s => !s.removed) : [],
       scheduleSearchAvailable: admin,
       ...(actor.isAppAdmin ? { accessUsers: this.accessUsers, accessGroups: this.accessGroups } : {}),
       ...(admin
@@ -256,7 +256,7 @@ export class MockReviewProvider implements ReviewProvider {
   }
   async startScheduleSearch(key: PersonaKey, request: ScheduleSearchRequest, jobId: string): Promise<ScheduleSearchJob> {
     const actor = coordinator(this.actor(key));
-    const season = this.state.seasons.find(s => s.id === request.seasonId);
+    const season = this.state.seasons.find(s => s.id === request.seasonId && !s.removed);
     if (request.seasonId && !season) invalid('Choose a season.');
     text(request.query, 'an import request', 2000); integer(request.ticketsPerEvent, 0, 1000, 'Tickets');
     const existing = this.scheduleJobs.get(jobId);
@@ -360,7 +360,7 @@ export class MockReviewProvider implements ReviewProvider {
         integer(command.defaultTickets, 0, 1000, 'Default tickets');
         if (
           next.teams.some(
-            (t) => t.name.toLowerCase() === command.name.trim().toLowerCase(),
+            (t) => !t.removed && t.name.toLowerCase() === command.name.trim().toLowerCase(),
           )
         )
           invalid('A team with that name already exists');
@@ -377,7 +377,7 @@ export class MockReviewProvider implements ReviewProvider {
         break;
       }
       case 'createSeason': {
-        if (!next.teams.some((t) => t.id === command.teamId))
+        if (!next.teams.some((t) => t.id === command.teamId && !t.removed))
           invalid('Select a team');
         text(command.label, 'a season label', 200);
         if (
@@ -389,7 +389,7 @@ export class MockReviewProvider implements ReviewProvider {
         if (
           next.seasons.some(
             (s) =>
-              s.teamId === command.teamId && s.label === command.label.trim(),
+              !s.removed && s.teamId === command.teamId && s.label === command.label.trim(),
           )
         )
           invalid('Season label already exists for this team');
@@ -423,7 +423,7 @@ export class MockReviewProvider implements ReviewProvider {
         text(command.title, 'an event title', 200); instant(command.gameDate); integer(command.tickets, 0, 1000, 'Ticket inventory');
         if (!['game', 'event'].includes(command.kind) || !['scheduled', 'completed', 'cancelled'].includes(command.status)) invalid('Choose a valid event type and status');
         const seasonId = command.kind === 'game' ? command.seasonId ?? '' : null;
-        if (command.kind === 'game' && !next.seasons.some(s => s.id === seasonId)) invalid('Choose a season');
+        if (command.kind === 'game' && !next.seasons.some(s => s.id === seasonId && !s.removed)) invalid('Choose a season');
         const allocations = next.allocations.filter(a => a.gameId === game.id);
         const hasHistory = allocations.length > 0 || next.requests.some(r => r.gameId === game.id);
         if (hasHistory && (game.kind !== command.kind || game.seasonId !== seasonId)) invalid('An event with request or allocation history cannot change type or season.');
@@ -450,6 +450,21 @@ export class MockReviewProvider implements ReviewProvider {
         Object.assign(game, { removed: true, status: 'cancelled', release: 'private', releaseAt: null });
         result = { message: 'Event removed from inventory.' }; break;
       }
+      case 'removeTeam':
+      case 'removeSeason': {
+        const team = command.type === 'removeTeam' ? next.teams.find(t => t.id === command.teamId && !t.removed) : undefined;
+        const season = command.type === 'removeSeason' ? next.seasons.find(s => s.id === command.seasonId && !s.removed) : undefined;
+        if (!team && !season) invalid('Team or season not found');
+        const seasons = team ? next.seasons.filter(s => s.teamId === team.id) : [season!];
+        const seasonIds = new Set(seasons.map(s => s.id));
+        const games = next.games.filter(g => !!g.seasonId && seasonIds.has(g.seasonId));
+        const gameIds = new Set(games.map(g => g.id));
+        if (next.requests.some(r => gameIds.has(r.gameId)) || next.allocations.some(a => gameIds.has(a.gameId))) invalid('Cannot delete: an affected game has request or allocation history.');
+        for (const game of games) Object.assign(game, { removed: true, status: 'cancelled', release: 'private', releaseAt: null });
+        for (const season of seasons) season.removed = true;
+        if (team) team.removed = true;
+        result = { message: 'Deleted from inventory.' }; break;
+      }
       case 'importSchedule': {
         let targetSeason = command.seasonId;
         if (command.newSeason) {
@@ -460,14 +475,14 @@ export class MockReviewProvider implements ReviewProvider {
           let targetTeam = d.teamId;
           if (!targetTeam) {
             text(d.teamName, 'a team name', 200); integer(d.defaultTickets, 0, 1000, 'Default tickets');
-            targetTeam = next.teams.find(t => t.name.toLowerCase() === d.teamName.trim().toLowerCase())?.id ?? '';
+            targetTeam = next.teams.find(t => !t.removed && t.name.toLowerCase() === d.teamName.trim().toLowerCase())?.id ?? '';
             if (!targetTeam) { targetTeam = this.id(); next.teams.push({ id: targetTeam, name: d.teamName.trim(), defaultTickets: d.defaultTickets }); }
           }
-          if (!next.teams.some(t => t.id === targetTeam)) invalid('Choose a team.');
-          if (next.seasons.some(s => s.teamId === targetTeam && s.label.toLowerCase() === d.label.trim().toLowerCase())) invalid('A season with that label already exists for this team. Select it from the list.');
+          if (!next.teams.some(t => t.id === targetTeam && !t.removed)) invalid('Choose a team.');
+          if (next.seasons.some(s => !s.removed && s.teamId === targetTeam && s.label.toLowerCase() === d.label.trim().toLowerCase())) invalid('A season with that label already exists for this team. Select it from the list.');
           targetSeason = this.id(); next.seasons.push({ id: targetSeason, teamId: targetTeam, label: d.label.trim(), startDate: d.startDate, endDate: d.endDate });
         }
-        if (!next.seasons.some((s) => s.id === targetSeason))
+        if (!next.seasons.some((s) => s.id === targetSeason && !s.removed))
           invalid('Choose a season for sports imports');
         const preview = previewScheduleCsv(command.csv);
         if (preview.errors.length) invalid(preview.errors.join(' '));
@@ -933,7 +948,7 @@ export class MockReviewProvider implements ReviewProvider {
       invalid('Choose a game or event');
     if (
       input.kind === 'game' &&
-      !state.seasons.some((s) => s.id === input.seasonId)
+      !state.seasons.some((s) => s.id === input.seasonId && !s.removed)
     )
       invalid('Sports games require a selected season');
     if (

@@ -136,7 +136,7 @@ try {
     await page.evaluate(`[...document.querySelectorAll('.work-event-setup tbody tr')].find(r=>r.textContent.includes('QA edited removal')).click()`);
     assert(await page.evaluate(`document.querySelector('[aria-label="Edit event"] input[name="tickets"]').value==='2'`));
     await screenshot('event-setup');
-    await click('Remove event'); await click('Confirm removal');
+    await click('Delete event'); await click('Confirm deletion');
     await page.wait(`!document.querySelector('.work-event-setup tbody').textContent.includes('QA edited removal')`);
     await click('+ New event');
     await page.wait(`document.querySelector('[aria-label="New event"] input[name="title"]')`);
@@ -322,11 +322,31 @@ try {
       assert(await page.evaluate(`document.querySelector('input[name="importTeamName"]').value==='Demo schedule search'`));
       await set('input[name="searchTickets"]', '2');
       await screenshot('ai-import-review');
+      await page.evaluate(`(async () => {
+        const source=await (await fetch('/src/review/SyntheticReview.tsx')).text();
+        const url=source.split('"').find(v=>v.startsWith('/src/review/demo.ts'));
+        const { demoProvider }=await import(url), original=demoProvider.execute;
+        demoProvider.execute=async function(...args) { demoProvider.execute=original; if(args[1].type==='importSchedule') throw new Error('Synthetic import could not save'); return original.apply(this,args); };
+      })()`);
       await click('Create season & import');
-      await page.wait(`document.querySelector('.work-found-schedule tbody tr').textContent.includes('Already in inventory')`);
+      await page.wait(`document.querySelector('aside[role="alert"]')?.textContent.includes('Synthetic import could not save')`);
+      assert(await page.evaluate(`document.querySelector('[aria-label="Found schedule"]') && document.querySelector('textarea[name="scheduleQuery"]').value && Object.keys(sessionStorage).some(k=>k.startsWith('ticket-ai-import:'))`), 'Failed import cleared the form or resumable search');
+      await page.evaluate(`document.querySelector('[aria-label="Dismiss save error"]').click()`);
+      await click('Create season & import');
+      await page.wait(`!document.querySelector('[aria-label="Found schedule"]') && document.querySelector('textarea[name="scheduleQuery"]').value===''`);
+      assert(await page.evaluate(`!Object.keys(sessionStorage).some(k=>k.startsWith('ticket-ai-import:'))`), 'Successful import retained the resumable search');
       await page.evaluate(`document.querySelector('button[aria-label="Teams"]').click()`);
       await page.wait(`document.querySelector('.work-setup-register tbody tr')`);
-      await page.evaluate(`document.querySelector('.work-setup-register tbody tr').cells[1].click()`);
+      await page.evaluate(`[...document.querySelectorAll('.work-setup-register tbody tr')].find(r=>r.textContent.includes('Demo schedule search')).click()`);
+      await click('Delete team');
+      assert(await page.evaluate(`document.querySelector('[aria-label="Delete team"]').textContent.includes('1 season') && document.querySelector('[aria-label="Delete team"]').textContent.includes('1 game')`), 'Team deletion did not show its descendants');
+      await screenshot('delete-team-confirmation');
+      await click('Keep team');
+      assert(await page.evaluate(`document.querySelector('[aria-label="Team details"] h3').textContent==='Demo schedule search'`));
+      await click('Delete team'); await click('Confirm deletion');
+      await page.wait(`!document.querySelector('.work-setup-register tbody').textContent.includes('Demo schedule search')`);
+      await page.evaluate(`[...document.querySelectorAll('.work-setup-register tbody tr')].find(r=>r.textContent.includes('Synthetic Comets')).click()`);
+      assert(await page.evaluate(`document.querySelector('[aria-label="Delete team"] button').disabled && document.querySelector('[aria-label="Delete team"]').textContent.includes('history')`), 'History protection missing from team deletion');
       await click('+ New team');
       await set('input[name="teamName"]', 'QA setup team');
       await set('input[name="defaultTickets"]', '2');
@@ -342,7 +362,14 @@ try {
       await click('Create game');
       await page.wait(`document.querySelector('[aria-label="New event"] select[name="season"]')`);
       assert(await page.evaluate(`document.querySelector('[aria-label="New event"] select[name="kind"]').value==='game' && document.querySelector('[aria-label="New event"] select[name="season"] option:checked').textContent.includes('QA 2027 season')`), 'Season did not preselect the new game');
-      await page.evaluate(`document.querySelector('[aria-label="Close event editor"]').click()`);
+      await set('[aria-label="New event"] input[name="title"]', 'QA delete game');
+      await set('[aria-label="New event"] input[name="date"]', '2027-03-01T18:00');
+      await set('[aria-label="New event"] input[name="tickets"]', '1');
+      await click('Create private inventory');
+      await page.wait(`!document.querySelector('[aria-label="New event"]')`);
+      await page.evaluate(`[...document.querySelectorAll('.work-event-setup tbody tr')].find(r=>r.textContent.includes('QA delete game')).click()`);
+      await click('Delete game'); await click('Confirm deletion');
+      await page.wait(`!document.querySelector('.work-event-setup tbody').textContent.includes('QA delete game')`);
       await page.evaluate(`document.querySelector('button[aria-label="Seasons"]').click()`);
       await page.wait(`document.querySelector('[aria-label="Season details"]')`);
       await click('Import into this season');
@@ -354,7 +381,11 @@ try {
       assert(await page.evaluate(`document.querySelector('.work-schedule-sources').textContent.includes('Synthetic schedule source')`));
       await screenshot('schedule-search');
       await click('Import selected games');
-      await page.wait(`document.querySelector('.work-found-schedule tbody tr').textContent.includes('Already in inventory')`);
+      await page.wait(`!document.querySelector('[aria-label="Found schedule"]') && document.querySelector('textarea[name="scheduleQuery"]').value===''`);
+      assert(await page.evaluate(`!Object.keys(sessionStorage).some(k=>k.startsWith('ticket-ai-import:'))`), 'Successful import retained the resumable search');
+      await page.evaluate(`document.querySelector('button[aria-label="Seasons"]').click()`);
+      await click('Import into this season');
+      assert(await page.evaluate(`!document.querySelector('[aria-label="Found schedule"]') && document.querySelector('textarea[name="scheduleQuery"]').value===''`), 'Reopening AI Import restored the completed job');
       await click('CSV import');
       await set('textarea[name="scheduleCsv"]', 'wrong,columns\nexample,invalid');
       await click('Validate & preview');
@@ -368,6 +399,15 @@ try {
       await click('Import private inventory');
       await page.wait(`document.querySelector('textarea[name="scheduleCsv"]').value===''`);
     }
+    await nav('Setup & import');
+    await page.evaluate(`document.querySelector('button[aria-label="Seasons"]').click()`);
+    await page.evaluate(`[...document.querySelectorAll('.work-setup-register tbody tr')].find(r=>r.textContent.includes('QA 2027 season')).click()`);
+    await click('Delete season');
+    await screenshot('delete-season-confirmation');
+    await click('Confirm deletion');
+    await page.wait(`!document.querySelector('.work-setup-register tbody').textContent.includes('QA 2027 season')`);
+    await page.evaluate(`document.querySelector('button[aria-label="Teams"]').click()`);
+    assert(await page.evaluate(`document.querySelector('.work-setup-register tbody').textContent.includes('QA setup team')`), 'Deleting a season also deleted its team');
     await nav('User access');
     await page.wait(`document.querySelector('.work-table tbody tr')`);
     assert(await page.evaluate(`!document.querySelector('[aria-label="User access details"]') && !document.querySelector('tbody tr[aria-selected="true"]')`));
@@ -569,7 +609,7 @@ try {
     await page.evaluate(`window.expirationRoot.unmount(); document.getElementById('expiration-check').remove(); document.getElementById('root').hidden=false; delete window.expirationProvider;`);
     assert.deepEqual(errors, [], `${design}: page errors`);
     assert.deepEqual(external, [], `${design}: external requests`);
-    results.push({ design, status: 'PASS', checks: ['no automatic initial selection', 'detail pane dismissal', 'no routine save banners', 'search', 'whole-row and keyboard selection', 'private inventory creation', 'interest', 'single self beneficiary follows requesting person', 'bounded saved contact selection', 'CRM search and recipient allocation', 'requester email', 'allocation', 'right-side allocation details', 'visible rejection reason', 'copy error diagnostics', 'legacy clipboard fallback', 'manual copy when clipboard is blocked', 'startup error diagnostics preserve connector status and request ID', 'startup retry refreshes copied error', 'contact history', ...(design === 'desk' ? ['team and season creation', 'web schedule preview and selected import', 'TBD game excluded', 'CSV fallback', 'iPad schedule search', 'independent detail scrolling'] : []), 'admin-only user access', 'role grant and reversal', 'group role assignment', 'connecting a directory group', 'requester navigation', 'iPad landscape', 'iPad portrait', 'bounded page scroll', 'requester inactive/history controls hidden', 'live event expiration closes interest', 'completed event history', 'attendance controls disabled before event day', 'same-day attendance before event start'], pageErrors: 0, externalRequests: 0 });
+    results.push({ design, status: 'PASS', checks: ['no automatic initial selection', 'detail pane dismissal', 'no routine save banners', 'search', 'whole-row and keyboard selection', 'private inventory creation', 'interest', 'single self beneficiary follows requesting person', 'bounded saved contact selection', 'CRM search and recipient allocation', 'requester email', 'allocation', 'right-side allocation details', 'visible rejection reason', 'copy error diagnostics', 'legacy clipboard fallback', 'manual copy when clipboard is blocked', 'startup error diagnostics preserve connector status and request ID', 'startup retry refreshes copied error', 'contact history', ...(design === 'desk' ? ['team and season creation', 'web schedule preview and selected import', 'TBD game excluded', 'CSV fallback', 'iPad schedule search', 'independent detail scrolling'] : []), 'admin-only user access', 'role grant and reversal', 'group role assignment', 'connecting a directory group', 'requester navigation', 'iPad landscape', 'iPad portrait', 'bounded page scroll', 'requester inactive/history controls hidden', 'live event expiration closes interest', 'completed event history', 'attendance controls disabled before event day', 'same-day attendance before event start', 'team and season deletion with descendant counts', 'history blocks hierarchy deletion', 'successful AI import clears prompt preview and resumable job', 'failed AI import retains form for retry', 'individual game deletion'], pageErrors: 0, externalRequests: 0 });
     page.close();
     await browser.call('Target.closeTarget', { targetId });
   }

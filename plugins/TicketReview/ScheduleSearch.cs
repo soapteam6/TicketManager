@@ -40,6 +40,7 @@ namespace Ais.TicketReview
                     var seasonEntity = service.Retrieve("cr9cd_season", seasonId, new ColumnSet("cr9cd_review_scope", "cr9cd_review_data"));
                     Check(seasonEntity.GetAttributeValue<string>("cr9cd_review_scope") == Scope, "Select a season from this workspace.");
                     season = Parse(seasonEntity.GetAttributeValue<string>("cr9cd_review_data"));
+                    Check((bool?)season["removed"] != true, "This season has been deleted.");
                 }
                 var tickets = Number(request, "ticketsPerEvent", 0, 1000);
                 Check(request["homeOnly"]?.Type == JTokenType.Boolean, "Choose home games or all games.");

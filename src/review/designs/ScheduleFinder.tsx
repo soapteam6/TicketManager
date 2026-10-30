@@ -23,7 +23,6 @@ export function ScheduleFinder({ initialSeasonId = '' }: { initialSeasonId?: str
   const [job, setJob] = useState<ScheduleSearchJob>();
   const [discovery, setDiscovery] = useState<ScheduleDiscovery>();
   const [starting, setStarting] = useState(false);
-  const [imported, setImported] = useState(false);
   const [error, setError] = useState<ErrorReport | null>(null);
   const searching = starting || !!jobId && (!job || ['queued', 'searching'].includes(job.status));
   const available = !!snapshot.scheduleSearchAvailable && !!provider.startScheduleSearch && !!provider.getScheduleSearch;
@@ -81,7 +80,7 @@ export function ScheduleFinder({ initialSeasonId = '' }: { initialSeasonId?: str
   return <div className={`work-import-section work-schedule-finder ${discovery ? 'has-result' : 'is-prompt'}`}>
     <form className="work-import-editor" onSubmit={async e => {
       e.preventDefault(); if (!available || !provider.startScheduleSearch) return;
-      setStarting(true); setError(null); setJobId(''); setJob(undefined); setDiscovery(undefined); setImported(false);
+      setStarting(true); setError(null); setJobId(''); setJob(undefined); setDiscovery(undefined);
       try {
         const result = await provider.startScheduleSearch(persona, { query: query.trim(), seasonId: initialSeasonId, ticketsPerEvent: ticketsValid ? Number(tickets) : 0, homeOnly }, crypto.randomUUID());
         try { sessionStorage.setItem(storageKey, result.id); } catch { /* Search still works without browser storage. */ }
@@ -103,7 +102,7 @@ export function ScheduleFinder({ initialSeasonId = '' }: { initialSeasonId?: str
       <div className="work-table-scroll">
         {discovery.warnings.length > 0 && <div className="work-import-errors">{discovery.warnings.map((w, i) => <p key={i}>{w}</p>)}</div>}
         <details className="work-schedule-source-disclosure"><summary>Sources ({discovery.sources.length})</summary><div className="work-schedule-sources">{discovery.sources.map(s => <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer">{s.title}</a>)}</div></details>
-        {discovery.games.length > 0 && <fieldset className="work-ai-target" disabled={busy || imported}><legend>Import destination</legend>
+        {discovery.games.length > 0 && <fieldset className="work-ai-target" disabled={busy}><legend>Import destination</legend>
           <Field label="Season"><Select name="searchSeason" value={seasonId} onChange={e => setSeasonId(e.target.value)}><option value="">Create a new season</option>{snapshot.seasons.map(s => <option key={s.id} value={s.id}>{snapshot.teams.find(t => t.id === s.teamId)?.name} · {s.label}</option>)}</Select></Field>
           <Field label="Our tickets per game" required><TextInput name="searchTickets" type="number" min={0} max={1000} required value={tickets} placeholder="Enter quantity" onChange={e => { setTickets(e.target.value); const n = Number(e.target.value); setDiscovery(current => current && ({ ...current, games: current.games.map(g => ({ ...g, tickets: n })) })); }} /></Field>
           {!seasonId && <>
@@ -114,17 +113,21 @@ export function ScheduleFinder({ initialSeasonId = '' }: { initialSeasonId?: str
             <Field label="Season ends" required><TextInput name="importSeasonEnd" type="date" min={draft.startDate || undefined} required value={draft.endDate} onChange={e => setDraft({ ...draft, endDate: e.target.value })} /></Field>
           </>}
         </fieldset>}
-        <table className="work-table work-found-schedule"><thead><tr><th><input type="checkbox" aria-label="Select ready games" disabled={imported || busy} checked={discovery.games.some(g => issues(g).length === 0) && discovery.games.filter(g => issues(g).length === 0).every(g => g.selected)} onChange={e => setDiscovery({ ...discovery, games: discovery.games.map(g => ({ ...g, selected: e.target.checked && issues(g).length === 0 })) })} /></th><th>Game / source</th><th>Date</th><th>Our tickets</th><th>Review</th></tr></thead><tbody>{discovery.games.map(game => {
+        <table className="work-table work-found-schedule"><thead><tr><th><input type="checkbox" aria-label="Select ready games" disabled={busy} checked={discovery.games.some(g => issues(g).length === 0) && discovery.games.filter(g => issues(g).length === 0).every(g => g.selected)} onChange={e => setDiscovery({ ...discovery, games: discovery.games.map(g => ({ ...g, selected: e.target.checked && issues(g).length === 0 })) })} /></th><th>Game / source</th><th>Date</th><th>Our tickets</th><th>Review</th></tr></thead><tbody>{discovery.games.map(game => {
           const errors = issues(game);
-          return <tr key={game.id}><td><input type="checkbox" aria-label={`Import ${game.title}`} checked={game.selected && !errors.length} disabled={imported || busy || !!errors.length} onChange={e => update(game.id, { selected: e.target.checked })} /></td>
-            <td><TextInput aria-label={`Title for ${game.title}`} disabled={imported || busy} value={game.title} maxLength={200} onChange={e => update(game.id, { title: e.target.value })} />{game.sourceUrl && <a className="work-source-link" href={game.sourceUrl} target="_blank" rel="noopener noreferrer">View source</a>}<small>{game.venue}{game.home === false ? ' · Away' : ''}</small></td>
-            <td><TextInput type="datetime-local" disabled={imported || busy} aria-label={`Local start for ${game.title}`} value={isoToLocalDateTimeInput(game.startAt)} onChange={e => updateStart(game, e.target.value)} />{!game.startAt && game.localDate && <small>Source date: {game.localDate}; time TBD</small>}</td>
-            <td><TextInput type="number" min={0} max={1000} disabled={imported || busy} aria-label={`Tickets for ${game.title}`} value={game.tickets} onChange={e => update(game.id, { tickets: Number(e.target.value) })} /></td><td>{errors.length ? errors.map(issue => <small key={issue}>{issue}</small>) : 'Ready'}</td></tr>;
+          return <tr key={game.id}><td><input type="checkbox" aria-label={`Import ${game.title}`} checked={game.selected && !errors.length} disabled={busy || !!errors.length} onChange={e => update(game.id, { selected: e.target.checked })} /></td>
+            <td><TextInput aria-label={`Title for ${game.title}`} disabled={busy} value={game.title} maxLength={200} onChange={e => update(game.id, { title: e.target.value })} />{game.sourceUrl && <a className="work-source-link" href={game.sourceUrl} target="_blank" rel="noopener noreferrer">View source</a>}<small>{game.venue}{game.home === false ? ' · Away' : ''}</small></td>
+            <td><TextInput type="datetime-local" disabled={busy} aria-label={`Local start for ${game.title}`} value={isoToLocalDateTimeInput(game.startAt)} onChange={e => updateStart(game, e.target.value)} />{!game.startAt && game.localDate && <small>Source date: {game.localDate}; time TBD</small>}</td>
+            <td><TextInput type="number" min={0} max={1000} disabled={busy} aria-label={`Tickets for ${game.title}`} value={game.tickets} onChange={e => update(game.id, { tickets: Number(e.target.value) })} /></td><td>{errors.length ? errors.map(issue => <small key={issue}>{issue}</small>) : 'Ready'}</td></tr>;
         })}</tbody></table>{!discovery.games.length && <EmptyRows>No published games were found for this request. Check the notes above or add a team and season year to your request.</EmptyRows>}
       </div>
-      {discovery.games.length > 0 && <div className="work-import-commit"><div><strong>{ready.length} games · {ready.reduce((n, g) => n + g.tickets, 0)} tickets</strong><p>{!ticketsValid ? 'Enter the number of tickets you own per game.' : seasonId ? 'Imported games start private.' : 'The team, season and private games will be saved together.'}</p></div><Button disabled={busy || searching || imported || !ticketsValid || !targetValid || !ready.length || ready.length > 100} onClick={async () => {
+      {discovery.games.length > 0 && <div className="work-import-commit"><div><strong>{ready.length} games · {ready.reduce((n, g) => n + g.tickets, 0)} tickets</strong><p>{!ticketsValid ? 'Enter the number of tickets you own per game.' : seasonId ? 'Imported games start private.' : 'The team, season and private games will be saved together.'}</p></div><Button disabled={busy || searching || !ticketsValid || !targetValid || !ready.length || ready.length > 100} onClick={async () => {
         if (await run({ type: 'importSchedule', csv: discoveredGamesCsv(ready), seasonId, ...(!seasonId && { newSeason: { ...draft, defaultTickets: Number(tickets) } }) })) {
-          setImported(true); setDiscovery(current => current && ({ ...current, games: current.games.map(g => ({ ...g, selected: false })) }));
+          try { sessionStorage.removeItem(storageKey); } catch { /* Import succeeded even when storage is unavailable. */ }
+          setJobId(''); setJob(undefined); setDiscovery(undefined); setError(null);
+          setQuery(''); setHomeOnly(true); setSeasonId(initialSeasonId);
+          setTickets(initialSeason ? String(snapshot.teams.find(t => t.id === initialSeason.teamId)?.defaultTickets ?? '') : '');
+          setDraft({ teamId: '', teamName: '', label: '', startDate: '', endDate: '' });
         }
       }}>{seasonId ? 'Import selected games' : 'Create season & import'}</Button></div>}
     </section>}

@@ -45,6 +45,7 @@ export interface Team {
   name: string;
   defaultTickets: number;
   active?: boolean;
+  removed?: boolean;
 }
 export interface Season {
   id: string;
@@ -53,6 +54,7 @@ export interface Season {
   startDate: string;
   endDate: string;
   active?: boolean;
+  removed?: boolean;
 }
 export interface Inventory {
   id: GameId;
@@ -286,6 +288,8 @@ export type ReviewCommand =
     }
   | { type: 'editInventory'; gameId: GameId; kind: Inventory['kind']; title: string; gameDate: string; tickets: number; seasonId?: string; status: Inventory['status'] }
   | { type: 'removeInventory'; gameId: GameId }
+  | { type: 'removeTeam'; teamId: string }
+  | { type: 'removeSeason'; seasonId: string }
   | { type: 'importSchedule'; csv: string; seasonId: string; newSeason?: { teamId: string; teamName: string; label: string; startDate: string; endDate: string; defaultTickets: number } }
   | ReleaseCommand
   | {

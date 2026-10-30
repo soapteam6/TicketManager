@@ -212,7 +212,7 @@ namespace Ais.TicketReview
                     var team = new JObject { ["id"] = NewId(), ["name"] = Text(c, "name", 200), ["defaultTickets"] = Number(c, "defaultTickets", 0, 1000) };
                     Add(s, "teams", team); result["id"] = team["id"]; break;
                 case "createSeason":
-                    Find(s, "teams", Str(c, "teamId"));
+                    FindLive(s, "teams", Str(c, "teamId"));
                     foreach (var field in new[] {"startDate", "endDate"}) Check(DateTime.TryParseExact(Str(c, field), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _), "Enter a real calendar date.");
                     Check(String.CompareOrdinal(Str(c, "startDate"), Str(c, "endDate")) <= 0, "Season end precedes start.");
                     var season = new JObject { ["id"] = NewId(), ["teamId"] = c["teamId"], ["label"] = Text(c, "label", 200), ["startDate"] = c["startDate"], ["endDate"] = c["endDate"] };
@@ -220,6 +220,8 @@ namespace Ais.TicketReview
                 case "createInventory": result["id"] = AddInventory(s, c); break;
                 case "editInventory": EditInventory(s, c, now); break;
                 case "removeInventory": RemoveInventory(s, Str(c, "gameId")); break;
+                case "removeTeam": RemoveInventoryGroup(s, "teams", Str(c, "teamId")); break;
+                case "removeSeason": RemoveInventoryGroup(s, "seasons", Str(c, "seasonId")); break;
                 case "importSchedule":
                     var importSeasonId = Str(c, "seasonId");
                     if (c["newSeason"] is JObject draft) {
@@ -227,13 +229,13 @@ namespace Ais.TicketReview
                         var importTeamId = Str(draft, "teamId");
                         if (String.IsNullOrEmpty(importTeamId)) {
                             var importName = Text(draft, "teamName", 200);
-                            var matchingTeam = Rows(s, "teams").FirstOrDefault(t => String.Equals(Str(t, "name"), importName, StringComparison.OrdinalIgnoreCase));
+                            var matchingTeam = Rows(s, "teams").FirstOrDefault(t => (bool?)t["removed"] != true && String.Equals(Str(t, "name"), importName, StringComparison.OrdinalIgnoreCase));
                             importTeamId = matchingTeam != null ? Str(matchingTeam, "id") : Str(Apply(service, s, actor, new JObject { ["type"] = "createTeam", ["name"] = importName, ["defaultTickets"] = draft["defaultTickets"] }, now), "id");
                         }
-                        Check(!Rows(s, "seasons").Any(x => Str(x, "teamId") == importTeamId && String.Equals(Str(x, "label"), Str(draft, "label").Trim(), StringComparison.OrdinalIgnoreCase)), "A season with that label already exists for this team. Select it from the list.");
+                        Check(!Rows(s, "seasons").Any(x => (bool?)x["removed"] != true && Str(x, "teamId") == importTeamId && String.Equals(Str(x, "label"), Str(draft, "label").Trim(), StringComparison.OrdinalIgnoreCase)), "A season with that label already exists for this team. Select it from the list.");
                         importSeasonId = Str(Apply(service, s, actor, new JObject { ["type"] = "createSeason", ["teamId"] = importTeamId, ["label"] = draft["label"], ["startDate"] = draft["startDate"], ["endDate"] = draft["endDate"] }, now), "id");
                     }
-                    Find(s, "seasons", importSeasonId);
+                    FindLive(s, "seasons", importSeasonId);
                     var lines = Str(c, "csv").Split('\n').Select(x => x.TrimEnd('\r')).Where(x => !String.IsNullOrWhiteSpace(x) && !x.StartsWith("#")).ToList();
                     if (lines.Count > 0 && lines[0].StartsWith("date,", StringComparison.OrdinalIgnoreCase)) lines.RemoveAt(0);
                     Check(lines.Count > 0 && lines.Count <= 100, "Import 1 to 100 rows per transaction.");
@@ -342,7 +344,7 @@ namespace Ais.TicketReview
         {
             var title = Text(c, "title", 200); var date = Instant(Str(c, "gameDate")); var tickets = Number(c, "tickets", 0, 1000); var kind = Str(c, "kind");
             Check(kind == "game" || kind == "event", "Choose game or event.");
-            if (kind == "game") Find(s, "seasons", Str(c, "seasonId"));
+            if (kind == "game") FindLive(s, "seasons", Str(c, "seasonId"));
             Check(!Rows(s, "games").Any(g => (bool?)g["removed"] != true && Str(g, "title") == title && Instant(Str(g, "gameDate")) == date), "Duplicate dated inventory.");
             var id = NewId(); Add(s, "games", new JObject { ["id"] = id, ["kind"] = kind, ["title"] = title, ["seasonId"] = kind == "game" ? c["seasonId"] : JValue.CreateNull(),
                 ["gameDate"] = date.ToString("o"), ["totalTickets"] = tickets, ["status"] = "scheduled", ["release"] = "private", ["releaseAt"] = JValue.CreateNull() });
@@ -428,7 +430,7 @@ namespace Ais.TicketReview
                 var option = new JObject(); foreach (var k in new[] {"id", "type", "name", "company", "email", "phone"}) option[k] = c[k].DeepClone(); options.Add(option);
             }
             var snapshot = new JObject { ["mode"] = "dataverse", ["persona"] = actor, ["catalog"] = catalog, ["requests"] = projected, ["options"] = options,
-                ["teams"] = admin ? s["teams"].DeepClone() : new JArray(), ["seasons"] = admin ? s["seasons"].DeepClone() : new JArray() };
+                ["teams"] = admin ? new JArray(Rows(s, "teams").Where(t => (bool?)t["removed"] != true).Select(t => t.DeepClone())) : new JArray(), ["seasons"] = admin ? new JArray(Rows(s, "seasons").Where(t => (bool?)t["removed"] != true).Select(t => t.DeepClone())) : new JArray() };
             if ((bool?)actor["isAppAdmin"] == true) {
                 snapshot["accessUsers"] = AccessUsers(service);
                 snapshot["accessGroups"] = AccessGroups(service);

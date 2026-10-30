@@ -16,9 +16,44 @@ internal static class InventoryTests
         return state;
     }
     private static JObject Edit(JObject state, int tickets = 4) => new JObject { ["gameId"] = state["games"][0]["id"], ["title"] = "Edited event", ["kind"] = "event", ["gameDate"] = "2026-12-02T02:00:00Z", ["tickets"] = tickets, ["status"] = "scheduled" };
+    private static JObject DeletionState() {
+        var s = State(); var team = Guid.NewGuid().ToString(); var season = Guid.NewGuid().ToString();
+        ((JArray)s["teams"]).Add(new JObject { ["id"] = team, ["name"] = "Deletion example" });
+        ((JArray)s["seasons"]).Add(new JObject { ["id"] = season, ["teamId"] = team });
+        s["games"][0]["kind"] = "game"; s["games"][0]["seasonId"] = season;
+        Call("AddInventory", s, new JObject { ["title"] = "Second deletion game", ["kind"] = "game", ["seasonId"] = season, ["gameDate"] = "2027-01-01T00:00:00Z", ["tickets"] = 2 });
+        return s;
+    }
     private static void Denied(Action run, string message) { try { run(); } catch (Microsoft.Xrm.Sdk.InvalidPluginExecutionException e) { Assert(e.Message.Contains(message), e.Message); return; } throw new Exception("Expected rejection: " + message); }
     public static int Run() {
         var tests = new Dictionary<string, Action> {
+            ["team deletion hides all unused descendants and retains native record identities"] = () => {
+                var s = DeletionState(); var beforeSeats = s["seats"].ToString(); var ids = ((JArray)s["games"]).Select(g => (string)g["id"]).ToList();
+                Call("RemoveInventoryGroup", s, "teams", (string)s["teams"][0]["id"]);
+                Assert((bool)s["teams"][0]["removed"] && (bool)s["seasons"][0]["removed"] && ((JArray)s["games"]).All(g => (bool)g["removed"] && (string)g["status"] == "cancelled"), "Incomplete hierarchy removal");
+                Assert(s["seats"].ToString() == beforeSeats && ((JArray)s["games"]).Select(g => (string)g["id"]).SequenceEqual(ids), "Deletion erased native identities");
+                Denied(() => Call("FindLive", s, "teams", (string)s["teams"][0]["id"]), "deleted");
+                Denied(() => Call("AddInventory", s, new JObject { ["title"] = "Invalid deleted target", ["kind"] = "game", ["seasonId"] = s["seasons"][0]["id"], ["gameDate"] = "2027-02-01T00:00:00Z", ["tickets"] = 1 }), "deleted");
+            },
+            ["season deletion retains the parent team and unrelated inventory"] = () => {
+                var s = DeletionState(); Call("AddInventory", s, new JObject { ["title"] = "Independent event", ["kind"] = "event", ["gameDate"] = "2027-03-01T00:00:00Z", ["tickets"] = 1 });
+                Call("RemoveInventoryGroup", s, "seasons", (string)s["seasons"][0]["id"]);
+                Assert((bool?)s["teams"][0]["removed"] != true && (bool)s["seasons"][0]["removed"] && (bool?)s["games"][2]["removed"] != true, "Unrelated inventory removed");
+            },
+            ["hierarchy deletion validates every descendant before marking anything removed"] = () => {
+                foreach (var collection in new[] { "teams", "seasons" }) foreach (var history in new[] { "requests", "allocations" }) {
+                    var s = DeletionState(); ((JArray)s[history]).Add(new JObject { ["id"] = Guid.NewGuid().ToString(), ["gameId"] = s["games"][1]["id"], ["status"] = "cancelled" });
+                    var before = s.ToString(); Denied(() => Call("RemoveInventoryGroup", s, collection, (string)s[collection][0]["id"]), "history");
+                    Assert(s.ToString() == before, "Rejected deletion partially altered the hierarchy");
+                }
+            },
+            ["requesters cannot delete teams or seasons by calling the API directly"] = () => {
+                foreach (var type in new[] { "removeTeam", "removeSeason" }) {
+                    var s = DeletionState(); var before = s.ToString();
+                    Denied(() => Call("Apply", null, s, new JObject { ["role"] = "requester" }, new JObject { ["type"] = type }, DateTimeOffset.UtcNow, null), "Coordinator");
+                    Assert(s.ToString() == before, "Unauthorized deletion changed data");
+                }
+            },
             ["attendance opens at Pacific midnight in summer winter and daylight saving transitions"] = () => {
                 foreach (var pair in new[] {
                     new[] { "2026-07-16T02:00:00Z", "2026-07-15T07:00:00Z" },
@@ -82,7 +117,7 @@ internal static class InventoryTests
             },
             ["event history prevents changing the inventory type or season"] = () => {
                 var state = State(); ((JArray)state["requests"]).Add(new JObject { ["gameId"] = state["games"][0]["id"] });
-                var season = Guid.NewGuid(); ((JArray)state["seasons"]).Add(new JObject { ["id"] = season.ToString() });
+                var season = Guid.NewGuid(); var team = Guid.NewGuid().ToString(); ((JArray)state["teams"]).Add(new JObject { ["id"] = team }); ((JArray)state["seasons"]).Add(new JObject { ["id"] = season.ToString(), ["teamId"] = team });
                 var edit = Edit(state); edit["kind"] = "game"; edit["seasonId"] = season.ToString();
                 Denied(() => Call("EditInventory", state, edit, DateTimeOffset.UtcNow), "cannot change type or season");
             },
