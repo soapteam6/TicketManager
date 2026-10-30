@@ -68,6 +68,13 @@ requester privacy, Setup event creation/edit/removal, Help articles/timeline and
 hidden directory-inactive contacts. No live event edits/removals are made by
 publication verification.
 
+Published to AIS Development as `emikes@ais-now.com` on 2026-10-30. The live
+read-only check verified grouping metadata and the deployed backend build;
+48 inventory entries and 281 contact records remain present, with 15 directory-
+inactive employees hidden by the register. Workspace revision was 21 during
+verification. Both solution exports match the production UI and signed backend.
+See [aggregate evidence](../solutions/workspace-ui-test.json).
+
 Allocation desk (B) is the only UI, available at `#/` and `#/review`. The layout
 comparison bar and alternate-layout routes have been removed. Old bookmarks
 redirect to the main workspace. The isolated synthetic preview uses this same UI. Refresh progress and a brief Updated confirmation appear on the refresh button. Decorative page and list footers have been removed.

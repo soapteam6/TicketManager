@@ -1,0 +1,16 @@
+{
+  "verifiedAtUtc": "2026-10-30T15:13:29.331919+00:00",
+  "authenticatedAs": "emikes@ais-now.com",
+  "workspaceRevision": 21,
+  "visibleInventory": 48,
+  "seasonGroupingMetadataVerified": true,
+  "backendMatchesLocalBuild": true,
+  "backendSha256": "da22ccd51753eda2b5a31ce2c82f9ee068a6623230d2bfc52acc256b57ac6278",
+  "contactRecordsRetained": 281,
+  "directoryInactiveEmployeesHiddenByUI": 15,
+  "liveEventMutations": 0,
+  "frontendTests": 99,
+  "backendTests": 58,
+  "desktopAndIPadBrowserChecks": "PASS",
+  "liveEventCrudTested": false
+}
