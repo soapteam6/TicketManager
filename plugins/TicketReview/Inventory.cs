@@ -35,7 +35,7 @@ namespace Ais.TicketReview
             var hasHistory = allocations.Any() || Rows(state, "requests").Any(r => Str(r, "gameId") == gameId);
             Check(!hasHistory || Str(game, "kind") == kind && Str(game, "seasonId") == seasonId, "An event with request or allocation history cannot change type or season.");
             Check(status != "cancelled" || !allocations.Any(Active), "Cancel active allocations before cancelling this event.");
-            Check(!allocations.Any(a => Str(a, "outcome") != "unknown") || date <= now, "An event with confirmed attendance cannot move into the future.");
+            Check(!allocations.Any(a => Str(a, "outcome") != "unknown") || AttendanceIsOpen(date, now), "An event with confirmed attendance cannot move beyond today in Pacific Time.");
             Check(!Rows(state, "games").Any(g => Str(g, "id") != gameId && (bool?)g["removed"] != true && Str(g, "title") == title && Instant(Str(g, "gameDate")) == date), "Duplicate dated inventory.");
             var seats = Rows(state, "seats").Where(seat => Str(seat, "gameId") == gameId).ToList();
             var protectedSeats = new HashSet<string>(allocations.Select(a => Str(a, "seatId")));

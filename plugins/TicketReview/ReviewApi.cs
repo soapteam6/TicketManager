@@ -300,7 +300,7 @@ namespace Ais.TicketReview
                 case "attendance":
                     var attendance = Find(s, "allocations", Str(c, "assignmentId")); Check(Active(attendance), "Choose an active allocation.");
                     var outcome = Str(c, "outcome"); Check(new[] {"unknown", "attended", "no_show"}.Contains(outcome), "Choose an attendance outcome.");
-                    Check(outcome == "unknown" || Instant(Str(Find(s, "games", Str(attendance, "gameId")), "gameDate")) <= now, "Attendance cannot be confirmed before the event.");
+                    Check(outcome == "unknown" || AttendanceIsOpen(Instant(Str(Find(s, "games", Str(attendance, "gameId")), "gameDate")), now), "Attendance opens on the event day (Pacific Time).");
                     if (outcome != "unknown") Text(c, "evidence");
                     Check(Str(c, "evidence").Length <= 1000, "Evidence is too long.");
                     attendance["outcome"] = outcome; attendance["evidence"] = Str(c, "evidence").Trim();
@@ -375,7 +375,7 @@ namespace Ais.TicketReview
                 var request = Find(s, "requests", Str(a, "requestId")); var seat = Find(s, "seats", Str(a, "seatId"));
                 Find(s, "contacts", Str(a, "contactId")); Check(Str(request, "gameId") == Str(a, "gameId") && Str(seat, "gameId") == Str(a, "gameId"), "Allocation belongs to another event.");
                 if (Str(a, "outcome") == "no_show") Text(a, "evidence");
-                Check(Str(a, "outcome") == "unknown" || Instant(Str(Find(s, "games", Str(a, "gameId")), "gameDate")) <= now, "Future attendance is invalid.");
+                Check(Str(a, "outcome") == "unknown" || AttendanceIsOpen(Instant(Str(Find(s, "games", Str(a, "gameId")), "gameDate")), now), "Attendance before the event day is invalid (Pacific Time).");
             }
             foreach (var r in Rows(s, "requests")) Check(active.Count(a => Str(a, "requestId") == Str(r, "id")) <= (int)r["quantity"], "Allocation exceeds requested quantity.");
             foreach (var seat in Rows(s, "seats")) { var owner = active.FirstOrDefault(a => Str(a, "seatId") == Str(seat, "id")); Check((Str(seat, "status") == "available") == (owner == null), "Seat state is inconsistent."); }

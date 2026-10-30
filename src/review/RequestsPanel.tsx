@@ -16,6 +16,7 @@ import {
 import { dateTime, number, value } from './form';
 import { RequestIdentity } from './RequestIdentity';
 import { beneficiaryNames, personName } from './personName';
+import { attendanceDay, attendanceIsOpen } from './attendanceDay';
 function AllocationForm({
   request,
   close,
@@ -236,24 +237,27 @@ export function RequestsPanel() {
   );
 }
 function AttendanceForm({ allocation }: { allocation: Allocation }) {
-  const { run, busy } = useReview();
+  const { snapshot, run, busy } = useReview();
+  const game = snapshot.catalog.find(g => g.id === allocation.gameId);
+  const open = !!game && !!snapshot.serverNow && attendanceIsOpen(game.gameDate, snapshot.serverNow);
   const [outcome, setOutcome] = useState(allocation.outcome);
   const [evidence, setEvidence] = useState(allocation.evidence);
   const requiresEvidence = outcome !== 'unknown';
   return <form className="space-y-3 rounded-lg bg-slate-50 p-3" onSubmit={e => {
     e.preventDefault();
-    if (requiresEvidence && !evidence.trim()) return;
+    if (!open || requiresEvidence && !evidence.trim()) return;
     void run({ type: 'attendance', assignmentId: allocation.id, outcome, evidence: evidence.trim() });
   }}>
     <h4 className="font-medium text-sm">Attendance: {allocation.outcome.replaceAll('_', ' ')}</h4>
-    <Field label="Attendance outcome"><Select name="outcome" value={outcome} onChange={e => setOutcome(e.target.value as Allocation['outcome'])}>
+    {!open && <p role="status" className="text-sm text-slate-600">{game ? `Attendance opens on ${attendanceDay(game.gameDate)} (Pacific Time).` : 'Event details are unavailable. Refresh before recording attendance.'}</p>}
+    <Field label="Attendance outcome"><Select name="outcome" disabled={!open || busy} value={outcome} onChange={e => setOutcome(e.target.value as Allocation['outcome'])}>
       <option value="unknown">Unknown — no confirmation</option><option value="attended">Attended — confirmed</option><option value="no_show">No-show — confirmed</option>
     </Select></Field>
     <Field label="Evidence / confirmation note" required={requiresEvidence} hint={requiresEvidence ? 'Required to confirm attendance or a no-show.' : 'Optional while attendance is unknown.'}>
-      <TextInput name="evidence" value={evidence} onChange={e => setEvidence(e.target.value)} required={requiresEvidence} maxLength={1000} />
+      <TextInput name="evidence" disabled={!open || busy} value={evidence} onChange={e => setEvidence(e.target.value)} required={requiresEvidence} maxLength={1000} />
     </Field>
-    <Button type="submit" size="sm" variant="secondary" disabled={busy || requiresEvidence && !evidence.trim()}>Save attendance</Button>
-    <p className="text-xs text-slate-500">Confirm outcomes only after the event. Without confirmation, keep Unknown.</p>
+    <Button type="submit" size="sm" variant="secondary" disabled={busy || !open || requiresEvidence && !evidence.trim()}>Save attendance</Button>
+    <p className="text-xs text-slate-500">Available from the event day in Pacific Time. Without confirmation, keep Unknown.</p>
   </form>;
 }
 

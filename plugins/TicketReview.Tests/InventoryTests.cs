@@ -19,6 +19,34 @@ internal static class InventoryTests
     private static void Denied(Action run, string message) { try { run(); } catch (Microsoft.Xrm.Sdk.InvalidPluginExecutionException e) { Assert(e.Message.Contains(message), e.Message); return; } throw new Exception("Expected rejection: " + message); }
     public static int Run() {
         var tests = new Dictionary<string, Action> {
+            ["attendance opens at Pacific midnight in summer winter and daylight saving transitions"] = () => {
+                foreach (var pair in new[] {
+                    new[] { "2026-07-16T02:00:00Z", "2026-07-15T07:00:00Z" },
+                    new[] { "2026-12-16T03:00:00Z", "2026-12-15T08:00:00Z" },
+                    new[] { "2026-03-09T02:00:00Z", "2026-03-08T08:00:00Z" },
+                    new[] { "2026-11-02T03:00:00Z", "2026-11-01T07:00:00Z" }
+                }) {
+                    var game = DateTimeOffset.Parse(pair[0]); var midnight = DateTimeOffset.Parse(pair[1]);
+                    Assert(!(bool)Call("AttendanceIsOpen", game, midnight.AddTicks(-1)), "Attendance opened before the event day");
+                    Assert((bool)Call("AttendanceIsOpen", game, midnight), "Attendance did not open at midnight");
+                }
+            },
+            ["same-day attendance before start survives full state validation and later edits"] = () => {
+                var s = State(); var game = (JObject)s["games"][0]; game["gameDate"] = "2026-12-02T02:00:00Z";
+                var now = DateTimeOffset.Parse("2026-12-01T08:00:00Z"); s["attendanceHistory"] = new JArray();
+                var contact = Guid.NewGuid().ToString(); var request = Guid.NewGuid().ToString(); var allocation = Guid.NewGuid().ToString();
+                ((JArray)s["contacts"]).Add(new JObject { ["id"] = contact });
+                ((JArray)s["requests"]).Add(new JObject { ["id"] = request, ["gameId"] = game["id"], ["contactIds"] = new JArray(contact), ["quantity"] = 1 });
+                s["seats"][0]["status"] = "assigned";
+                ((JArray)s["allocations"]).Add(new JObject { ["id"] = allocation, ["requestId"] = request, ["contactId"] = contact, ["gameId"] = game["id"], ["seatId"] = s["seats"][0]["id"], ["status"] = "approved", ["outcome"] = "unknown", ["evidence"] = "" });
+                var actor = new JObject { ["id"] = Guid.NewGuid().ToString(), ["role"] = "coordinator" };
+                var command = new JObject { ["type"] = "attendance", ["assignmentId"] = allocation, ["outcome"] = "attended", ["evidence"] = "Confirmed with recipient" };
+                Denied(() => Call("Apply", null, s, actor, command, now.AddSeconds(-1), null), "event day");
+                Call("Apply", null, s, actor, command, now, null); Call("Validate", s, now);
+                var edit = Edit(s); edit["gameDate"] = "2026-12-02T03:00:00Z"; Call("EditInventory", s, edit, now); Call("Validate", s, now);
+                edit["gameDate"] = "2026-12-03T03:00:00Z"; Denied(() => Call("EditInventory", s, edit, now), "beyond today");
+                Assert(((JArray)s["attendanceHistory"]).Count == 1, "Attendance audit missing");
+            },
             ["past scheduled events complete at their exact instant and cancellations are preserved"] = () => {
                 var now = DateTimeOffset.Parse("2026-10-30T15:00:00Z"); var game = new JObject { ["status"] = "scheduled", ["gameDate"] = "2026-10-30T08:00:00-07:00" };
                 Assert((string)Call("InventoryStatus", game, now.AddTicks(-1)) == "scheduled", "Future event completed early");

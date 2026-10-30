@@ -417,7 +417,7 @@ describe('directory override, history and attendance', () => {
     });
     expect(snapshot(p).outbox).toEqual([]);
   });
-  it('requires a past event and explicit no-show evidence while retaining unknown and audit corrections', async () => {
+  it('requires the event day and explicit no-show evidence while retaining unknown and audit corrections', async () => {
     const p = create();
     await p.execute('coordinator', {
       type: 'allocate',
@@ -434,7 +434,7 @@ describe('directory override, history and attendance', () => {
         outcome: 'attended',
         evidence: 'Not yet',
       }),
-    ).rejects.toThrow('after');
+    ).rejects.toThrow('event day');
     await expect(
       p.execute('coordinator', {
         type: 'attendance',

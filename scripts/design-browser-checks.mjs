@@ -203,13 +203,34 @@ try {
     await page.evaluate(`(() => {const row=document.querySelectorAll('.work-allocation-split tbody tr')[1];row.focus();row.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));})()`);
     await page.wait(`document.querySelectorAll('.work-allocation-split tbody tr')[1].getAttribute('aria-selected')==='true'`);
     assert(await page.evaluate(`(() => {const table=document.querySelector('.work-allocation-split>.work-table-scroll').getBoundingClientRect();const detail=document.querySelector('[aria-label="Allocation details"]').getBoundingClientRect();return detail.left>=table.right-1 && Math.abs(detail.top-table.top)<2;})()`), `${design}: allocation details are not on the right`);
+    assert(await page.evaluate(`document.querySelector('select[name="outcome"]').disabled && document.querySelector('input[name="evidence"]').disabled && [...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Save attendance').disabled`), 'Future attendance controls are enabled');
+    assert(await page.evaluate(`document.querySelector('[aria-label="Allocation details"] [role="status"]').textContent.includes('Attendance opens on')`));
+    await page.evaluate(`document.querySelector('select[name="outcome"]').closest('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))`);
+    assert(await page.evaluate(`!document.querySelector('aside[role="alert"]')`), 'Blocked client attendance submitted a server request');
+    await screenshot('attendance-before-day');
+    await page.evaluate(`(async () => {
+      const source = await (await fetch('/src/review/SyntheticReview.tsx')).text();
+      const demoUrl = source.split('"').find(value => value.startsWith('/src/review/demo.ts'));
+      const { demoProvider } = await import(demoUrl);
+      demoProvider.state.games.find(g=>g.title==='QA layout ${design}').gameDate='2026-10-27T02:00:00Z';
+      window.attendanceDemo = demoProvider; demoProvider.refresh();
+    })()`);
+    await page.wait(`!document.querySelector('select[name="outcome"]').disabled`);
     await set('select[name="outcome"]', 'attended');
     assert(await page.evaluate(`[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Save attendance').disabled && document.querySelector('input[name="evidence"]').required && document.querySelector('input[name="evidence"]').closest('label').textContent.includes('*')`), 'Confirmed attendance did not require a note');
     await set('input[name="evidence"]', '   ');
     assert(await page.evaluate(`[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Save attendance').disabled`), 'Whitespace was accepted as evidence');
     await set('input[name="evidence"]', 'Synthetic confirmation for validation.');
     await click('Save attendance');
-    await page.wait(`document.querySelector('aside[role="alert"]')?.textContent.includes('after the event')`);
+    await page.wait(`[...document.querySelectorAll('[aria-label="Allocation details"] h4')].some(h=>h.textContent.includes('attended'))`);
+    assert(await page.evaluate(`window.attendanceDemo.snapshot('coordinator').catalog.find(g=>g.title==='QA layout ${design}').status==='scheduled'`), 'Day-of attendance required the event to finish');
+    await screenshot('attendance-on-day');
+    // Preserve copy-error coverage with a simulated save failure on an allowed day.
+    await page.evaluate(`(() => { const p=window.attendanceDemo, original=p.execute; p.execute=async function(...args) { p.execute=original; throw Object.assign(new Error('Synthetic attendance save failure'), { code: 'invalid' }); }; })()`);
+    await click('Save attendance');
+    await page.wait(`document.querySelector('aside[role="alert"]')?.textContent.includes('Synthetic attendance save failure')`);
+    await page.evaluate(`delete window.attendanceDemo`);
+
     await page.evaluate(`(() => {
       window.originalClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
       window.originalExecCommand = document.execCommand;
@@ -548,7 +569,7 @@ try {
     await page.evaluate(`window.expirationRoot.unmount(); document.getElementById('expiration-check').remove(); document.getElementById('root').hidden=false; delete window.expirationProvider;`);
     assert.deepEqual(errors, [], `${design}: page errors`);
     assert.deepEqual(external, [], `${design}: external requests`);
-    results.push({ design, status: 'PASS', checks: ['no automatic initial selection', 'detail pane dismissal', 'no routine save banners', 'search', 'whole-row and keyboard selection', 'private inventory creation', 'interest', 'single self beneficiary follows requesting person', 'bounded saved contact selection', 'CRM search and recipient allocation', 'requester email', 'allocation', 'right-side allocation details', 'visible rejection reason', 'copy error diagnostics', 'legacy clipboard fallback', 'manual copy when clipboard is blocked', 'startup error diagnostics preserve connector status and request ID', 'startup retry refreshes copied error', 'contact history', ...(design === 'desk' ? ['team and season creation', 'web schedule preview and selected import', 'TBD game excluded', 'CSV fallback', 'iPad schedule search', 'independent detail scrolling'] : []), 'admin-only user access', 'role grant and reversal', 'group role assignment', 'connecting a directory group', 'requester navigation', 'iPad landscape', 'iPad portrait', 'bounded page scroll', 'requester inactive/history controls hidden', 'live event expiration closes interest', 'completed event history'], pageErrors: 0, externalRequests: 0 });
+    results.push({ design, status: 'PASS', checks: ['no automatic initial selection', 'detail pane dismissal', 'no routine save banners', 'search', 'whole-row and keyboard selection', 'private inventory creation', 'interest', 'single self beneficiary follows requesting person', 'bounded saved contact selection', 'CRM search and recipient allocation', 'requester email', 'allocation', 'right-side allocation details', 'visible rejection reason', 'copy error diagnostics', 'legacy clipboard fallback', 'manual copy when clipboard is blocked', 'startup error diagnostics preserve connector status and request ID', 'startup retry refreshes copied error', 'contact history', ...(design === 'desk' ? ['team and season creation', 'web schedule preview and selected import', 'TBD game excluded', 'CSV fallback', 'iPad schedule search', 'independent detail scrolling'] : []), 'admin-only user access', 'role grant and reversal', 'group role assignment', 'connecting a directory group', 'requester navigation', 'iPad landscape', 'iPad portrait', 'bounded page scroll', 'requester inactive/history controls hidden', 'live event expiration closes interest', 'completed event history', 'attendance controls disabled before event day', 'same-day attendance before event start'], pageErrors: 0, externalRequests: 0 });
     page.close();
     await browser.call('Target.closeTarget', { targetId });
   }

@@ -320,6 +320,13 @@ npm run preview:review
 
 Open **http://127.0.0.1:4173/** on the same machine. `review-dist/` is ignored. Never serve the normal `dist/` bundle for mock QA: it contains the existing SDK entry.
 
+## Event-day attendance checks (2026-10-30)
+
+- Attendance opens at midnight on the event calendar day in **Pacific Time**, in both client and server validation. It does not wait for the scheduled start. Summer, winter and daylight-saving transition days use the same calendar rule.
+- Before that day, outcome, note and Save attendance are disabled, with an opening-date message. The client submit handler also blocks a forced submission. On the day, confirmed attendance/no-show still requires a nonblank note.
+- Full-state validation and edits accept same-day confirmed attendance before start. Moving an event with confirmed attendance to a later day remains blocked.
+- Verification: 122 frontend tests, 73 backend tests and desktop/iPad browser coverage for blocked future controls, successful day-of attendance before start, note requirements and copy-error handling. Live attendance records are not changed for testing.
+
 ## Event completion and requester inventory checks (2026-10-30)
 
 - Scheduled events automatically show Completed at their event instant, using server time plus elapsed time in an open tab. Equivalent UTC and local-offset timestamps have the same boundary. Cancelled events remain cancelled. Completion is a date-based projection, with no history rewrites or inferred attendance.

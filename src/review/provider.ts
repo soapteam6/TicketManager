@@ -1,6 +1,7 @@
 import { rankReviewState } from './ranking';
 import { prepareCrmPeople } from './crmPeople';
 import { eventStatus } from './eventActivity';
+import { attendanceIsOpen } from './attendanceDay';
 import { FACTOR_KEYS } from '../domain/enums';
 import type { GameRankingResult } from '../domain/scoring-types';
 import { createFixtures, DIRECTORY, GUID, PERSONAS } from './fixtures';
@@ -427,7 +428,8 @@ export class MockReviewProvider implements ReviewProvider {
         const hasHistory = allocations.length > 0 || next.requests.some(r => r.gameId === game.id);
         if (hasHistory && (game.kind !== command.kind || game.seasonId !== seasonId)) invalid('An event with request or allocation history cannot change type or season.');
         if (command.status === 'cancelled' && allocations.some(active)) invalid('Cancel active allocations before cancelling this event.');
-        if ((command.status === 'completed' || allocations.some(a => a.outcome !== 'unknown')) && instant(command.gameDate) > now) invalid('Completed events or confirmed attendance cannot be in the future.');
+        if (command.status === 'completed' && instant(command.gameDate) > now) invalid('Completed events cannot be in the future.');
+        if (allocations.some(a => a.outcome !== 'unknown') && !attendanceIsOpen(command.gameDate, now)) invalid('An event with confirmed attendance cannot move beyond today in Pacific Time.');
         if (next.games.some(g => g.id !== game.id && !g.removed && g.title === command.title.trim() && instant(g.gameDate) === instant(command.gameDate))) invalid('Duplicate dated inventory.');
         const seats = next.seats.filter(s => s.gameId === game.id);
         const protectedIds = new Set(allocations.map(a => a.seatId));
@@ -730,8 +732,8 @@ export class MockReviewProvider implements ReviewProvider {
         if (!['unknown', 'attended', 'no_show'].includes(command.outcome))
           invalid('Choose an attendance outcome');
         const game = next.games.find((g) => g.id === allocation.gameId)!;
-        if (command.outcome !== 'unknown' && instant(game.gameDate) > now)
-          invalid('Confirm attendance only after the event');
+        if (command.outcome !== 'unknown' && !attendanceIsOpen(game.gameDate, now))
+          invalid('Attendance opens on the event day (Pacific Time).');
         if (command.outcome !== 'unknown')
           text(command.evidence, 'attendance evidence / confirmation note');
         allocation.outcome = command.outcome;
