@@ -1,0 +1,30 @@
+{
+  "verifiedAtUtc": "2026-10-30T16:11:13.487076+00:00",
+  "authenticatedAs": "emikes@ais-now.com",
+  "environment": "AIS Development",
+  "solution": "AISTicketManager",
+  "sourceCommit": "6d42e63",
+  "attendanceCalendarTimeZone": "America/Los_Angeles",
+  "attendanceOpens": "midnight on event day",
+  "revisionBefore": 34,
+  "revisionAfter": 34,
+  "existingStateUnchanged": true,
+  "recordCounts": {
+    "games": 48,
+    "contacts": 283,
+    "requests": 8,
+    "allocations": 6,
+    "attendanceHistory": 4
+  },
+  "backendMatchesBuild": true,
+  "backendSha256": "dff7626845e226812cf5abf5a9a5a7a175632051991fe55c47fbff57c41b88ac",
+  "frontendTests": 122,
+  "backendTests": 73,
+  "syntheticDesktopIpadBrowser": "passed",
+  "futureAttendanceControls": "disabled",
+  "sameDayBeforeStartConfirmation": "passed",
+  "daylightSavingBoundaryTests": "passed",
+  "liveAttendanceChangesForTesting": 0,
+  "managedAndUnmanagedBackendMatchBuild": true,
+  "managedAndUnmanagedAppMatchBuild": true
+}
