@@ -302,6 +302,16 @@ before cleanup. Native job Notes retain the submitted original for provenance.
 If service cancellation itself fails, cleanup can fail and needs operator review;
 there is no claim of guaranteed deletion after a service outage.
 
+The current inventory-only file test submitted the supplied Excel with no typed
+prompt. It returned **44 games / 176 tickets**, with no missing or extra dates and
+no source local-time mismatches. All 44 passed source/time/quantity validation.
+Against the existing workspace, **38 were already present and 6 were new**;
+only duplicate protection prevented those 38 from being created again. The API
+reported real upload completion and analysis stages, and the desktop/iPad checks
+verified visible stage transitions and elapsed time. No inventory or attendees
+were imported, and the workspace stayed unchanged. See
+[inventory import verification](../solutions/ai-inventory-import-test.json).
+
 Before attendee backfill was removed, the 2026-10-30 live file test used the supplied VGK 2026-27 tracker with its
 arbitrary layout, misplaced names, cached formulas and struck-through header.
 Claude returned **44 games and 176 tickets**. All 44 source dates and local times

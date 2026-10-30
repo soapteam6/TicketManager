@@ -1,0 +1,64 @@
+{
+  "authenticatedAs": "emikes@ais-now.com",
+  "jobId": "a78060b2-aa09-41f9-89f8-daac7fc5d64c",
+  "status": "complete",
+  "team": "Vegas Golden Knights",
+  "season": "2026-27",
+  "timezone": "America/Los_Angeles",
+  "existingSeasonRequired": false,
+  "gamesFound": 44,
+  "gamesReadyForReview": 44,
+  "gamesWithUnconfirmedTimes": 0,
+  "toolReturnedSources": 1,
+  "warnings": 5,
+  "workspaceUnchanged": true,
+  "inventoryImported": 0,
+  "progressObserved": [
+    {
+      "stage": "uploading",
+      "filesDone": 1,
+      "totalFiles": 1,
+      "round": 0
+    },
+    {
+      "stage": "analyzing",
+      "filesDone": 1,
+      "totalFiles": 1,
+      "round": 1
+    }
+  ],
+  "uploadedFiles": 1,
+  "sourceFileCount": 1,
+  "totalTickets": 176,
+  "attendeeBackfill": false,
+  "sourceComparison": {
+    "sourceGames": 44,
+    "proposedGames": 44,
+    "missingSourceDates": 0,
+    "extraDates": 0,
+    "sourceLocalTimeMismatches": 0,
+    "ownedTickets": 176,
+    "attendeeDataExtracted": false
+  },
+  "existingInventoryComparison": {
+    "games": 44,
+    "totalTickets": 176,
+    "readyAgainstCurrentInventory": 6,
+    "issueCounts": {
+      "Already in inventory": 38
+    }
+  },
+  "tests": {
+    "frontend": 138,
+    "backend": 85,
+    "flowSecurity": 13,
+    "desktopAndIpad": "PASS"
+  },
+  "flowVerification": {
+    "runId": "08584082146300914050373960945CU01",
+    "status": "Succeeded",
+    "saveResult": "Succeeded",
+    "batchCleanup": "Succeeded",
+    "fileCleanup": "Succeeded"
+  }
+}
