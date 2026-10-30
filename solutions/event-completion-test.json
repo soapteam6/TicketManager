@@ -1,0 +1,28 @@
+{
+  "verifiedAtUtc": "2026-10-30T16:02:27.237373+00:00",
+  "authenticatedAs": "emikes@ais-now.com",
+  "environment": "AIS Development",
+  "solution": "AISTicketManager",
+  "sourceCommit": "0554efa",
+  "revisionBefore": 28,
+  "revisionAfter": 28,
+  "pastEventsNowProjectedCompleted": 8,
+  "pastEventsStillProjectedScheduled": 0,
+  "existingStateUnchanged": true,
+  "recordCounts": {
+    "games": 48,
+    "contacts": 283,
+    "requests": 7,
+    "allocations": 5
+  },
+  "backendMatchesBuild": true,
+  "backendSha256": "1722d267f37bc33cc00f41c73d5a36757391458ba1d154b507b342536d1314f9",
+  "frontendTests": 116,
+  "backendTests": 71,
+  "syntheticDesktopIpadBrowser": "passed",
+  "openInterestExpirationBrowser": "passed",
+  "requesterHistoryControlsBrowser": "hidden",
+  "liveRequestsCreatedForTesting": 0,
+  "managedAndUnmanagedBackendMatchBuild": true,
+  "managedAndUnmanagedAppMatchBuild": true
+}
