@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "excludedIdentityPattern": "^\\$|^(?:svc|serviceaccount)(?:[._\\-\\s]|$)",
+  "excludedAddresses": [
+    "sgateway@ais-now.com",
+    "test4insidesales@ais-now.com",
+    "testapp@ais-now.com"
+  ]
+}

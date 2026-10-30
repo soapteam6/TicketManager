@@ -712,8 +712,8 @@ export class MockReviewProvider implements ReviewProvider {
         const game = next.games.find((g) => g.id === allocation.gameId)!;
         if (command.outcome !== 'unknown' && instant(game.gameDate) > now)
           invalid('Confirm attendance only after the event');
-        if (command.outcome === 'no_show')
-          text(command.evidence, 'explicit no-show evidence / confirmation');
+        if (command.outcome !== 'unknown')
+          text(command.evidence, 'attendance evidence / confirmation note');
         allocation.outcome = command.outcome;
         allocation.evidence = command.evidence.trim();
         next.attendanceHistory.push({

@@ -80,6 +80,28 @@ internal static class DirectoryTests
                 var state = State(); Call("SyncDirectory", new Fake(user), state);
                 Assert((string)state["contacts"][0]["email"] == "login@example.invalid" && (string)state["contacts"][0]["phone"] == "555-0200", "Directory fallback failed");
             },
+            ["service account markers and reviewed test aliases are excluded"] = () => {
+                var service = User(); service["mail"] = "$svc.LV.Backup@ais-now.com";
+                var upnOnly = User(); upnOnly["mail"] = "ordinary@example.invalid"; upnOnly["userprincipalname"] = "SVC_SYNC@ais-now.com";
+                var named = User(null, "# SVC VMware");
+                var test = User(); test["mail"] = "TESTAPP@ais-now.com";
+                var gateway = User(); gateway["userprincipalname"] = "sgateway@ais-now.com";
+                var state = State(); Call("SyncDirectory", new Fake(User(), service, upnOnly, named, test, gateway), state);
+                Assert(((JArray)state["contacts"]).Count == 1, "A non-person account became a contact");
+            },
+            ["excluded existing contacts retain IDs and history and stay inactive across syncs"] = () => {
+                var service = User(); service["mail"] = "$svc.LV.Backup@ais-now.com";
+                var contact = Contact(service.Id); contact["appActive"] = true;
+                var state = State(contact); var history = state["allocations"].ToString() + state["attendanceHistory"].ToString();
+                Call("SyncDirectory", new Fake(User(), service), state);
+                Call("SyncDirectory", new Fake(User(), service), state);
+                Assert(!(bool)state["contacts"][0]["directoryActive"] && (bool)state["contacts"][0]["appActive"] && (string)state["contacts"][0]["id"] == (string)contact["id"], "Excluded contact was lost or reactivated");
+                Assert(history == state["allocations"].ToString() + state["attendanceHistory"].ToString(), "Exclusion erased history");
+            },
+            ["hash-prefixed human names and similar human names are retained"] = () => {
+                var state = State(); Call("SyncDirectory", new Fake(User(null, "# Example Employee"), User(null, "Svend Example")), state);
+                Assert(((JArray)state["contacts"]).Count == 2, "Real users were classified as service accounts");
+            },
             ["an empty directory cannot deactivate every employee"] = () => RejectUnchanged(new Fake(), State(Contact(Guid.NewGuid())), "no active member"),
             ["a second-page access failure leaves all contacts unchanged"] = () => RejectUnchanged(new Fake(User()) { SecondPage = new[] { User() }, FailSecondPage = true }, State(Contact(Guid.NewGuid())), "Directory access denied"),
             ["an incomplete paging response cannot inactivate contacts"] = () => RejectUnchanged(new Fake(User()) { SecondPage = new[] { User() }, MissingCookie = true }, State(Contact(Guid.NewGuid())), "incomplete directory page"),

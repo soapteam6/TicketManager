@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Modal } from '../components/Modal';
 import { useReview } from './context';
-import type { InterestView } from './types';
+import type { Allocation, InterestView } from './types';
 import {
   Badge,
   Button,
@@ -235,6 +235,28 @@ export function RequestsPanel() {
     </Panel>
   );
 }
+function AttendanceForm({ allocation }: { allocation: Allocation }) {
+  const { run, busy } = useReview();
+  const [outcome, setOutcome] = useState(allocation.outcome);
+  const [evidence, setEvidence] = useState(allocation.evidence);
+  const requiresEvidence = outcome !== 'unknown';
+  return <form className="space-y-3 rounded-lg bg-slate-50 p-3" onSubmit={e => {
+    e.preventDefault();
+    if (requiresEvidence && !evidence.trim()) return;
+    void run({ type: 'attendance', assignmentId: allocation.id, outcome, evidence: evidence.trim() });
+  }}>
+    <h4 className="font-medium text-sm">Attendance: {allocation.outcome.replaceAll('_', ' ')}</h4>
+    <Field label="Attendance outcome"><Select name="outcome" value={outcome} onChange={e => setOutcome(e.target.value as Allocation['outcome'])}>
+      <option value="unknown">Unknown — no confirmation</option><option value="attended">Attended — confirmed</option><option value="no_show">No-show — confirmed</option>
+    </Select></Field>
+    <Field label="Evidence / confirmation note" required={requiresEvidence} hint={requiresEvidence ? 'Required to confirm attendance or a no-show.' : 'Optional while attendance is unknown.'}>
+      <TextInput name="evidence" value={evidence} onChange={e => setEvidence(e.target.value)} required={requiresEvidence} maxLength={1000} />
+    </Field>
+    <Button type="submit" size="sm" variant="secondary" disabled={busy || requiresEvidence && !evidence.trim()}>Save attendance</Button>
+    <p className="text-xs text-slate-500">Confirm outcomes only after the event. Without confirmation, keep Unknown.</p>
+  </form>;
+}
+
 export function FollowthroughPanel({ assignmentId }: { assignmentId?: string } = {}) {
   const { snapshot, run, busy } = useReview(),
     [gameId, setGameId] = useState('');
@@ -244,7 +266,7 @@ export function FollowthroughPanel({ assignmentId }: { assignmentId?: string } =
   return (
     <Panel
       title="Manual transfer & attendance"
-      description="Record the provider-app step separately from attendance. No evidence leaves attendance unknown; a confirmed no-show requires an explicit note."
+      description="Record the provider-app step separately from attendance. Confirmed outcomes require a note."
     >
       {!assignmentId && <Field label="Filter allocations by event">
         <Select value={gameId} onChange={(e) => setGameId(e.target.value)}>
@@ -345,57 +367,7 @@ export function FollowthroughPanel({ assignmentId }: { assignmentId?: string } =
                       {snapshot.mode === 'dataverse' ? 'Confirmation saved in Dataverse; this app never delivers tickets.' : 'Local record only; this app never delivers tickets.'}
                     </p>
                   </form>
-                  <form
-                    className="space-y-3 rounded-lg bg-slate-50 p-3"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const f = new FormData(e.currentTarget);
-                      const outcome = value(f, 'outcome');
-                      if (
-                        outcome === 'unknown' ||
-                        outcome === 'attended' ||
-                        outcome === 'no_show'
-                      )
-                        void run({
-                          type: 'attendance',
-                          assignmentId: a.id,
-                          outcome,
-                          evidence: value(f, 'evidence'),
-                        });
-                    }}
-                  >
-                    <h4 className="font-medium text-sm">
-                      Attendance: {a.outcome.replaceAll('_', ' ')}
-                    </h4>
-                    <Field label="Attendance outcome">
-                      <Select name="outcome" defaultValue={a.outcome}>
-                        <option value="unknown">
-                          Unknown — no confirmation
-                        </option>
-                        <option value="attended">Attended — confirmed</option>
-                        <option value="no_show">No-show — confirmed</option>
-                      </Select>
-                    </Field>
-                    <Field label="Evidence / confirmation note">
-                      <TextInput
-                        name="evidence"
-                        defaultValue={a.evidence}
-                        maxLength={1000}
-                      />
-                    </Field>
-                    <Button
-                      type="submit"
-                      size="sm"
-                      variant="secondary"
-                      disabled={busy}
-                    >
-                      Save attendance
-                    </Button>
-                    <p className="text-xs text-slate-500">
-                      Confirmed outcomes only after the event; unknown is
-                      neutral.
-                    </p>
-                  </form>
+                  <AttendanceForm key={`${a.id}:${a.outcome}:${a.evidence}`} allocation={a} />
                 </div>
               )}
               {a.status !== 'cancelled' && (

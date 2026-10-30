@@ -37,6 +37,21 @@ applied environment changes, test evidence, roles, and remaining checks.
 
 ## Main UI
 
+The access-administration Help article is intentionally omitted, including from
+the user-facing change timeline. Keep administration guidance out of those
+surfaces unless the user requests otherwise.
+
+Confirmed **Attended** and **No-show** outcomes now require a nonblank evidence /
+confirmation note. The label shows a red asterisk and Save attendance is disabled
+for empty or whitespace-only notes. Unknown keeps an optional note. The same
+requirement is enforced in the backend; historical records are not rewritten.
+Employee sync now excludes the reserved service-account naming patterns and
+reviewed gateway/test aliases in `config/directory-people-policy.json`.
+Validation: 105 frontend tests, 62 backend tests, production build, changed-source
+lint and desktop/iPad browser checks pass, including the required marker,
+whitespace-only note rejection and removal of the access article from Help and
+the change timeline. Live attendance records were not altered by testing.
+
 Teams and seasons now have automatically derived app activity. A season stays
 active through its calendar end date in the viewer's local timezone; future
 seasons are active. A team is active when it has at least one active season.

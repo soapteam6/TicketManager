@@ -8,6 +8,7 @@ Never prints or saves directory profiles, access tokens or contact details.
 import argparse
 from datetime import datetime, timezone
 import json
+import re
 from pathlib import Path
 import uuid
 
@@ -15,12 +16,24 @@ from dataverse_api import Dataverse, ORG
 
 ROOT = Path(__file__).resolve().parent.parent
 COLUMNS = "aaduserid,accountenabled,usertype,displayname,mail,userprincipalname,mobilephone,businessphones,companyname"
+POLICY = json.loads((ROOT / "config/directory-people-policy.json").read_text(encoding="utf-8"))
+
+
+def is_person(profile):
+    addresses = [(profile.get(key) or "").strip() for key in ["mail", "userprincipalname"]]
+    excluded = {value.lower() for value in POLICY["excludedAddresses"]}
+    if any(value.lower() in excluded for value in addresses):
+        return False
+    identities = [value.split("@")[0] for value in addresses] + [(profile.get("displayname") or "").strip().lstrip("#").strip()]
+    return not any(re.search(POLICY["excludedIdentityPattern"], value, re.IGNORECASE) for value in identities)
 
 
 def directory(d):
     url = ORG + "/api/data/v9.2/aadusers"
     params = {"$select": COLUMNS, "$filter": "accountenabled eq true and usertype eq 'Member'"}
     rows = {}
+    excluded = 0
+    seen = set()
     pages = set()
     while url:
         if not url.startswith(ORG + "/api/data/v9.2/aadusers") or url in pages:
@@ -33,12 +46,16 @@ def directory(d):
         for row in data["value"]:
             key = str(uuid.UUID(row["aaduserid"]))
             assert row["accountenabled"] is True and row["usertype"].lower() == "member", "Unexpected account eligibility"
-            assert key not in rows, "Duplicate Entra profile"
+            assert key not in seen, "Duplicate Entra profile"
+            seen.add(key)
+            if not is_person(row):
+                excluded += 1
+                continue
             rows[key] = row
         url = data.get("@odata.nextLink")
         params = None
     assert rows, "Entra returned no enabled member accounts; no sync was attempted"
-    return rows, len(pages)
+    return rows, len(pages), excluded
 
 
 def main():
@@ -51,7 +68,7 @@ def main():
     def api(payload):
         return json.loads(d.call("POST", "cr9cd_TicketReview", {"Payload": json.dumps(payload)})["Result"])
 
-    profiles, pages = directory(d)
+    profiles, pages, excluded = directory(d)
     before = api({"operation": "snapshot"})
     assert before["snapshot"]["persona"]["email"].lower() == "emikes@ais-now.com"
     contacts = before["state"]["contacts"]
@@ -59,6 +76,8 @@ def main():
     record = {
         "authenticatedAs": "emikes@ais-now.com", "source": "Microsoft Entra ID", "virtualTable": "aaduser",
         "enabledMemberProfiles": len(profiles), "directoryReadPages": pages,
+        "rawEnabledMembers": len(profiles) + excluded, "excludedServiceOrTestProfiles": excluded,
+        "peoplePolicyVersion": POLICY["version"],
         "existingEmployeeContacts": len(existing), "matchingExisting": len(profiles.keys() & existing.keys()),
         "newEmployeeContacts": len(profiles.keys() - existing.keys()),
         "existingEmployeesOutsideEnabledMembers": len(existing.keys() - profiles.keys()),
@@ -89,7 +108,7 @@ def main():
         employees = [c for c in current.values() if c["type"] == "employee"]
         by_directory = {str(uuid.UUID(c["directoryId"])): c for c in employees}
         assert len(by_directory) == len(employees), "Duplicate employee identities"
-        assert {key for key, c in by_directory.items() if c["directoryActive"]} == set(profiles), "Enabled member coverage differs from Entra"
+        assert {key for key, c in by_directory.items() if c["directoryActive"]} == set(profiles), "Filtered people coverage differs from Entra"
         for key, profile in profiles.items():
             contact = by_directory[key]
             assert contact["name"] == profile["displayname"].strip()
@@ -104,7 +123,7 @@ def main():
             "customersUnchanged": True, "ticketHistoryAndInventoryUnchanged": True,
             "userAndGroupAccessUnchanged": True, "newConnectionsCreated": 0, "newPermissionsGranted": 0,
         })
-        (ROOT / "solutions/entra-directory-test.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+        (ROOT / "solutions/directory-people-test.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(record, indent=2))
 
 

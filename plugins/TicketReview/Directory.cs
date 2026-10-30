@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
+using System.Text.RegularExpressions;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 using Newtonsoft.Json.Linq;
@@ -10,6 +12,22 @@ namespace Ais.TicketReview
     public sealed partial class ReviewApi
     {
         private static readonly string[] DirectoryColumns = { "aaduserid", "accountenabled", "usertype", "displayname", "mail", "userprincipalname", "mobilephone", "businessphones", "companyname" };
+        private static readonly JObject DirectoryPeoplePolicy = LoadDirectoryPeoplePolicy();
+
+        private static JObject LoadDirectoryPeoplePolicy()
+        {
+            using (var stream = typeof(ReviewApi).Assembly.GetManifestResourceStream("Ais.TicketReview.directory-people-policy.json"))
+            using (var reader = new StreamReader(stream)) return JObject.Parse(reader.ReadToEnd());
+        }
+
+        private static bool IsDirectoryPerson(string name, string email, string login)
+        {
+            var addresses = new[] { email ?? "", login ?? "" };
+            var excluded = DirectoryPeoplePolicy["excludedAddresses"].Values<string>();
+            if (addresses.Any(address => excluded.Contains(address.Trim(), StringComparer.OrdinalIgnoreCase))) return false;
+            var identities = addresses.Select(address => address.Trim().Split('@')[0]).Concat(new[] { (name ?? "").Trim().TrimStart('#').Trim() });
+            return !identities.Any(identity => Regex.IsMatch(identity, (string)DirectoryPeoplePolicy["excludedIdentityPattern"], RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
+        }
 
         private static string DirectoryText(Entity user, string field) => (user.GetAttributeValue<string>(field) ?? "").Trim();
         private static string DirectoryEmail(Entity user) => String.IsNullOrWhiteSpace(DirectoryText(user, "mail")) ? DirectoryText(user, "userprincipalname") : DirectoryText(user, "mail");
@@ -34,6 +52,7 @@ namespace Ais.TicketReview
                     // Also enforce eligibility locally if a provider returns an
                     // account outside the requested filter.
                     if (!user.GetAttributeValue<bool>("accountenabled") || !String.Equals(DirectoryText(user, "usertype"), "Member", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (!IsDirectoryPerson(DirectoryText(user, "displayname"), DirectoryText(user, "mail"), DirectoryText(user, "userprincipalname"))) continue;
                     Check(user.Id != Guid.Empty && ids.Add(user.Id), "Entra returned duplicate or invalid identities. No contacts were changed.");
                     Check(DirectoryText(user, "displayname").Length > 0 && DirectoryText(user, "displayname").Length <= 200
                         && DirectoryEmail(user).Length > 0 && DirectoryEmail(user).Length <= 200

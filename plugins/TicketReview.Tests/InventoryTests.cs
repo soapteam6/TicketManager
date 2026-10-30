@@ -55,6 +55,20 @@ internal static class InventoryTests
             ["native event edits clear an old season lookup for a dated event"] = () => {
                 var state = State(); var native = (Microsoft.Xrm.Sdk.Entity)Call("Native", "games", state["games"][0]);
                 Assert(native.Contains("cr9cd_season") && native["cr9cd_season"] == null, "Native season lookup was not cleared");
+            },
+            ["confirmed attendance requires a nonblank note while Unknown permits an empty note"] = () => {
+                var state = State(); state["games"][0]["gameDate"] = "2026-01-01T02:00:00Z"; state["attendanceHistory"] = new JArray();
+                var id = Guid.NewGuid().ToString();
+                ((JArray)state["allocations"]).Add(new JObject { ["id"] = id, ["gameId"] = state["games"][0]["id"], ["status"] = "approved", ["outcome"] = "unknown", ["evidence"] = "" });
+                var actor = new JObject { ["role"] = "coordinator", ["id"] = Guid.NewGuid().ToString() };
+                foreach (var outcome in new[] { "attended", "no_show" }) {
+                    var command = new JObject { ["type"] = "attendance", ["assignmentId"] = id, ["outcome"] = outcome, ["evidence"] = "   " };
+                    Denied(() => Call("Apply", null, state, actor, command, DateTimeOffset.UtcNow, null), "evidence");
+                    Assert((string)state["allocations"][0]["outcome"] == "unknown" && !state["attendanceHistory"].Any(), "Blank note changed attendance");
+                }
+                Call("Apply", null, state, actor, new JObject { ["type"] = "attendance", ["assignmentId"] = id, ["outcome"] = "attended", ["evidence"] = "Confirmed with attendee" }, DateTimeOffset.UtcNow, null);
+                Call("Apply", null, state, actor, new JObject { ["type"] = "attendance", ["assignmentId"] = id, ["outcome"] = "unknown", ["evidence"] = "" }, DateTimeOffset.UtcNow, null);
+                Assert((string)state["allocations"][0]["outcome"] == "unknown" && ((JArray)state["attendanceHistory"]).Count == 2, "Unknown or audit correction failed");
             }
         };
         foreach (var test in tests) { test.Value(); Console.WriteLine("PASS " + test.Key); }

@@ -111,10 +111,28 @@ and attendance history. New members get contact records without provisioning
 Dataverse users or granting app access. Customers are unchanged and remain
 manually maintained. This does not add CRM customer synchronization.
 
-Guest and disabled accounts are excluded. Employees absent from a complete
+Guest and disabled accounts are excluded. Employee sync also applies the shared
+policy in `config/directory-people-policy.json`, embedded in the signed backend:
+leading `$`, reserved `svc`/`serviceaccount` prefixes, and reviewed gateway/test
+addresses are excluded. It checks both mail and UPN as well as display name;
+a leading `#` alone does not identify a non-person account. The requesting-person
+picker uses the same rule. Existing excluded contacts become directory-inactive,
+remain hidden, and retain IDs, app eligibility overrides and all ticket history.
+No Entra account, native user role or group membership is changed. This naming
+policy is not a claim that Entra `Member` status proves someone is an employee;
+additional exceptions can be added to the reviewed policy.
+
+The 2026-10-30 people-filter deployment excluded 26 reviewed service/test profiles
+from 263 enabled member accounts, leaving 237 matching employee profiles. One
+guarded sync marked those 26 existing app contacts directory-inactive while
+retaining all 282 contact records, overrides, inventory/history and role
+projections. Workspace revision advanced from 24 to 25. The first preflight
+stopped before writes while the new backend was propagating; a matching read
+probe was verified before the single successful sync. See
+[`directory-people-test.json`](../solutions/directory-people-test.json).
+
+Employees absent from a complete
 enabled-member result remain recorded with directory eligibility inactive.
-Entra `Member` status does not itself prove a person is an employee: enabled
-service accounts represented as members may need an app eligibility override.
 Every source page is read and validated before contact changes. Missing account
 status, duplicate identities, empty results, failed reads and incomplete paging
 fail the entire sync; the existing API transaction protects persisted changes.

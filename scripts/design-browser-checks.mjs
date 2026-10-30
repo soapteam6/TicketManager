@@ -186,6 +186,10 @@ try {
     await page.wait(`document.querySelectorAll('.work-allocation-split tbody tr')[1].getAttribute('aria-selected')==='true'`);
     assert(await page.evaluate(`(() => {const table=document.querySelector('.work-allocation-split>.work-table-scroll').getBoundingClientRect();const detail=document.querySelector('[aria-label="Allocation details"]').getBoundingClientRect();return detail.left>=table.right-1 && Math.abs(detail.top-table.top)<2;})()`), `${design}: allocation details are not on the right`);
     await set('select[name="outcome"]', 'attended');
+    assert(await page.evaluate(`[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Save attendance').disabled && document.querySelector('input[name="evidence"]').required && document.querySelector('input[name="evidence"]').closest('label').textContent.includes('*')`), 'Confirmed attendance did not require a note');
+    await set('input[name="evidence"]', '   ');
+    assert(await page.evaluate(`[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Save attendance').disabled`), 'Whitespace was accepted as evidence');
+    await set('input[name="evidence"]', 'Synthetic confirmation for validation.');
     await click('Save attendance');
     await page.wait(`document.querySelector('aside[role="alert"]')?.textContent.includes('after the event')`);
     await page.evaluate(`(() => {
@@ -228,12 +232,14 @@ try {
     await page.wait(`document.querySelector('[aria-label="Contact history"]')?.textContent.includes('QA layout ${design}')`);
     await page.evaluate(`document.querySelector('[aria-label="Close contact details"]').click()`);
     await nav('Help');
+    assert(await page.evaluate(`!document.querySelector('.work-help-list').textContent.includes('How do I give someone access?')`), 'Removed admin article is still present');
     await click('How do I waitlist someone?Move an existing request onto the waitlist.');
     await page.wait(`document.querySelector('article[aria-label="How do I waitlist someone?"]')`);
     assert(await page.evaluate(`document.querySelector('.work-help-article').textContent.includes('Move to waitlist')`));
     await screenshot('help-article');
     await click('What’s new');
     await page.wait(`document.querySelector('.work-change-timeline')`);
+    assert(await page.evaluate(`!document.querySelector('.work-change-timeline').textContent.includes('give someone access') && !document.querySelector('.work-change-timeline').textContent.includes('App admins can manage')`), 'Admin help leaked into the timeline');
     assert(await page.evaluate(`document.querySelector('.work-change-timeline').textContent.includes('Inventory dashboards')`));
     await screenshot('help-timeline');
     if (design === 'desk') {

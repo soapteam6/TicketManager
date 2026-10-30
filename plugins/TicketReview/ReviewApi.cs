@@ -306,7 +306,7 @@ namespace Ais.TicketReview
                     var attendance = Find(s, "allocations", Str(c, "assignmentId")); Check(Active(attendance), "Choose an active allocation.");
                     var outcome = Str(c, "outcome"); Check(new[] {"unknown", "attended", "no_show"}.Contains(outcome), "Choose an attendance outcome.");
                     Check(outcome == "unknown" || Instant(Str(Find(s, "games", Str(attendance, "gameId")), "gameDate")) <= now, "Attendance cannot be confirmed before the event.");
-                    if (outcome == "no_show") Text(c, "evidence");
+                    if (outcome != "unknown") Text(c, "evidence");
                     Check(Str(c, "evidence").Length <= 1000, "Evidence is too long.");
                     attendance["outcome"] = outcome; attendance["evidence"] = Str(c, "evidence").Trim();
                     Add(s, "attendanceHistory", new JObject { ["assignmentId"] = attendance["id"], ["outcome"] = outcome, ["evidence"] = attendance["evidence"], ["recordedAt"] = now.ToString("o"), ["recordedBy"] = actor["id"] }); break;
@@ -441,7 +441,8 @@ namespace Ais.TicketReview
                 snapshot["scheduleSearchAvailable"] = ScheduleSearchAvailable(service);
                 foreach (var k in new[] {"contacts", "allocations", "attendanceHistory", "outbox", "followup", "scoring"}) snapshot[k] = s[k].DeepClone();
                 snapshot["requesters"] = new JArray(Read(service, "systemuser", new ConditionExpression("isdisabled", ConditionOperator.Equal, false), new ConditionExpression("accessmode", ConditionOperator.Equal, 0))
-                    .Where(u => u.GetAttributeValue<Guid>("azureactivedirectoryobjectid") != Guid.Empty)
+                    .Where(u => u.GetAttributeValue<Guid>("azureactivedirectoryobjectid") != Guid.Empty && u.GetAttributeValue<Guid>("applicationid") == Guid.Empty
+                        && IsDirectoryPerson(u.GetAttributeValue<string>("fullname"), u.GetAttributeValue<string>("internalemailaddress"), u.GetAttributeValue<string>("domainname")))
                     .Select(u => new JObject { ["id"] = u.Id.ToString(), ["name"] = u.GetAttributeValue<string>("fullname"), ["email"] = u.GetAttributeValue<string>("internalemailaddress") }));
             }
             return snapshot;
